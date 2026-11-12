@@ -180,6 +180,9 @@ final class AppModel {
             if let v = s.values[id], abs(cell.effective - v) > 1e-9 { cell.effective = v }
             if now >= cell.localEditUntil, let b = s.bases[id], abs(cell.base - b) > 1e-9 { cell.base = b }
         }
+        let known = Set(appOrder)
+        let newApps = s.apps.map(\.name).filter { !known.contains($0) }.sorted()
+        if !newApps.isEmpty { appOrder += newApps }
         var motifSteps: [String: Set<Int>] = [:]
         for n in s.recentNotes.suffix(80) {
             // Lit while sounding (and a beat of grace so short notes are still seen at 10 Hz).
@@ -214,6 +217,16 @@ final class AppModel {
     func auditionChord(_ degree: Int) { session?.auditionChord(degree) }
 
     // MARK: - Motifs
+
+    /// Apps in the order they were first heard. Lists use this so they don't reshuffle as
+    /// traffic and wake-up counts change.
+    private(set) var appOrder: [String] = []
+
+    /// Apps heard, in stable first-heard order.
+    var orderedApps: [EngineStatus.AppInfo] {
+        let byName = Dictionary((status?.apps ?? []).map { ($0.name, $0) }, uniquingKeysWith: { a, _ in a })
+        return appOrder.compactMap { byName[$0] }
+    }
 
     /// Motif steps sounding right now, keyed "app:<name>" and "design:<id>" (for live highlighting).
     private(set) var soundingMotifSteps: [String: Set<Int>] = [:]

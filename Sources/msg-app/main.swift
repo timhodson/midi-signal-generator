@@ -102,6 +102,19 @@ enum Snapshot {
                 await render(ContentView(selection: item).environment(model), to: url, size: NSSize(width: 1280, height: height))
                 print("wrote \(url.path)")
             }
+            // A piano roll being inspected: point at the most recent lead (motif) note.
+            if let s = model.status, let n = s.recentNotes.last(where: { $0.role == "lead" && $0.time < model.engineNow() }) {
+                let size = CGSize(width: 1200, height: 260), window = 16.0, ahead = 2.0
+                let now = model.engineNow() + 0.8 // render() waits 0.8 s before capturing
+                let leads = s.recentNotes.filter { $0.role == "lead" }.map(\.note)
+                let lo = (leads.min() ?? 60) - 3, hi = max((leads.max() ?? 72) + 3, lo + 18)
+                let rowH = (size.height - 18) / CGFloat(hi - lo + 1)
+                let x = CGFloat((n.time + n.duration / 2 - (now - window)) / (window + ahead)) * size.width
+                let y = 18 + CGFloat(hi - n.note) * rowH + rowH / 2
+                await render(PianoRoll(roles: ["lead"], window: window, ahead: ahead, pitchRange: lo...hi, inspectAt: CGPoint(x: x, y: y))
+                    .environment(model).frame(width: size.width, height: size.height).padding(20),
+                             to: directory.appendingPathComponent("roll-inspect.png"), size: NSSize(width: 1240, height: 300))
+            }
             // The motif editor needs a selection: an app, and a design customised from it.
             if let app = model.status?.apps.first(where: { !$0.ignored })?.name, let h = model.harmony {
                 await render(MotifsView(selection: .app(app)).environment(model),

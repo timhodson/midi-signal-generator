@@ -9,6 +9,8 @@ struct ParamRow: View {
     let spec: ParamSpec
     /// Replaces the spec's label (e.g. "Depth" on a mod route).
     var label: String?
+    /// Show a box for typing an exact value (Advanced drawers).
+    var typing = false
 
     private var base: Double { model.base(spec.id) }
     private var effective: Double { model.effective(spec.id) }
@@ -52,7 +54,14 @@ struct ParamRow: View {
             control.frame(maxWidth: .infinity)
 
             VStack(alignment: .trailing, spacing: 1) {
-                Text(Self.format(base, spec)).monospacedDigit()
+                if typing, spec.kind == .continuous || spec.kind == .normalised || spec.kind == .integer {
+                    TextField("", value: Binding(get: { base }, set: { model.set(spec.id, $0) }),
+                              format: .number.precision(.significantDigits(1...6)))
+                        .textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing).frame(width: 100)
+                        .help("Type an exact value and press Return")
+                } else {
+                    Text(Self.format(base, spec)).monospacedDigit()
+                }
                 if modulated {
                     Text("~ \(Self.format(effective, spec))")
                         .font(.caption).monospacedDigit().foregroundStyle(.orange)
@@ -193,7 +202,13 @@ struct ParamSection: View {
                             .padding(.vertical, 4)
                     }
                     if filter.isEmpty, let extra = accessory(group) { extra.listRowSeparator(.hidden).padding(.bottom, 6) }
-                    ForEach(groups[group] ?? [], id: \.id) { ParamRow(spec: $0) }
+                    let all = groups[group] ?? []
+                    // Params a visual above can set live in an Advanced drawer (unless you're searching).
+                    let advanced = filter.isEmpty ? all.filter { VisualControls.covers($0.id) } : []
+                    ForEach(all.filter { !advanced.contains($0) }, id: \.id) { ParamRow(spec: $0) }
+                    if !advanced.isEmpty {
+                        AdvancedDrawer(specs: advanced)
+                    }
                 } header: {
                     Text(Self.title(group)).font(.headline)
                 }
@@ -221,6 +236,38 @@ extension ParamSection {
     static func title(_ group: String) -> String {
         ["gen": "Generators", "quant": "Quantise", "macro": "Macros", "sub": "Sub drone", "drone": "Pad (drone)",
          "motif": "Lead (motifs)", "pulse": "Pulse", "bass": "Bass", "activity": "App activity"][group] ?? group.capitalized
+    }
+}
+
+/// Params that have a direct visual control (drag handles), so their sliders are tucked away.
+enum VisualControls {
+    static let ids: Set<String> = [
+        "conductor.quietBelow", "conductor.busyAbove",              // Harmony → mood bar
+        "quant.pitch.strength", "quant.density.maxPerSecond",       // Quantise → strength bar, density line
+        "quant.velocity.floor", "quant.velocity.ceiling", "quant.velocity.curve", // velocity curve
+    ]
+
+    static func covers(_ id: String) -> Bool {
+        if ids.contains(id) { return true }
+        // Voices → range keyboards.
+        return id.hasPrefix("voice.") && (id.hasSuffix(".low") || id.hasSuffix(".high"))
+    }
+}
+
+/// Collapsed by default: sliders and exact-value entry for settings the visuals already control.
+struct AdvancedDrawer: View {
+    let specs: [ParamSpec]
+    @State private var open = false
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $open) {
+            ForEach(specs, id: \.id) { ParamRow(spec: $0, typing: true) }
+        } label: {
+            Label("Advanced: \(specs.map { ParamRow.shortLabel($0.id).lowercased() }.joined(separator: ", ")). Set by dragging in the visual above; open for sliders and exact values",
+                  systemImage: "slider.horizontal.3")
+                .font(.callout).foregroundStyle(.secondary)
+        }
+        .listRowSeparator(.hidden)
     }
 }
 

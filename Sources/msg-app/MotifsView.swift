@@ -36,7 +36,7 @@ struct MotifsView: View {
     // MARK: List
 
     private var sidebar: some View {
-        let apps = model.status?.apps ?? []
+        let apps = model.orderedApps
         return List(selection: $selection) {
             Section {
                 ForEach(model.motifDesigns) { d in
@@ -424,7 +424,7 @@ struct MotifGallery: View {
     let select: (MotifsView.Selection) -> Void
 
     var body: some View {
-        let apps = model.status?.apps ?? []
+        let apps = model.orderedApps
         VisualCard(title: "All motifs", caption: "Designs and every app heard. Lit cards are playing now; orange dots are chord notes, yellow are other scale notes.") {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 10)], spacing: 10) {
                 ForEach(model.motifDesigns) { d in

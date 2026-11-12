@@ -104,6 +104,7 @@ public final class MotifGenerator: Generator {
     public let id = "motif"
     /// Hand-made motifs that replace the generated one for matching apps.
     public var designs: [MotifDesign] = []
+    private var instances = 0
     public init() {}
 
     public var params: [ParamSpec] {
@@ -146,6 +147,7 @@ public final class MotifGenerator: Generator {
         guard p.bool("gen.motif.enabled") else { return out }
 
         for activation in ctx.activations.prefix(p.int("gen.motif.maxPerTick")) {
+            instances += 1
             if let design = MotifDesign.best(for: activation.key, in: designs) {
                 out.notes += play(design, for: activation, ctx)
                 continue
@@ -163,7 +165,7 @@ public final class MotifGenerator: Generator {
                     role: "lead", pitch: .raw(centre + Double(offset)), intensity: intensity,
                     time: ctx.now + Double(i) * step, beats: p.value("gen.motif.noteBeats"),
                     why: "\(activation.key) woke (\(formatRate(activation.bytesPerSecond))) · generated motif",
-                    motif: .init(app: activation.key, step: i, designID: nil)
+                    motif: .init(app: activation.key, step: i, designID: nil, instance: instances)
                 ))
             }
         }
@@ -185,7 +187,7 @@ public final class MotifGenerator: Generator {
                               intensity: intensity, time: ctx.now + Double(i) * step,
                               beats: p.value("gen.motif.noteBeats"),
                               why: "\(activation.key) woke (\(formatRate(activation.bytesPerSecond))) · \(label)",
-                              motif: .init(app: activation.key, step: i, designID: design.id))
+                              motif: .init(app: activation.key, step: i, designID: design.id, instance: instances))
         }
     }
 }

@@ -33,10 +33,13 @@ public struct NoteIntent: Sendable, Equatable {
         public var app: String
         public var step: Int
         public var designID: String?
-        public init(app: String, step: Int, designID: String?) {
+        /// Which wake-up this note belongs to, so all notes of one motif can be grouped.
+        public var instance: Int
+        public init(app: String, step: Int, designID: String?, instance: Int = 0) {
             self.app = app
             self.step = step
             self.designID = designID
+            self.instance = instance
         }
     }
 

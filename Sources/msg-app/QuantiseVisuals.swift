@@ -12,14 +12,27 @@ struct PitchPullView: View {
         let s = model.strengthSplit
         VStack(alignment: .leading, spacing: 6) {
             GeometryReader { geo in
-                HStack(spacing: 0) {
-                    segment("raw \(s.raw)%", s.raw, .gray, geo.size.width)
-                    segment("in scale \(s.scale)%", s.scale, .blue, geo.size.width)
-                    segment("chord tone \(s.chord)%", s.chord, .accentColor, geo.size.width)
+                let w = geo.size.width
+                let strength = model.base("quant.pitch.strength")
+                ZStack(alignment: .leading) {
+                    HStack(spacing: 0) {
+                        segment("raw \(s.raw)%", s.raw, .gray, w)
+                        segment("in scale \(s.scale)%", s.scale, .blue, w)
+                        segment("chord tone \(s.chord)%", s.chord, .accentColor, w)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    Capsule().fill(.white).frame(width: 8, height: 26).shadow(radius: 1.5)
+                        .offset(x: w * CGFloat(strength) - 4)
                 }
+                .frame(width: w, height: 18, alignment: .leading)
+                .contentShape(Rectangle())
+                .gesture(DragGesture(minimumDistance: 0).onChanged { g in
+                    model.set("quant.pitch.strength", Double(min(max(g.location.x / w, 0), 1)))
+                })
             }
             .frame(height: 18)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
+            Text("Drag the handle: left = raw data pitches, middle = always in the scale, right = only chord notes.")
+                .font(.caption).foregroundStyle(.secondary)
             Canvas { gc, size in draw(&gc, size) }
         }
     }
@@ -106,8 +119,13 @@ struct TimingView: View {
     }
 }
 
-/// The velocity curve as currently set, with recent notes plotted on it.
+/// The velocity curve as currently set, with recent notes plotted on it. Drag the left end
+/// (floor), the right end (ceiling) or the middle (bend).
 struct VelocityCurveView: View {
+    private func handles(floor: Double, ceiling: Double, curve: Double) -> [(Int, Double, Double)] {
+        [(0, 0, floor), (1, 0.5, floor + (ceiling - floor) * pow(0.5, curve)), (2, 1, ceiling)]
+    }
+
     @Environment(AppModel.self) private var model
 
     var body: some View {
@@ -130,31 +148,74 @@ struct VelocityCurveView: View {
         .chartYScale(domain: 0...127)
         .chartXAxisLabel("generator intensity (from data)")
         .chartYAxisLabel("MIDI velocity")
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                if let plot = proxy.plotFrame {
+                    let frame = geo[plot]
+                    // Handles: floor (left end), ceiling (right end), bend (middle).
+                    ForEach(handles(floor: floor, ceiling: ceiling, curve: curve), id: \.0) { h in
+                        if let p = proxy.position(for: (h.1, h.2)) {
+                            Circle().fill(.white).frame(width: 12, height: 12).shadow(radius: 1.5)
+                                .position(x: frame.minX + p.x, y: frame.minY + p.y)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    Rectangle().fill(.clear).contentShape(Rectangle())
+                        .frame(width: frame.width, height: frame.height)
+                        .position(x: frame.midX, y: frame.midY)
+                        .gesture(DragGesture(minimumDistance: 0).onChanged { g in
+                            let start = g.startLocation.x / frame.width
+                            let loc = CGPoint(x: g.location.x, y: g.location.y)
+                            guard let (x, v): (Double, Double) = proxy.value(at: loc) else { return }
+                            let vel = min(max(v, 1), 127)
+                            if start < 0.25 {
+                                model.set("quant.velocity.floor", min(vel, ceiling - 1))
+                            } else if start > 0.75 {
+                                model.set("quant.velocity.ceiling", max(vel, floor + 1))
+                            } else {
+                                // Bend the curve so it passes through the pointer.
+                                let xi = min(max(x, 0.05), 0.95)
+                                let f = min(max((vel - floor) / max(ceiling - floor, 1), 0.01), 0.99)
+                                model.set("quant.velocity.curve", log(f) / log(xi))
+                            }
+                        })
+                }
+            }
+        }
     }
 }
 
 /// Melodic notes per second over the last few seconds against the limit.
 struct DensityMeter: View {
     @Environment(AppModel.self) private var model
+    // Fixed log scale 0.25…40 notes/s (the limit's range), so dragging doesn't move the scale.
+    private static let lo = log(0.25), hi = log(40.0)
+    private func pos(_ v: Double) -> CGFloat { CGFloat((log(max(v, 0.25)) - Self.lo) / (Self.hi - Self.lo)) }
 
     var body: some View {
         let now = model.engineNow()
         let recent = (model.status?.recentNotes ?? []).filter { ($0.role == "lead" || $0.role == "pulse") && now - $0.time < 5 && $0.time <= now }
         let rate = Double(recent.count) / 5
         let limit = model.base("quant.density.maxPerSecond")
+        let lo = Self.lo, hi = Self.hi
         VStack(alignment: .leading, spacing: 4) {
             GeometryReader { geo in
                 let w = geo.size.width
-                let scaleMax = max(limit * 1.5, 1)
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 4).fill(.primary.opacity(0.08))
                     RoundedRectangle(cornerRadius: 4).fill(rate >= limit * 0.95 ? Color.orange : .teal)
-                        .frame(width: w * CGFloat(min(rate / scaleMax, 1)))
-                    Rectangle().fill(.red).frame(width: 2).offset(x: w * CGFloat(min(limit / scaleMax, 1)) - 1)
+                        .frame(width: rate > 0 ? max(w * pos(rate), 2) : 0)
+                    Capsule().fill(.red).frame(width: 5, height: 22).offset(x: w * pos(limit) - 2.5)
                 }
+                .frame(width: w, height: 14, alignment: .leading)
+                .contentShape(Rectangle())
+                .gesture(DragGesture(minimumDistance: 0).onChanged { g in
+                    let f = Double(min(max(g.location.x / w, 0), 1))
+                    model.set("quant.density.maxPerSecond", (exp(lo + f * (hi - lo)) * 4).rounded() / 4)
+                })
             }
             .frame(height: 14)
-            Text(String(format: "%.1f melodic notes/s now · limit %.1f/s (red line) · %.0f%% chance each note plays",
+            Text(String(format: "%.1f melodic notes/s now · drag the red line to set the limit (%.2g/s) · %.0f%% chance each note plays",
                         rate, limit, model.base("quant.density.probability") * 100))
                 .font(.caption).foregroundStyle(.secondary)
         }

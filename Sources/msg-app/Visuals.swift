@@ -65,6 +65,8 @@ struct PianoRoll: View {
     /// Frames per second. Big "hero" rolls scroll smoothly at 24; small lanes are fine at 12.
     var fps: Double = 24
     @State private var hover: CGPoint?
+    /// Snapshot/testing aid: behave as if the pointer were here (inspecting, paused).
+    var inspectAt: CGPoint?
     /// While the pointer is over the roll, time stands still so the note being inspected stays put.
     @State private var frozenAt: Double?
     /// The data as it was when frozen, so notes being inspected can't scroll out of the history.
@@ -86,14 +88,8 @@ struct PianoRoll: View {
     var body: some View {
         TimelineView(.animation(minimumInterval: 1 / (frozenAt == nil ? fps : 12), paused: !model.visualsActive)) { tl in
             Canvas { gc, size in
-                draw(&gc, size, now: displayTime(at: tl.date), status: frozenStatus ?? model.status)
-                if frozenAt != nil {
-                    let badge = gc.resolve(Text("⏸ paused while inspecting").font(.system(size: 10, weight: .semibold)))
-                    let bs = badge.measure(in: size)
-                    let box = CGRect(x: size.width - bs.width - 14, y: 2, width: bs.width + 10, height: bs.height + 4)
-                    gc.fill(Path(roundedRect: box, cornerRadius: 4), with: .color(.orange.opacity(0.85)))
-                    gc.draw(badge, in: box.insetBy(dx: 5, dy: 2))
-                }
+                draw(&gc, size, now: displayTime(at: tl.date), status: frozenStatus ?? model.status,
+                     paused: frozenAt != nil || inspectAt != nil, hoverPoint: inspectAt ?? hover)
             }
         }
         .onContinuousHover { phase in
@@ -111,10 +107,10 @@ struct PianoRoll: View {
                 frozenStatus = nil
             }
         }
-        .help("Hover to pause and see why a note played")
     }
 
-    private func draw(_ gc: inout GraphicsContext, _ size: CGSize, now: Double, status: EngineStatus?) {
+    private func draw(_ gc: inout GraphicsContext, _ size: CGSize, now: Double, status: EngineStatus?, paused: Bool = false,
+                      hoverPoint: CGPoint? = nil) {
         Perf.canvasFrames += 1
         guard let s = status else { return }
         let start = now - window, end = now + ahead
@@ -184,20 +180,47 @@ struct PianoRoll: View {
             } else {
                 gc.fill(Path(roundedRect: r, cornerRadius: 2), with: .color(colour.opacity(0.35 + 0.65 * Double(n.velocity) / 127)))
             }
-            if let h = hover, r.insetBy(dx: -2, dy: -3).contains(h) { hovered = (n, r) }
+            if let h = hoverPoint, r.insetBy(dx: -2, dy: -3).contains(h) { hovered = (n, r) }
         }
 
-        // Why did the hovered note play?
+        // Highlight the hovered note and, for motifs, every note of that same wake-up.
         if let (n, r) = hovered {
-            gc.stroke(Path(roundedRect: r.insetBy(dx: -1.5, dy: -1.5), cornerRadius: 3), with: .color(.primary), lineWidth: 1.5)
-            let text = gc.resolve(Text("\(n.role) · \(Format.note(n.note)) · v\(n.velocity)\n\(n.why)").font(.system(size: 11)))
-            let ts = text.measure(in: CGSize(width: 360, height: 100))
-            var box = CGRect(x: r.minX, y: r.maxY + 6, width: ts.width + 12, height: ts.height + 8)
-            if box.maxX > size.width { box.origin.x = size.width - box.width - 2 }
-            if box.maxY > size.height { box.origin.y = r.minY - box.height - 6 }
-            gc.fill(Path(roundedRect: box, cornerRadius: 5), with: .color(Color(nsColor: .windowBackgroundColor).opacity(0.95)))
-            gc.stroke(Path(roundedRect: box, cornerRadius: 5), with: .color(RoleStyle.color(n.role)), lineWidth: 1)
-            gc.draw(text, in: box.insetBy(dx: 6, dy: 4))
+            if let tag = n.motif {
+                for m in notes where m.motif?.app == tag.app && m.motif?.instance == tag.instance && m.id != n.id && m.note >= lo && m.note <= hi {
+                    let mr = CGRect(x: x(m.time), y: y(m.note) + 0.5, width: max(x(m.time + m.duration) - x(m.time), 3), height: max(rowH - 1, 2))
+                    gc.stroke(Path(roundedRect: mr.insetBy(dx: -1.5, dy: -1.5), cornerRadius: 3), with: .color(.primary.opacity(0.75)), lineWidth: 1)
+                }
+            }
+            gc.stroke(Path(roundedRect: r.insetBy(dx: -2, dy: -2), cornerRadius: 3), with: .color(.primary), lineWidth: 2)
+        }
+
+        // Details live in a fixed panel on the left, so they never cover the note being inspected.
+        if paused {
+            var lines = [Text("⏸ paused").font(.system(size: 10, weight: .semibold)).foregroundStyle(.orange)]
+            if let (n, _) = hovered {
+                lines.append(Text("\(n.role) · \(Format.note(n.note)) · velocity \(n.velocity)").font(.system(size: 11, weight: .semibold)))
+                lines.append(Text(n.why).font(.system(size: 11)))
+                if let tag = n.motif {
+                    let count = notes.filter { $0.motif?.app == tag.app && $0.motif?.instance == tag.instance }.count
+                    lines.append(Text("step \(tag.step + 1) of \(count) in this motif").font(.system(size: 10)).foregroundStyle(.secondary))
+                }
+                lines.append(Text(n.time > now ? String(format: "plays in %.1f s", n.time - now) : String(format: "%.1f s ago", now - n.time))
+                    .font(.system(size: 10)).foregroundStyle(.secondary))
+            } else {
+                lines.append(Text("point at a note for details").font(.system(size: 10)).foregroundStyle(.secondary))
+            }
+            let width = min(240, size.width * 0.32)
+            let resolved = lines.map { gc.resolve($0) }
+            let heights = resolved.map { $0.measure(in: CGSize(width: width - 16, height: 200)).height }
+            let box = CGRect(x: 4, y: band + 4, width: width, height: min(heights.reduce(0, +) + CGFloat(lines.count - 1) * 2 + 12, size.height - band - 8))
+            gc.fill(Path(roundedRect: box, cornerRadius: 6), with: .color(Color(nsColor: .windowBackgroundColor).opacity(0.92)))
+            gc.stroke(Path(roundedRect: box, cornerRadius: 6),
+                      with: .color(hovered.map { RoleStyle.color($0.0.role) } ?? .orange), lineWidth: 1)
+            var yy = box.minY + 6
+            for (text, h) in zip(resolved, heights) {
+                gc.draw(text, in: CGRect(x: box.minX + 8, y: yy, width: width - 16, height: h))
+                yy += h + 2
+            }
         }
 
         // Playhead.
@@ -339,6 +362,9 @@ struct MoodLadder: View {
                     handle(x: pos(quiet, w), h: h)
                     handle(x: pos(busy, w), h: h)
                 }
+                // Children are positioned with offsets, which don't size the ZStack: pin it to the full
+                // width so the whole bar (including the busy handle) takes the drag.
+                .frame(width: w, height: h, alignment: .topLeading)
                 .contentShape(Rectangle())
                 .gesture(DragGesture(minimumDistance: 0)
                     .onChanged { g in

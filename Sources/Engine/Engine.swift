@@ -277,7 +277,7 @@ extension Engine {
                                  lastWake: appStats[name]?.last, ignored: ignore.contains(name))
         }
         .sorted { ($0.wakes, $0.bytesPerSecond) > ($1.wakes, $1.bytesPerSecond) }
-        .prefix(60).map { $0 }
+        .prefix(200).map { $0 }
     }
 
     /// Switch to a chord right now so it can be heard (pads, bass and sub re-strike). Call on `queue`.

@@ -57,6 +57,18 @@ the sliders edit, so moving a control changes the picture immediately:
 Visuals scroll smoothly by extrapolating engine time between the 10 Hz status updates.
 (Menus with custom labels lose their styling on macOS, so editable chips are buttons with popovers.)
 
+## Visual-first controls (third round)
+
+- A setting that a visual can set directly is moved out of the slider list into an **Advanced** drawer
+  at the end of its group, with sliders and typed exact values (`VisualControls`). Direct controls:
+  mood thresholds (mood bar), pitch strength (strength bar), density limit (red line, fixed log scale),
+  velocity floor/ceiling/bend (handles on the curve), voice ranges (keyboard handles). Searching still shows everything.
+- Drag areas built from offset children must be pinned to their full size (`.frame(width:height:)`
+  before `.contentShape`). Otherwise only part of the control accepts drags (this was the busy-threshold bug).
+- Piano rolls: hovering pauses the roll. Details appear in a fixed panel at the left (never over the
+  note); all notes of a hovered motif's wake-up are outlined (`MotifTag.instance`). There's no system tooltip.
+- The Motifs page lists apps in first-heard order, so it doesn't reshuffle as traffic changes.
+
 ## Consequences
 
 - New params appear in the UI with no UI work.
