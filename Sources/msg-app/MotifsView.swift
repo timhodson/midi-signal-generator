@@ -143,6 +143,8 @@ struct AppMotifPanel: View {
                     if design == nil {
                         Button { customise() } label: { Label("Customise this motif", systemImage: "slider.horizontal.3") }
                             .help("Turns the generated motif into a design you can edit (nearest scale steps).")
+                        Button { randomFor(app) } label: { Label("Try a random motif", systemImage: "dice") }
+                            .help("Makes a random design for this app (chord notes only) and plays it. Delete the design to go back to the generated one.")
                     }
                 }
             }
@@ -158,6 +160,13 @@ struct AppMotifPanel: View {
                 }
             }
         }
+    }
+
+    private func randomFor(_ app: String) {
+        var rng = SystemRandomNumberGenerator()
+        let steps = MotifDesign.randomSteps(count: Int(model.base("gen.motif.length")), chordNotesOnly: true, using: &rng)
+        model.updateDesign(MotifDesign(match: app, steps: steps, anchor: .chord))
+        model.previewMotif(for: app)
     }
 
     private func caption(_ info: EngineStatus.AppInfo?, _ design: MotifDesign?) -> String {
@@ -267,6 +276,12 @@ struct DesignEditor: View {
                         .disabled(design.steps.count >= 16)
                     Button { update { _ = $0.steps.popLast() } } label: { Label("Remove last", systemImage: "minus") }
                         .disabled(design.steps.count <= 1)
+                    Menu {
+                        Button("Chord notes only (always consonant)") { randomise(chordNotesOnly: true) }
+                        Button("Any scale notes (more colour)") { randomise(chordNotesOnly: false) }
+                    } label: { Label("Randomise", systemImage: "dice") }
+                        .fixedSize()
+                        .help("Replace the steps with a random motif of the same length, and play it")
                     Spacer()
                     Button { model.previewMotif(for: previewApp) } label: { Label("Play now", systemImage: "play.fill") }
                         .buttonStyle(.borderedProminent)
@@ -279,6 +294,16 @@ struct DesignEditor: View {
                 MotifStrip(notes: model.resolve(design), active: live).frame(height: 110)
             }
         }
+    }
+
+    private func randomise(chordNotesOnly: Bool) {
+        var rng = SystemRandomNumberGenerator()
+        update {
+            $0.steps = MotifDesign.randomSteps(count: max($0.steps.count, 3), chordNotesOnly: chordNotesOnly, using: &rng)
+            // Chord-note steps only fit when they're measured from the chord.
+            if chordNotesOnly { $0.anchor = .chord }
+        }
+        model.previewMotif(for: previewApp)
     }
 
     /// An app name that this design applies to, for previewing.

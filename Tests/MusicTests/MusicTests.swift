@@ -191,3 +191,17 @@ private let dDorian = HarmonyContext(root: 2, scale: .dorian)
         #expect(d.anchor == .key)
     }
 }
+
+@Suite struct RandomMotifTests {
+    @Test func randomStepsAreAnchoredAndStayInTheirPool() {
+        var rng = SeededRandom(seed: 42)
+        for _ in 0..<50 {
+            let steps = MotifDesign.randomSteps(count: 8, chordNotesOnly: true, using: &rng)
+            #expect(steps.count == 8)
+            #expect(steps.first == 0)
+            #expect(steps.compactMap { $0 }.allSatisfy { [-3, 0, 2, 4, 7, 9, 11].contains($0) })
+        }
+        let any = MotifDesign.randomSteps(count: 12, chordNotesOnly: false, using: &rng)
+        #expect(any.compactMap { $0 }.allSatisfy { (-3...11).contains($0) })
+    }
+}

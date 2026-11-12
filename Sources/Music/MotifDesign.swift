@@ -48,6 +48,26 @@ public struct MotifDesign: Codable, Sendable, Equatable, Identifiable {
         designs.map { ($0, $0.matchScore(app)) }.filter { $0.1 > 0 }.max { $0.1 < $1.1 }?.0
     }
 
+    /// Random steps for "see what comes up". A gentle random walk (so it sounds like a melody, not
+    /// noise) over chord-note steps (0, 2, 4, 7, 9, 11 above a chord root) or any scale step, with the
+    /// odd rest. Always starts on step 0 so it's anchored.
+    public static func randomSteps<R: RandomNumberGenerator>(count: Int, chordNotesOnly: Bool,
+                                                            using rng: inout R) -> [Int?] {
+        let pool = chordNotesOnly ? [-3, 0, 2, 4, 7, 9, 11] : Array(-3...11)
+        var index = pool.firstIndex(of: 0) ?? 0
+        var out: [Int?] = [0]
+        while out.count < max(count, 1) {
+            if Double.random(in: 0..<1, using: &rng) < 0.15 {
+                out.append(nil)
+                continue
+            }
+            let move = [-2, -1, -1, 0, 1, 1, 2].randomElement(using: &rng) ?? 0
+            index = min(max(index + move, 0), pool.count - 1)
+            out.append(pool[index])
+        }
+        return out
+    }
+
     /// Turn concrete pitches (e.g. what a generated motif plays right now) into the nearest scale
     /// steps above the key tonic at `octave`.
     public static func fromPitches(app: String, pitches: [Int?], octave: Int, harmony: HarmonyContext) -> MotifDesign {
