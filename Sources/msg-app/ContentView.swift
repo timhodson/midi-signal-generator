@@ -49,6 +49,9 @@ struct ContentView: View {
             }
         }
         .navigationTitle(model.session?.scene.name ?? model.scene.name)
+        .background(WindowVisibility { visible in
+            if !model.forceVisualsActive { model.visualsActive = visible }
+        })
     }
 
     @ViewBuilder func detail(_ item: SidebarItem) -> some View {

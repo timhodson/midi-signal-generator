@@ -16,7 +16,7 @@ struct InstrumentsView: View {
                 NotRunningHint()
             } else {
                 ScrollView {
-                    VStack(spacing: 16) {
+                    LazyVStack(spacing: 16) {
                         ForEach(instruments, id: \.id) { InstrumentPanel(config: $0) }
                     }
                     .padding(20)
@@ -46,7 +46,12 @@ struct InstrumentPanel: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
+                    if model.openingEditors.contains(config.id) {
+                        ProgressView().controlSize(.small)
+                        Text("Opening…").foregroundStyle(.secondary)
+                    }
                     Button { model.openEditor(config.id) } label: { Label("Open Editor", systemImage: "macwindow") }
+                        .disabled(model.openingEditors.contains(config.id))
                 }
                 ForEach(roles, id: \.self) { RoleLane(role: $0) }
                 ForEach(["preset", "volume", "pan"], id: \.self) { name in

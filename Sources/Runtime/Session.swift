@@ -146,6 +146,11 @@ public final class Session: @unchecked Sendable {
     /// The scene including every tweak made since it was loaded.
     public func currentScene() -> Scene { engine.queue.sync { engine.currentScene() } }
 
+    /// How often the engine publishes status (e.g. slower while the UI is hidden), from any thread.
+    public func setStatusInterval(_ seconds: Double) {
+        engine.queue.async { [engine] in engine.statusInterval = seconds }
+    }
+
     /// Hear a chord now, from any thread.
     public func auditionChord(_ degree: Int) {
         engine.queue.async { [engine] in engine.auditionChord(degree) }

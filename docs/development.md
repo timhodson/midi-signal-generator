@@ -35,11 +35,14 @@ swift build
 ## The app
 
 ```sh
-swift run msg-app --scene scenes/audiokit-hosted.json
+swift run -c release msg-app --scene scenes/audiokit-hosted.json   # use release for real use (ADR 0013)
 swift run msg-app --source synthetic                       # no network needed
 # headless check: render every screen to PNGs and exit (no window appears)
 swift run msg-app --scene scenes/audiokit-hosted.json --source synthetic --snapshot /tmp/msg-snap --seconds 10
 ```
+
+Performance check (control re-renders, visual frames, CPU), see ADR 0013:
+`$(swift build -c release --show-bin-path)/msg-app --source synthetic --profile generators --seconds 8`
 
 ## Tests
 

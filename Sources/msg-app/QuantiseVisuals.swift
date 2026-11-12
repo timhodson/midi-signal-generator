@@ -69,7 +69,7 @@ struct TimingView: View {
     var window: Double = 8
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30)) { tl in
+        TimelineView(.animation(minimumInterval: 1 / 24, paused: !model.visualsActive)) { tl in
             Canvas { gc, size in draw(&gc, size, now: model.engineNow(at: tl.date)) }
         }
     }

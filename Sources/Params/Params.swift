@@ -73,6 +73,13 @@ public final class ParamStore: @unchecked Sendable {
     public private(set) var order: [String] = []
     private var base: [String: Double] = [:]
     private var offsets: [String: Double] = [:]
+    /// Effective values, kept up to date on every change so `value(_:)` is a single lookup.
+    /// (The engine reads params hundreds of times per tick.)
+    private var effective: [String: Double] = [:]
+    /// Ids in the order their effective value changed. Consumers that mirror params elsewhere
+    /// (e.g. hosted synths) read it from their own cursor instead of scanning every param.
+    private var changeLog: [String] = []
+    private var changeLogStart = 0
 
     public init() {}
 
@@ -80,6 +87,31 @@ public final class ParamStore: @unchecked Sendable {
         if specs[spec.id] == nil { order.append(spec.id) }
         specs[spec.id] = spec
         if base[spec.id] == nil { base[spec.id] = spec.sanitise(spec.defaultValue) }
+        recompute(spec.id)
+    }
+
+    private func recompute(_ id: String) {
+        guard let spec = specs[id] else { return }
+        let v = spec.sanitise((base[id] ?? spec.defaultValue) + (offsets[id] ?? 0))
+        if effective[id] != v {
+            effective[id] = v
+            changeLog.append(id)
+        }
+    }
+
+    /// Position just past the latest change; pass it to `changes(since:)` next time.
+    public var changeCursor: Int { changeLogStart + changeLog.count }
+
+    /// Ids whose effective value changed since `cursor` (may repeat), and the new cursor.
+    public func changes(since cursor: Int) -> (ids: ArraySlice<String>, cursor: Int) {
+        let from = max(cursor - changeLogStart, 0)
+        let ids = from < changeLog.count ? changeLog[from...] : []
+        // Keep the log bounded; anyone that far behind will just miss old entries.
+        if changeLog.count > 20_000 {
+            changeLog.removeFirst(10_000)
+            changeLogStart += 10_000
+        }
+        return (ids, changeCursor)
     }
 
     public func register(_ list: [ParamSpec]) { list.forEach(register) }
@@ -88,6 +120,7 @@ public final class ParamStore: @unchecked Sendable {
     public func set(_ id: String, _ value: Double) throws {
         guard let spec = specs[id] else { throw ParamError.unknown(id) }
         base[id] = spec.sanitise(value)
+        recompute(id)
     }
 
     public func baseValue(_ id: String) -> Double {
@@ -96,18 +129,22 @@ public final class ParamStore: @unchecked Sendable {
 
     /// The value the music engine should use right now.
     public func value(_ id: String) -> Double {
-        guard let spec = specs[id] else {
+        guard let v = effective[id] else {
             assertionFailure("Unregistered param \(id)")
             return 0
         }
-        return spec.sanitise(baseValue(id) + (offsets[id] ?? 0))
+        return v
     }
 
     public func int(_ id: String) -> Int { Int(value(id)) }
     public func bool(_ id: String) -> Bool { value(id) >= 0.5 }
 
     /// Replace all modulation offsets (called once per engine tick by the mod matrix).
-    public func setOffsets(_ new: [String: Double]) { offsets = new }
+    public func setOffsets(_ new: [String: Double]) {
+        let touched = Set(offsets.keys).union(new.keys)
+        offsets = new
+        for id in touched { recompute(id) }
+    }
 
     public var baseValues: [String: Double] { base }
 }

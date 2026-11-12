@@ -12,7 +12,7 @@ is a tunable parameter**, from raw sonification to tidy ambient music.
 ## Quick start
 
 ```sh
-swift run msg-app --scene scenes/audiokit-hosted.json   # the Mac app
+swift run -c release msg-app --scene scenes/audiokit-hosted.json   # the Mac app (release: much lighter)
 swift build
 .build/debug/msg-spike --source synthetic --dry-run   # hear nothing, see the notes
 .build/debug/msg-spike --verbose                      # real traffic → virtual MIDI port "MIDI Signal Generator"

@@ -33,6 +33,13 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
         var idByAddress: [AUParameterAddress: String] = [:]
         var lastPresetPoll = Date.distantPast
         lazy var presetNumbers: [Int] = (unit.auAudioUnit.factoryPresets ?? []).map(\.number)
+        /// Param id -> what to do when it changes (see applyParams).
+        var targets: [String: Target] = [:]
+
+        enum Target {
+            case preset, volume, pan
+            case parameter(AUParameter)
+        }
 
         init(config: InstrumentConfig, unit: AVAudioUnit) {
             self.config = config
@@ -44,6 +51,9 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
     }
 
     public let engine = AVAudioEngine()
+    /// Param id -> instrument id, for routing changes.
+    private var instrumentByParam: [String: String] = [:]
+    private var changeCursor = 0
     public private(set) var instruments: [String: Instrument] = [:]
     public var log: (String) -> Void = { print($0) }
     private let meterLock = NSLock()
@@ -255,7 +265,13 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
                 inst.idByAddress[param.address] = id
             }
             observeExternalChanges(inst)
+            inst.targets["\(p).preset"] = .preset
+            inst.targets["\(p).volume"] = .volume
+            inst.targets["\(p).pan"] = .pan
+            for (id, param) in inst.parameters { inst.targets[id] = .parameter(param) }
+            for id in inst.targets.keys { instrumentByParam[id] = inst.config.id }
         }
+        changeCursor = store.changeCursor
     }
 
     /// Two-way sync: when the user turns a knob or picks a preset in the plugin's own window,
@@ -315,30 +331,35 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
         return stripped.contains("") || Set(stripped).count != stripped.count ? cleaned : stripped
     }
 
+    /// Called every engine tick. Only params whose value changed since the last call are
+    /// looked at (via the store's change log), not all of them.
     public func applyParams(_ store: ParamStore) {
         for inst in instruments.values {
-            let p = inst.prefix
             drainExternalChanges(inst, store)
-            if let v = changed("\(p).preset", inst, store) {
-                select(preset: Int(v), on: inst)
-                // The plugin updates its values asynchronously; adopt them a moment later.
-                inst.resyncAt = Date().addingTimeInterval(0.6)
-                log("♪ \(inst.config.id) preset → \(inst.presetNames[safe: Int(v)] ?? "?")")
-            }
             if let due = inst.resyncAt, Date() >= due {
                 inst.resyncAt = nil
                 resync(inst, store)
             }
-            if let v = changed("\(p).volume", inst, store) { inst.mixer.outputVolume = Float(v) }
-            if let v = changed("\(p).pan", inst, store) { inst.mixer.pan = Float(v) }
-            for (id, param) in inst.parameters {
-                if let v = changed(id, inst, store) { param.setValue(AUValue(v), originator: inst.observerToken) }
+        }
+        let (ids, cursor) = store.changes(since: changeCursor)
+        changeCursor = cursor
+        for id in Set(ids) {
+            guard let owner = instrumentByParam[id], let inst = instruments[owner],
+                  let target = inst.targets[id], let v = changed(id, inst, store) else { continue }
+            switch target {
+            case .preset:
+                select(preset: Int(v), on: inst)
+                // The plugin updates its values asynchronously; adopt them a moment later.
+                inst.resyncAt = Date().addingTimeInterval(0.6)
+                log("♪ \(inst.config.id) preset → \(inst.presetNames[safe: Int(v)] ?? "?")")
+            case .volume: inst.mixer.outputVolume = Float(v)
+            case .pan: inst.mixer.pan = Float(v)
+            case .parameter(let param): param.setValue(AUValue(v), originator: inst.observerToken)
             }
         }
     }
 
     private func changed(_ id: String, _ inst: Instrument, _ store: ParamStore) -> Double? {
-        guard store.specs[id] != nil else { return nil }
         let v = store.value(id)
         if let last = inst.pushed[id], abs(last - v) < 1e-4 { return nil }
         inst.pushed[id] = v

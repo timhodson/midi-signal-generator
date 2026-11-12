@@ -82,7 +82,7 @@ enum Pages {
 struct HarmonyKeyboard: View {
     @Environment(AppModel.self) private var model
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 15)) { _ in
+        TimelineView(.animation(minimumInterval: 1 / 12, paused: !model.visualsActive)) { _ in
             KeyboardView(low: 24, high: 96, scale: Set(model.status?.scalePitchClasses ?? []),
                          chord: Set(model.status?.chordPitchClasses ?? []), sounding: model.soundingNotes())
         }
@@ -100,7 +100,7 @@ struct RoleLane: View {
                 RoundedRectangle(cornerRadius: 2).fill(RoleStyle.color(role)).frame(width: 12, height: 8)
                 Text("\(role) voice · \(Format.note(lo))–\(Format.note(hi))").font(.caption).foregroundStyle(.secondary)
             }
-            PianoRoll(roles: [role], window: 16, ahead: 2, pitchRange: lo...max(hi, lo + 12), showChords: role != "lead")
+            PianoRoll(roles: [role], window: 16, ahead: 2, pitchRange: lo...max(hi, lo + 12), showChords: role != "lead", fps: 12)
                 .frame(height: 110)
                 .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 6))
         }
@@ -115,7 +115,7 @@ struct VoiceRangeEditor: View {
         let lo = Int(model.base("voice.\(role).low")), hi = Int(model.base("voice.\(role).high"))
         VisualCard(title: "\(role.capitalized) range: \(Format.note(lo)) – \(Format.note(hi))",
                    caption: "Drag the handles to set the lowest and highest notes. Notes outside are moved by octaves into this range. Lit keys: notes this voice is playing now.") {
-            TimelineView(.animation(minimumInterval: 1 / 15)) { _ in
+            TimelineView(.animation(minimumInterval: 1 / 12, paused: !model.visualsActive)) { _ in
                 KeyboardView(low: 21, high: 108, scale: Set(model.status?.scalePitchClasses ?? []),
                              chord: Set(model.status?.chordPitchClasses ?? []),
                              sounding: model.soundingNotes(roles: [role]), range: lo...hi,
@@ -125,7 +125,7 @@ struct VoiceRangeEditor: View {
                 }
             }
             .frame(height: 70)
-            PianoRoll(roles: [role], window: 12, ahead: 2, pitchRange: lo...max(hi, lo + 12), showChords: false)
+            PianoRoll(roles: [role], window: 12, ahead: 2, pitchRange: lo...max(hi, lo + 12), showChords: false, fps: 12)
                 .frame(height: 80)
         }
     }

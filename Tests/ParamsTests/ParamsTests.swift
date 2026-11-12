@@ -55,3 +55,21 @@ import Testing
         #expect(s.value("p") == 0.75)
     }
 }
+
+@Suite struct ChangeLogTests {
+    @Test func reportsOnlyChangedParams() throws {
+        let s = ParamStore()
+        s.register(ParamSpec("a", default: 0.1))
+        s.register(ParamSpec("b", default: 0.2))
+        let start = s.changeCursor
+        try s.set("a", 0.5)
+        try s.set("a", 0.5)                 // same value: no new entry
+        s.setOffsets(["b": 0.1])
+        let (ids, cursor) = s.changes(since: start)
+        #expect(Array(ids) == ["a", "b"])
+        #expect(s.changes(since: cursor).ids.isEmpty)
+        #expect(abs(s.value("b") - 0.3) < 1e-12)
+        s.setOffsets([:])                   // removing an offset is a change too
+        #expect(Array(s.changes(since: cursor).ids) == ["b"])
+    }
+}

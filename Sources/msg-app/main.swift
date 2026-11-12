@@ -28,7 +28,13 @@ MainActor.assumeIsolated {
     let model = AppModel(scene: scene, sceneURL: sceneURL)
     if arg("--source") == "synthetic" { model.sourceKind = .synthetic }
 
-    if let dir = arg("--snapshot") {
+    if let name = arg("--profile") {
+        guard let section = SidebarItem.allCases.first(where: { $0.rawValue.lowercased() == name.lowercased() }) else {
+            print("unknown section \(name)"); exit(1)
+        }
+        Profile.run(model: model, section: section, seconds: Double(arg("--seconds") ?? "") ?? 10,
+                    interact: args.contains("--drag"))
+    } else if let dir = arg("--snapshot") {
         Snapshot.run(model: model, directory: URL(fileURLWithPath: dir), seconds: Double(arg("--seconds") ?? "") ?? 8,
                      height: Double(arg("--height") ?? "") ?? 860)
     } else {
@@ -82,6 +88,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @MainActor
 enum Snapshot {
     static func run(model: AppModel, directory: URL, seconds: Double, height: Double = 860) {
+        model.forceVisualsActive = true
         setvbuf(stdout, nil, _IOLBF, 0)
         NSApplication.shared.setActivationPolicy(.prohibited)
         Task { @MainActor in
@@ -115,5 +122,64 @@ enum Snapshot {
         host.cacheDisplay(in: host.bounds, to: rep)
         try? rep.representation(using: .png, properties: [:])?.write(to: url)
         window.close()
+    }
+}
+
+// MARK: - Profiling (headless performance check)
+
+/// Counters bumped by views; cheap enough to leave in.
+@MainActor
+enum Perf {
+    static var paramRowBodies = 0
+    static var canvasFrames = 0
+}
+
+@MainActor
+enum Profile {
+    /// Show one section in an offscreen window for `seconds`, then report how often controls and
+    /// visuals re-rendered and how much CPU the app used.
+    static func run(model: AppModel, section: SidebarItem, seconds: Double, interact: Bool) {
+        setvbuf(stdout, nil, _IOLBF, 0)
+        // The offscreen window counts as hidden; --hidden measures that case instead.
+        model.forceVisualsActive = true // don't let the offscreen window's occlusion state decide
+        model.visualsActive = !args.contains("--hidden")
+        NSApplication.shared.setActivationPolicy(.prohibited)
+        Task { @MainActor in
+            await model.start()
+            let host = NSHostingView(rootView: ContentView(selection: section).environment(model)
+                .background(Color(nsColor: .windowBackgroundColor)))
+            let window = NSWindow(contentRect: NSRect(x: -30_000, y: -30_000, width: 1280, height: 860),
+                                  styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = host
+            window.orderFrontRegardless()
+            try? await Task.sleep(for: .seconds(3)) // settle
+            Perf.paramRowBodies = 0
+            Perf.canvasFrames = 0
+            let cpu0 = cpuSeconds(), wall0 = Date()
+            var drags = 0
+            let end = Date().addingTimeInterval(seconds)
+            while Date() < end {
+                if interact {
+                    // Simulate dragging a slider: 30 changes a second.
+                    model.set("gen.pulse.density", 0.05 + 0.4 * abs(sin(Date().timeIntervalSince1970)))
+                    drags += 1
+                }
+                try? await Task.sleep(for: .milliseconds(33))
+            }
+            let wall = Date().timeIntervalSince(wall0), cpu = cpuSeconds() - cpu0
+            print(String(format: "PROFILE %@%@: %.0f param-row renders/s, %.0f visual frames/s, CPU %.0f%% of one core",
+                         section.rawValue, interact ? " (+slider drag)" : "",
+                         Double(Perf.paramRowBodies) / wall, Double(Perf.canvasFrames) / wall, 100 * cpu / wall))
+            model.stop()
+            exit(0)
+        }
+        NSApplication.shared.run()
+    }
+
+    static func cpuSeconds() -> Double {
+        var u = rusage()
+        getrusage(RUSAGE_SELF, &u)
+        return Double(u.ru_utime.tv_sec + u.ru_stime.tv_sec) + Double(u.ru_utime.tv_usec + u.ru_stime.tv_usec) / 1e6
     }
 }

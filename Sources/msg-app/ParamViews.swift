@@ -25,6 +25,7 @@ struct ParamRow: View {
     }
 
     var body: some View {
+        let _ = Perf.paramRowBodies += 1
         VStack(alignment: .leading, spacing: 3) {
             row
             if showsInlineHelp {

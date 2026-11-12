@@ -46,6 +46,8 @@ public final class Engine: @unchecked Sendable {
     private var unroutedRoles: Set<String> = []
     private var chordHistory: [EngineStatus.ChordEvent] = []
     private var auditionPending = false
+    /// Seconds between status snapshots. A UI slows this down while it isn't visible. Engine queue only.
+    public var statusInterval: Double = 0.1
     /// Called on the engine queue about 10× a second with a snapshot (for UIs).
     public var onStatus: (@Sendable (EngineStatus) -> Void)?
 
@@ -217,7 +219,7 @@ public final class Engine: @unchecked Sendable {
 
         scheduler.fire(now: t)
 
-        if let onStatus, t - lastPublish >= 0.1 {
+        if let onStatus, t - lastPublish >= statusInterval {
             lastPublish = t
             onStatus(status(at: t, harmony: harmony, total: total))
         }

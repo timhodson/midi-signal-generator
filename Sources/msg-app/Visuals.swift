@@ -62,14 +62,17 @@ struct PianoRoll: View {
     /// Fixed pitch range (e.g. a voice's range); nil = fit to the notes.
     var pitchRange: ClosedRange<Int>?
     var showChords = true
+    /// Frames per second. Big "hero" rolls scroll smoothly at 24; small lanes are fine at 12.
+    var fps: Double = 24
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / 30)) { tl in
+        TimelineView(.animation(minimumInterval: 1 / fps, paused: !model.visualsActive)) { tl in
             Canvas { gc, size in draw(&gc, size, now: model.engineNow(at: tl.date)) }
         }
     }
 
     private func draw(_ gc: inout GraphicsContext, _ size: CGSize, now: Double) {
+        Perf.canvasFrames += 1
         guard let s = model.status else { return }
         let start = now - window, end = now + ahead
         let notes = s.recentNotes.filter { (roles?.contains($0.role) ?? true) && $0.time + $0.duration >= start && $0.time <= end }

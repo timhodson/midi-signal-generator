@@ -8,6 +8,24 @@ import Params
 import Router
 import Runtime
 
+/// One parameter's values. Each control observes only its own cell, so a status update re-renders
+/// just the controls whose values changed, not every control on the page.
+@MainActor
+@Observable
+final class ParamCell {
+    let id: String
+    var base: Double
+    var effective: Double
+    /// While the user drags, ignore status updates that predate the edit.
+    @ObservationIgnored var localEditUntil = Date.distantPast
+
+    init(id: String, base: Double) {
+        self.id = id
+        self.base = base
+        effective = base
+    }
+}
+
 /// Everything the UI shows and does. Main-actor only; talks to the engine through `Session`.
 @MainActor
 @Observable
@@ -54,8 +72,19 @@ final class AppModel {
     /// Short histories (≈60 s at 4 Hz) of route inputs and targets, for the modulation sparklines.
     private(set) var traces: [String: [TracePoint]] = [:]
     private var lastTrace: Double = 0
-    /// Base values, updated optimistically when the user moves a control.
-    private(set) var bases: [String: Double] = [:]
+    /// Per-param observable values (fine-grained, see `ParamCell`).
+    private(set) var cells: [String: ParamCell] = [:]
+    /// False while the window is hidden, minimised or covered: visuals pause, status slows down.
+    var visualsActive = true {
+        didSet {
+            guard visualsActive != oldValue else { return }
+            session?.setStatusInterval(visualsActive ? 0.1 : 1.0)
+        }
+    }
+    /// Keep visuals running regardless of window visibility (headless profiling/snapshots).
+    @ObservationIgnored var forceVisualsActive = false
+    /// Instruments whose editor window is being opened (shows a spinner).
+    private(set) var openingEditors: Set<String> = []
     private(set) var history: [TrafficPoint] = []
     private(set) var peakDB: Double = -120
     private(set) var messages: [String] = []
@@ -95,7 +124,8 @@ final class AppModel {
             let specs = s.engine.paramSpecs
             self.specs = specs
             specsByID = Dictionary(uniqueKeysWithValues: specs.map { ($0.id, $0) })
-            bases = s.engine.params.baseValues
+            let baseValues = s.engine.params.baseValues
+            cells = Dictionary(uniqueKeysWithValues: specs.map { ($0.id, ParamCell(id: $0.id, base: baseValues[$0.id] ?? $0.defaultValue)) })
             messages = s.notes
             history = []
             s.engine.onStatus = { [weak self] status in
@@ -103,6 +133,7 @@ final class AppModel {
             }
             try s.start()
             session = s
+            if !visualsActive { s.setStatusInterval(1.0) }
         } catch {
             self.error = "\(error)"
         }
@@ -142,7 +173,11 @@ final class AppModel {
                 trace("param:" + route.target, s.time, s.values[route.target] ?? 0)
             }
         }
-        bases = s.bases
+        let now = Date()
+        for (id, cell) in cells {
+            if let v = s.values[id], abs(cell.effective - v) > 1e-9 { cell.effective = v }
+            if now >= cell.localEditUntil, let b = s.bases[id], abs(cell.base - b) > 1e-9 { cell.base = b }
+        }
         pointCounter += 1
         // One chart point per second is plenty; skip the silence before the first data arrives.
         if s.totalRate > 0 || !history.isEmpty, history.last.map({ s.time - $0.time >= 1 }) ?? true {
@@ -175,12 +210,17 @@ final class AppModel {
 
     // MARK: - Params
 
-    func base(_ id: String) -> Double { bases[id] ?? specsByID[id]?.defaultValue ?? 0 }
-    func effective(_ id: String) -> Double { status?.values[id] ?? base(id) }
+    func base(_ id: String) -> Double { cells[id]?.base ?? specsByID[id]?.defaultValue ?? 0 }
+    func effective(_ id: String) -> Double { cells[id]?.effective ?? base(id) }
 
     func set(_ id: String, _ value: Double) {
         guard let spec = specsByID[id] else { return }
-        bases[id] = spec.sanitise(value)
+        if let cell = cells[id] {
+            let v = spec.sanitise(value)
+            cell.base = v
+            if !spec.modulatable { cell.effective = v }
+            cell.localEditUntil = Date().addingTimeInterval(0.4)
+        }
         session?.set(id, value)
     }
 
@@ -258,10 +298,12 @@ final class AppModel {
             w.makeKeyAndOrderFront(nil)
             return
         }
-        guard let inst = session?.auHost?.instruments[instrumentID] else { return }
+        guard let inst = session?.auHost?.instruments[instrumentID], !openingEditors.contains(instrumentID) else { return }
         let title = "\(inst.config.component) — \(instrumentID)"
+        openingEditors.insert(instrumentID)
         inst.unit.auAudioUnit.requestViewController { [weak self] vc in
             Task { @MainActor in
+                self?.openingEditors.remove(instrumentID)
                 guard let self, let vc else {
                     self?.error = "\(title) has no editor view."
                     return

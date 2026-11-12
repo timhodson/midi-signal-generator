@@ -7,7 +7,7 @@ struct OverviewView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            LazyVStack(alignment: .leading, spacing: 16) {
                 TransportBar()
                 if let error = model.error {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
