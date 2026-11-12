@@ -8,11 +8,11 @@
 - [x] Continuous quantisers, mod matrix, faithfulness macro, JSON scenes
 - [x] CoreMIDI out: virtual port, network session, named destinations; scheduler with note ledger
 - [x] Hosted Audio Unit instruments, one per voice, with plugin params as mod targets (ADR 0010). Heard on the Mac
+- [x] Record / replay signals (`--record`, `--source replay:`, ADR 0011)
 - [ ] **Listen to it on the iPad** and tune the default and hosted scenes by ear
 
 ## Next
 
-1. **Recorder / replayer source**: save signal streams to a file and replay them, so tuning is repeatable.
 2. **OSC in** (ADR 0008), for both signals and param control (`/param/quant.pitch.strength 0.4`).
 3. **pcap helper** (privileged, separate process). Packet-level features: protocol mix, DNS
    → pickup notes, SYN/FIN → phrase start/end, TLS hello, mDNS/SSDP chatter → texture.

@@ -13,7 +13,12 @@ msg-spike — turn this Mac's network traffic into MIDI.
 
 USAGE: msg-spike [options]
 
-  --source nettop|synthetic   Data source (default: nettop = real per-app traffic).
+  --source nettop|synthetic|replay:<file>
+                              Data source (default: nettop = real per-app traffic).
+                              replay plays back a --record file with its original timing.
+  --record <file.jsonl>       Also record every incoming signal to this file.
+  --speed <x>                 Replay speed (default 1; 4 = four times faster).
+  --loop                      Loop the replay.
   --scene <file.json>         Load a scene (default: built-in; see scenes/default.json).
   --set <id=value>            Override a parameter or macro. Repeatable.
                               e.g. --set macro.faithfulness=0.2 --set harmony.scale=4
@@ -38,6 +43,9 @@ USAGE: msg-spike [options]
 
 struct Options {
     var source = "nettop"
+    var record: String?
+    var speed = 1.0
+    var loop = false
     var scenePath: String?
     var sets: [(String, Double)] = []
     var dest: String?
@@ -68,6 +76,11 @@ func parse(_ args: [String]) -> Options {
     while let a = it.next() {
         switch a {
         case "--source": o.source = value(a)
+        case "--record": o.record = value(a)
+        case "--speed":
+            guard let v = Double(value(a)), v > 0 else { fail("--speed needs a positive number") }
+            o.speed = v
+        case "--loop": o.loop = true
         case "--scene": o.scenePath = value(a)
         case "--set":
             let kv = value(a).split(separator: "=", maxSplits: 1).map(String.init)
@@ -236,7 +249,21 @@ engine.logNotes = options.dryRun || options.verbose
 switch options.source {
 case "nettop": engine.add(NettopSource())
 case "synthetic": engine.add(SyntheticSource(seed: scene.seed))
+case let s where s.hasPrefix("replay:"):
+    let path = String(s.dropFirst("replay:".count))
+    do {
+        let replay = try ReplaySource(url: URL(fileURLWithPath: path), speed: options.speed, loop: options.loop)
+        print(String(format: "▶︎ replaying %@: %d batches, %.0f s (recorded %@ from %@)", path, replay.batches.count,
+                     replay.duration, replay.header.recorded.formatted(), replay.header.sources.joined(separator: ", ")))
+        engine.add(replay)
+    } catch { fail("\(error)") }
 default: fail("unknown source \(options.source)")
+}
+if let path = options.record {
+    do {
+        engine.recorder = try SignalRecorder(url: URL(fileURLWithPath: path), sources: [options.source])
+        print("● recording signals to \(path)")
+    } catch { fail("could not record: \(error)") }
 }
 
 do { try engine.start() } catch { fail("could not start: \(error)") }

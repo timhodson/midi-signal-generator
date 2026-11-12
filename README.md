@@ -20,6 +20,8 @@ swift build
 .build/debug/msg-spike --dest network                 # → iPad via network MIDI (docs/midi-setup.md)
 .build/debug/msg-spike --list-params                  # all ~80 parameters (hundreds more with hosted synths)
 .build/debug/msg-spike --set macro.faithfulness=0.9   # closer to raw data
+.build/debug/msg-spike --record recordings/evening.jsonl          # capture the traffic…
+.build/debug/msg-spike --source replay:recordings/evening.jsonl  # …and replay it while tuning
 ```
 
 Voices: `pad` = ch 1, `lead` = ch 2, `pulse` = ch 3 (all tunable).

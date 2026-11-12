@@ -6,8 +6,8 @@ import Foundation
 /// - `.stream`: a continuous quantity, latest value wins (bytes/s, temperature).
 /// - `.event`: something happened (flow opened, motion detected).
 /// States are *derived* from streams/events by the Conductor, not sent by sources.
-public struct SignalSample: Sendable, Equatable {
-    public enum Kind: Sendable, Equatable { case stream, event }
+public struct SignalSample: Sendable, Equatable, Codable {
+    public enum Kind: String, Sendable, Equatable, Codable { case stream, event }
 
     public var kind: Kind
     /// Dotted id, e.g. "net.app.bytesPerSec".

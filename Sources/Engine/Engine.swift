@@ -4,6 +4,7 @@ import Music
 import Params
 import Router
 import SignalBus
+import Sources
 
 /// Owns the clock and runs the pipeline on one serial queue:
 ///
@@ -16,6 +17,8 @@ public final class Engine: @unchecked Sendable {
     public let queue = DispatchQueue(label: "msg.engine", qos: .userInteractive)
 
     public var log: (String) -> Void = { print($0) }
+    /// When set, every batch of incoming samples is also written here (see `SignalRecorder`).
+    public var recorder: SignalRecorder?
     /// Log every note (dry-run / verbose).
     public var logNotes = false
 
@@ -95,7 +98,11 @@ public final class Engine: @unchecked Sendable {
         for s in sources {
             try s.start { [weak self] samples in
                 guard let self else { return }
-                self.queue.async { self.bus.post(samples, at: self.now) }
+                self.queue.async {
+                    let t = self.now
+                    self.recorder?.record(samples, at: t)
+                    self.bus.post(samples, at: t)
+                }
             }
         }
         let t = DispatchSource.makeTimerSource(flags: .strict, queue: queue)
@@ -114,6 +121,7 @@ public final class Engine: @unchecked Sendable {
             timer?.cancel()
             timer = nil
             scheduler.panic()
+            recorder?.close()
         }
     }
 

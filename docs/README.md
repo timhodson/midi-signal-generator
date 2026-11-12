@@ -22,3 +22,4 @@ is made or reversed; don't rewrite history. Mark superseded ones in their status
 | [0008](decisions/0008-sources-behind-a-protocol-osc-later.md) | Sources behind a protocol; OSC and out-of-process later |
 | [0009](decisions/0009-seeded-randomness-and-leitmotifs.md) | Seeded randomness and per-app leitmotifs |
 | [0010](decisions/0010-hosted-audio-unit-instruments.md) | Host Audio Unit instruments (Synth One J6, King of FM) in-app, one per voice |
+| [0011](decisions/0011-record-and-replay-signals.md) | Record and replay signals for repeatable tuning |
