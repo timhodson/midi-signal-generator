@@ -131,12 +131,16 @@ struct Sparkline: View {
     var color: Color = .accentColor
     var baseline: Double?
 
+    static let window = 60.0
+
     var body: some View {
         let now = points.last?.0 ?? 0
+        // Only what fits the window: Charts doesn't clip marks outside the axis domain.
+        let visible = points.filter { now - $0.0 <= Self.window }
         VStack(alignment: .leading, spacing: 2) {
             Text(title).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
             Chart {
-                ForEach(Array(points.enumerated()), id: \.offset) { _, p in
+                ForEach(Array(visible.enumerated()), id: \.offset) { _, p in
                     LineMark(x: .value("t", p.0 - now), y: .value("v", min(max(p.1, domain.lowerBound), domain.upperBound)))
                         .foregroundStyle(color)
                 }
@@ -144,7 +148,8 @@ struct Sparkline: View {
                     RuleMark(y: .value("base", baseline)).foregroundStyle(.secondary).lineStyle(StrokeStyle(dash: [3, 3]))
                 }
             }
-            .chartXScale(domain: -60...0)
+            .chartXScale(domain: -Self.window...0)
+            .chartPlotStyle { $0.clipped() }
             .chartYScale(domain: domain.lowerBound...max(domain.upperBound, domain.lowerBound + 0.0001))
             .chartXAxis(.hidden)
             .chartYAxis(.hidden)

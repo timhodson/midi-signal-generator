@@ -170,10 +170,14 @@ final class AppModel {
         statusReceivedAt = Date()
         if s.time - lastTrace >= 0.25 {
             lastTrace = s.time
+            // Several routes can share a source or target: record each one once per sample, or its
+            // history fills up several times faster and covers less time than the chart shows.
+            var keys: [String: Double] = [:]
             for route in routes {
-                trace(route.source, s.time, s.signals[route.source] ?? 0)
-                trace("param:" + route.target, s.time, s.values[route.target] ?? 0)
+                keys[route.source] = s.signals[route.source] ?? 0
+                keys["param:" + route.target] = s.values[route.target] ?? 0
             }
+            for (key, value) in keys { trace(key, s.time, value) }
         }
         let now = Date()
         for (id, cell) in cells {

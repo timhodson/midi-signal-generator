@@ -149,6 +149,7 @@ struct TrafficChart: View {
         }
         .chartYScale(domain: 100...100_000_000, type: .log)
         .chartXScale(domain: -180...0)
+        .chartPlotStyle { $0.clipped() }
         .chartYAxis {
             AxisMarks(values: [1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8]) { v in
                 AxisGridLine()
@@ -168,10 +169,11 @@ struct TopApps: View {
             Text("No traffic yet").foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             Chart(apps, id: \.app) { a in
-                BarMark(x: .value("Bytes/s", log10(max(a.bytesPerSecond, 1))), y: .value("App", a.app), height: .fixed(16))
+                BarMark(x: .value("Bytes/s", min(log10(max(a.bytesPerSecond, 1)), 8)), y: .value("App", a.app), height: .fixed(16))
                     .annotation(position: .trailing) { Text(Format.rate(a.bytesPerSecond)).font(.caption2) }
             }
             .chartXScale(domain: 0...8)
+            .chartPlotStyle { $0.clipped() }
             .chartXAxis(.hidden)
         }
     }
