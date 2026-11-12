@@ -108,7 +108,8 @@ public final class Session: @unchecked Sendable {
         var coreMIDI: CoreMIDISink?
         var fallback: MIDISink = PrintSink { _ in } // the engine logs notes itself
         let external = Set(scene.voices.map(\.destination).filter { !$0.hasPrefix(InstrumentConfig.destinationPrefix) })
-        if options.output == .live, !external.isEmpty {
+        // Live sessions always get CoreMIDI, so a voice can be moved to a device while running.
+        if options.output == .live {
             let c = CoreMIDISink()
             try c.start(destinations: external, enableNetworkSession: options.networkSession)
             for (name, ok) in c.connectedDestinations().sorted(by: { $0.key < $1.key }) {
@@ -207,6 +208,22 @@ public final class Session: @unchecked Sendable {
     /// Replace the motif designs (live), from any thread.
     public func setMotifs(_ designs: [MotifDesign]) {
         engine.queue.async { [engine] in engine.setMotifs(designs) }
+    }
+
+    /// Send a voice to another destination ("virtual", "network", "au:<id>" of a loaded synth, or a
+    /// MIDI destination's display name), from any thread.
+    public func setDestination(_ role: String, _ destination: String) {
+        engine.queue.async { [engine, coreMIDI] in
+            if !destination.hasPrefix(InstrumentConfig.destinationPrefix) {
+                do { try coreMIDI?.connect(destination) } catch { engine.log("⚠︎ could not connect to \(destination): \(error)") }
+            }
+            engine.setVoiceDestination(role, destination)
+        }
+    }
+
+    /// Which external destinations currently reach a device. Blocks briefly on the engine queue.
+    public func destinationStatus() -> [String: Bool] {
+        engine.queue.sync { coreMIDI?.connectedDestinations() ?? [:] }
     }
 
     /// Replace the edited drum grooves (live), from any thread.

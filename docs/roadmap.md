@@ -15,6 +15,7 @@
 - [x] Motif designer (scale-step grid, per app / pattern / default) and trigger explanations (ADR 0014)
 - [x] Packet capture helper `msg-pcap`: DNS lookups, handshakes with round trips, closes and LAN chatter as figures; features over OSC (ADR 0015)
 - [x] Drummer: a groove per mood with presence and complexity, fills at phrase ends and flurries, idle rests, Euclidean grooves, network accents; built-in GM kit; editable step grid (ADR 0016)
+- [x] Destination picker per voice in the app: virtual, network, hosted, Bluetooth / USB / network / IAC / app destinations (incl. offline), live switching, Bluetooth MIDI pairing panel
 - [ ] **Listen to it on the iPad** and tune the default and hosted scenes by ear
 
 ## Next
@@ -23,7 +24,7 @@
    (`/param/quant.pitch.strength 0.4`) and accepting from the LAN.
 2. **Packets, next:** per-process attribution via PKTAP (link events to app motifs), a packet
    source for whole-LAN capture on a Pi.
-3. **App, next round:** voice routing and range editing in the UI (AudioKit Keyboard), adding
+3. **App, next round:** adding
    and removing hosted instruments, scene A/B comparison, MIDI-learn for params, an app bundle.
 4. **MIDI clock** out (and in, to follow a DAW). CoreMIDI timestamped sends.
 5. More generators: arpeggiator over the chord, flow-voice (one voice per live connection with voice stealing).

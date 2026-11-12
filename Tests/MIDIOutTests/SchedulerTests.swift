@@ -75,3 +75,19 @@ private func note(_ n: Int, at start: Double, for duration: Double, poly: Int = 
         #expect(midi.log == ["on 62", "panic"])
     }
 }
+
+@Suite struct DestinationKindTests {
+    @Test func driversMapToKinds() {
+        #expect(CoreMIDISink.kind(driver: "com.apple.AppleMIDIBluetoothDriver") == .bluetooth)
+        #expect(CoreMIDISink.kind(driver: "com.apple.AppleMIDIUSBDriver") == .usb)
+        #expect(CoreMIDISink.kind(driver: "com.apple.AppleMIDINetworkDriver") == .network)
+        #expect(CoreMIDISink.kind(driver: "com.apple.AppleMIDIRTPDriver") == .network)
+        #expect(CoreMIDISink.kind(driver: "com.apple.AppleMIDIIACDriver") == .iac)
+        #expect(CoreMIDISink.kind(driver: nil) == .other)
+    }
+
+    @Test func listingIncludesOfflineDevicesWithoutCrashing() {
+        // Whatever this Mac has; every entry must be addressable.
+        #expect(CoreMIDISink.systemDestinations().allSatisfy { !$0.address.isEmpty })
+    }
+}

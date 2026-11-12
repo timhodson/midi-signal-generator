@@ -52,3 +52,17 @@ import Music
         #expect(back.voices.filter { $0.role == "drums" }.count == 1)
     }
 }
+
+@Suite struct VoiceDestinationTests {
+    @Test func movingAVoiceRoutesItsNotesAndIsSaved() throws {
+        var lines: [String] = []
+        let engine = try Engine(scene: .default, sink: PrintSink { lines.append($0) })
+        engine.log = { _ in }
+        engine.setVoiceDestination("lead", "Tim's iPad Bluetooth")
+        engine.setVoiceDestination("nope", "virtual") // unknown roles are ignored
+        let saved = engine.currentScene()
+        #expect(saved.voices.first { $0.role == "lead" }?.destination == "Tim's iPad Bluetooth")
+        #expect(saved.voices.first { $0.role == "pad" }?.destination == "virtual")
+        #expect(!saved.voices.contains { $0.role == "nope" })
+    }
+}

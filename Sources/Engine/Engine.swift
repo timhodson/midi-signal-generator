@@ -22,11 +22,11 @@ public final class Engine: @unchecked Sendable {
     /// Log every note (dry-run / verbose).
     public var logNotes = false
 
-    private let scene: Scene
+    private var scene: Scene
     private let modMatrix: ModMatrix
     private let conductor: Conductor
     private let generators: [Generator]
-    private let router: VoiceRouter
+    private var router: VoiceRouter
     private let scheduler: NoteScheduler
     private let parameterisedSink: ParameterisedSink?
     private var quantiser = Quantiser()
@@ -290,6 +290,15 @@ extension Engine {
 
     /// Replace the motif designs (live). Call on `queue`.
     public func setMotifs(_ designs: [MotifDesign]) { motif.designs = designs }
+
+    /// Send a voice somewhere else (live). Notes already sounding finish on the old destination.
+    /// Call on `queue`, after the sink can reach `destination`.
+    public func setVoiceDestination(_ role: String, _ destination: String) {
+        guard router.voices[role] != nil else { return }
+        router.voices[role]?.destination = destination
+        if let i = scene.voices.firstIndex(where: { $0.role == role }) { scene.voices[i].destination = destination }
+        log("→ \(role) now plays on \(destination)")
+    }
 
     /// Replace the edited drum grooves (live). Call on `queue`.
     public func setGrooves(_ grooves: [DrumGroove]) { drums.custom = grooves }

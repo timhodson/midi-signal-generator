@@ -3,6 +3,22 @@
 Run `msg-spike --list-destinations` to see what this Mac can send to, and
 `msg-spike --list-instruments` for Audio Unit synths it can host itself.
 
+## In the app
+
+**Voices → each voice → "plays on"** picks the destination from a menu, live:
+
+- **This Mac:** the virtual port "MIDI Signal Generator" (for DAWs, AUM…) and the network session.
+- **Hosted synths** loaded by the scene.
+- Every destination macOS knows, grouped as **Bluetooth, USB, Network, IAC buses, other apps**,
+  including devices that are paired or known but not connected now. Those still work: notes
+  reach them once they appear.
+
+**Bluetooth MIDI…** opens macOS's Bluetooth MIDI panel to find and connect a device (e.g. an
+iPad advertising Bluetooth MIDI from AUM or a synth's settings); it then shows up in the menu.
+**Audio MIDI Setup** opens the system app for the network session and IAC buses. The choice is
+saved with the scene (⌘S). Destinations are stored by display name, e.g. `"Tim's iPad Bluetooth"`,
+which tells several Bluetooth devices apart (their endpoints are all called "Bluetooth").
+
 ## Hosted Audio Unit synths on the Mac (Synth One J6, King of FM 2…)
 
 No other app is needed: the synths run inside `msg-spike` and play through the Mac's audio output.
@@ -49,7 +65,7 @@ trusted. Use its name with `--dest "<name from --list-destinations>"`.
 
 ## Bluetooth MIDI
 
-Pair it under Audio MIDI Setup → MIDI Studio → Bluetooth (the "Configure Bluetooth" button). Bluetooth has the
+In the app, use Voices → **Bluetooth MIDI…**; or pair it under Audio MIDI Setup → MIDI Studio → Bluetooth (the "Configure Bluetooth" button). Bluetooth has the
 most latency, so delay the *other* voices to line up, e.g. `--set voice.lead.latencyMs=25`.
 
 ## A DAW or AUM on the Mac

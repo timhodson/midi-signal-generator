@@ -87,7 +87,10 @@ enum Pages {
     // MARK: Voices
 
     @MainActor static func voiceAccessory(_ role: String) -> AnyView? {
-        AnyView(VoiceRangeEditor(role: role))
+        AnyView(VStack(spacing: 10) {
+            DestinationPicker(role: role)
+            VoiceRangeEditor(role: role)
+        })
     }
 }
 

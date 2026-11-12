@@ -32,8 +32,11 @@ public func noteName(_ n: Int) -> String {
 ///
 /// - "virtual" publishes a virtual MIDI source named `virtualName`, visible to DAWs, AUM, etc.
 /// - "network" sends to Apple's network MIDI session (whatever it is named), which iPad apps join.
-/// - Any other destination name connects to an existing MIDI destination with that name,
-///   e.g. "Network Session 1" for Apple's network MIDI (which iPad apps join).
+/// - Any other destination connects to the MIDI destination with that display name
+///   ("Tim's iPad Bluetooth", "IAC Driver Bus 1") or, for older scenes, that bare name. It
+///   connects whenever the device appears, so offline Bluetooth or USB devices are fine.
+///
+/// Destinations can be added while running (`connect`); call everything on one queue.
 public final class CoreMIDISink: MIDISink, @unchecked Sendable {
     public static let virtualDestination = "virtual"
     public static let networkDestination = "network"
@@ -52,17 +55,24 @@ public final class CoreMIDISink: MIDISink, @unchecked Sendable {
     public func start(destinations names: Set<String>, enableNetworkSession: Bool) throws {
         try manager.start()
         if enableNetworkSession { setMIDINetworkSession(policy: .anyone) }
-        for name in names {
-            if name == Self.virtualDestination {
-                try manager.addOutput(name: virtualName, tag: name, uniqueID: .userDefaultsManaged(key: virtualName))
-            } else if name == Self.networkDestination {
-                guard let id = Self.networkSessionDestinationID() else { continue } // reported by connectedDestinations()
-                try manager.addOutputConnection(to: .inputs(matching: [.uniqueID(id)]), tag: name)
-            } else {
-                try manager.addOutputConnection(to: .inputs(matching: [.name(name)]), tag: name)
-            }
+        for name in names.sorted() { try connect(name) }
+    }
+
+    /// Start sending to a destination (no-op if already connected). A disabled network session
+    /// is remembered and retried on the next call.
+    public func connect(_ name: String) throws {
+        let known = destinations.contains(name)
+        destinations.insert(name)
+        if name == Self.virtualDestination {
+            guard manager.managedOutputs[name] == nil else { return }
+            try manager.addOutput(name: virtualName, tag: name, uniqueID: .userDefaultsManaged(key: virtualName))
+        } else if name == Self.networkDestination {
+            guard manager.managedOutputConnections[name] == nil, let id = Self.networkSessionDestinationID() else { return }
+            try manager.addOutputConnection(to: .inputs(matching: [.uniqueID(id)]), tag: name)
+        } else {
+            guard !known || manager.managedOutputConnections[name] == nil else { return }
+            try manager.addOutputConnection(to: .inputs(matching: [.displayName(name), .name(name)]), tag: name)
         }
-        destinations = names
     }
 
     /// Unique ID of the network session's destination endpoint, if the session is enabled.
@@ -81,6 +91,7 @@ public final class CoreMIDISink: MIDISink, @unchecked Sendable {
 
     /// Destinations from the scene that currently resolve to at least one real endpoint.
     public func connectedDestinations() -> [String: Bool] {
+        if destinations.contains(Self.networkDestination) { try? connect(Self.networkDestination) }
         var out: [String: Bool] = [:]
         for name in destinations {
             out[name] = name == Self.virtualDestination

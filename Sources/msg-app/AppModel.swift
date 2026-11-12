@@ -3,6 +3,7 @@ import AUHost
 import CoreAudioKit
 import Engine
 import Foundation
+import MIDIOut
 import Music
 import Observation
 import Params
@@ -257,6 +258,55 @@ final class AppModel {
         var all = motifDesigns
         if let i = all.firstIndex(where: { $0.id == design.id }) { all[i] = design } else { all.append(design) }
         setMotifDesigns(all)
+    }
+
+    // MARK: MIDI destinations
+
+    /// Every MIDI destination on this Mac (online or remembered), refreshed while the Voices page is open.
+    private(set) var midiDestinations: [MIDIDestinationInfo] = []
+    /// Which of the session's external destinations reach a device right now.
+    private(set) var destinationStatus: [String: Bool] = [:]
+    private(set) var networkSessionEnabled = false
+    @ObservationIgnored private var bluetoothWindow: NSWindowController?
+
+    func refreshDestinations() {
+        let list = CoreMIDISink.systemDestinations()
+        if list != midiDestinations { midiDestinations = list }
+        let status = session?.destinationStatus() ?? [:]
+        if status != destinationStatus { destinationStatus = status }
+        let network = CoreMIDISink.networkSessionDestinationID() != nil
+        if network != networkSessionEnabled { networkSessionEnabled = network }
+    }
+
+    func destination(of role: String) -> String {
+        scene.voices.first { $0.role == role }?.destination ?? CoreMIDISink.virtualDestination
+    }
+
+    /// Send a voice somewhere else: live if running, and into the scene either way.
+    func setDestination(_ role: String, _ destination: String) {
+        guard let i = scene.voices.firstIndex(where: { $0.role == role }), scene.voices[i].destination != destination else { return }
+        scene.voices[i].destination = destination
+        session?.setDestination(role, destination)
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300))
+            self.refreshDestinations()
+        }
+    }
+
+    /// Hosted synths this session loaded (a voice can only move to one of these).
+    var hostedInstruments: [InstrumentConfig] { session?.scene.instruments ?? [] }
+
+    /// macOS's own Bluetooth MIDI panel: find, pair and connect Bluetooth MIDI devices.
+    func showBluetoothMIDI() {
+        let controller = bluetoothWindow ?? CABTLEMIDIWindowController()
+        bluetoothWindow = controller
+        controller.showWindow(nil)
+        controller.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+    }
+
+    func openAudioMIDISetup() {
+        NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Audio MIDI Setup.app"))
     }
 
     func deleteDesign(_ id: String) { setMotifDesigns(motifDesigns.filter { $0.id != id }) }

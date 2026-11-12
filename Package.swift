@@ -1,5 +1,9 @@
 // swift-tools-version: 6.0
+import Foundation
 import PackageDescription
+
+let appInfoPlist = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+    .appendingPathComponent("Sources/msg-app/Info.plist").path
 
 let package = Package(
     name: "MIDISignalGenerator",
@@ -51,8 +55,12 @@ let package = Package(
         .executableTarget(name: "msg-spike", dependencies: ["Runtime", "Engine", "AUHost"]),
         // The Mac app: SwiftUI panels generated from ParamSpecs, scopes, synth editors.
         .executableTarget(name: "msg-app", dependencies: [
-            "Runtime", "Engine", "AUHost", "Music", "Params", "Router", "Sources",
+            "Runtime", "Engine", "AUHost", "MIDIOut", "Music", "Params", "Router", "Sources",
             .product(name: "Controls", package: "Controls"),
+        ], exclude: ["Info.plist"], linkerSettings: [
+            // An embedded Info.plist, so macOS lets the unbundled app use Bluetooth (pairing
+            // Bluetooth MIDI devices) and shows the reason.
+            .unsafeFlags(["-Xlinker", "-sectcreate", "-Xlinker", "__TEXT", "-Xlinker", "__info_plist", "-Xlinker", appInfoPlist]),
         ]),
 
         .testTarget(name: "ParamsTests", dependencies: ["Params"]),

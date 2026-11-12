@@ -172,7 +172,12 @@ if options.listDestinations {
     print(CoreMIDISink.networkSessionDestinationID() == nil
         ? "  network  (Apple network MIDI session — currently DISABLED; enable it in Audio MIDI Setup → Network)"
         : "  network  (Apple network MIDI session — enabled)")
-    for name in sink.availableDestinations() { print("  \(name)") }
+    for kind in MIDIDestinationInfo.Kind.allCases {
+        let list = CoreMIDISink.systemDestinations().filter { $0.kind == kind }
+        guard !list.isEmpty else { continue }
+        print("  \(kind.title):")
+        for d in list { print("    \(d.address)\(d.online ? "" : "  (not connected now; used when it appears)")") }
+    }
     exit(0)
 }
 
