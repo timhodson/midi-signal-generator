@@ -12,6 +12,7 @@
 - [x] Mac app v1: generated param panels, overview scopes, instruments with editors, mod matrix, scenes (ADR 0012)
 - [x] Bass and sub-drone voices; plain-language help on every param, group intros and a mood table in the app; two-way sync with synth editor windows
 - [x] Live visuals on every settings page; chord palette with audition; per-mood progression editor
+- [x] Motif designer (scale-step grid, per app / pattern / default) and trigger explanations (ADR 0014)
 - [ ] **Listen to it on the iPad** and tune the default and hosted scenes by ear
 
 ## Next

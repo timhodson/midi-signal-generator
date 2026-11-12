@@ -46,6 +46,9 @@ public final class Engine: @unchecked Sendable {
     private var unroutedRoles: Set<String> = []
     private var chordHistory: [EngineStatus.ChordEvent] = []
     private var auditionPending = false
+    private let motif = MotifGenerator()
+    private var pendingPreviews: [Activation] = []
+    private var appStats: [String: (wakes: Int, last: Double)] = [:]
     /// Seconds between status snapshots. A UI slows this down while it isn't visible. Engine queue only.
     public var statusInterval: Double = 0.1
     /// Called on the engine queue about 10× a second with a snapshot (for UIs).
@@ -65,7 +68,8 @@ public final class Engine: @unchecked Sendable {
             progressions[mood] = v
         }
         conductor = Conductor(progressions: progressions, gestures: scene.gestures)
-        generators = [DroneGenerator(), MotifGenerator(), PulseGenerator(), BassGenerator(), SubDroneGenerator()]
+        motif.designs = scene.motifs
+        generators = [DroneGenerator(), motif, PulseGenerator(), BassGenerator(), SubDroneGenerator()]
         router = VoiceRouter(voices: scene.voices)
         scheduler = NoteScheduler(sink: sink)
         parameterisedSink = sink as? ParameterisedSink
@@ -162,6 +166,9 @@ public final class Engine: @unchecked Sendable {
             }
         }
         _ = bus.drainEvents() // no event-producing sources yet; keep the buffer bounded
+        for a in activations { appStats[a.key, default: (0, 0)] = (appStats[a.key, default: (0, 0)].wakes + 1, t) }
+        activations += pendingPreviews.map { var a = $0; a.time = horizon; return a }
+        pendingPreviews.removeAll()
 
         var chordChanged = false
         for barBeat in MusicalClock.crossings(of: Double(clock.beatsPerBar), in: beats) {
@@ -248,7 +255,28 @@ extension Engine {
         for i in s.routes.indices { s.routes[i].amount = params.baseValue("mod.\(i).amount") }
         s.progressions = Dictionary(uniqueKeysWithValues: conductor.progressions.map { ($0.key.rawValue, $0.value) })
         s.gestures = conductor.gestures
+        s.motifs = motif.designs
         return s
+    }
+
+    /// Replace the motif designs (live). Call on `queue`.
+    public func setMotifs(_ designs: [MotifDesign]) { motif.designs = designs }
+
+    /// Play an app's motif (designed or generated) on the next tick, as if it had woken. Call on `queue`.
+    public func previewMotif(for app: String) {
+        pendingPreviews.append(Activation(key: app, bytesPerSecond: 100_000, time: 0))
+    }
+
+    fileprivate func appInfos() -> [EngineStatus.AppInfo] {
+        let rates = bus.streams["net.app.bytesPerSec"] ?? [:]
+        let ignore = Set(scene.ignoreApps)
+        let names = Set(rates.keys).union(appStats.keys)
+        return names.map { name in
+            EngineStatus.AppInfo(name: name, bytesPerSecond: rates[name] ?? 0, wakes: appStats[name]?.wakes ?? 0,
+                                 lastWake: appStats[name]?.last, ignored: ignore.contains(name))
+        }
+        .sorted { ($0.wakes, $0.bytesPerSecond) > ($1.wakes, $1.bytesPerSecond) }
+        .prefix(60).map { $0 }
     }
 
     /// Switch to a chord right now so it can be heard (pads, bass and sub re-strike). Call on `queue`.
@@ -299,7 +327,9 @@ extension Engine {
             },
             chordHistory: chordHistory,
             scalePitchClasses: harmony.scalePitchClasses.sorted(),
-            chordPitchClasses: harmony.chordPitchClasses.sorted()
+            chordPitchClasses: harmony.chordPitchClasses.sorted(),
+            root: harmony.root, scaleSteps: harmony.scaleSteps, chordSize: harmony.chordSize,
+            apps: appInfos(), motifs: motif.designs
         )
     }
 }

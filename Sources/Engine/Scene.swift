@@ -15,6 +15,8 @@ public struct Scene: Codable, Sendable {
     public var voices: [VoiceConfig]
     /// Audio Unit instruments hosted in-app; voices reach them with destination "au:<id>".
     public var instruments: [InstrumentConfig] = []
+    /// Hand-designed motifs for matching apps (see MotifDesign).
+    public var motifs: [MotifDesign] = []
     public var progressions: [String: [Int]]
     public var gestures: [String: [Int]]
     /// Apps that never trigger motifs (always-on daemons) while `activity.ignore` is on.
@@ -58,7 +60,7 @@ public struct Scene: Codable, Sendable {
     )
 
     private enum CodingKeys: String, CodingKey {
-        case name, seed, params, routes, macros, voices, instruments, progressions, gestures, ignoreApps
+        case name, seed, params, routes, macros, voices, instruments, motifs, progressions, gestures, ignoreApps
     }
 
     public init(name: String, seed: UInt64, params: [String: Double], routes: [ModRoute], macros: [Macro],
@@ -85,6 +87,7 @@ public struct Scene: Codable, Sendable {
         macros = try c.decode([Macro].self, forKey: .macros)
         voices = try c.decode([VoiceConfig].self, forKey: .voices)
         instruments = try c.decodeIfPresent([InstrumentConfig].self, forKey: .instruments) ?? []
+        motifs = try c.decodeIfPresent([MotifDesign].self, forKey: .motifs) ?? []
         progressions = try c.decode([String: [Int]].self, forKey: .progressions)
         gestures = try c.decode([String: [Int]].self, forKey: .gestures)
         ignoreApps = try c.decode([String].self, forKey: .ignoreApps)

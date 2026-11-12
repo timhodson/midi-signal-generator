@@ -25,3 +25,4 @@ is made or reversed; don't rewrite history. Mark superseded ones in their status
 | [0011](decisions/0011-record-and-replay-signals.md) | Record and replay signals for repeatable tuning |
 | [0012](decisions/0012-mac-app-generated-from-params.md) | The Mac app: SwiftUI panels generated from ParamSpecs, shared Runtime |
 | [0013](decisions/0013-ui-and-engine-performance.md) | Performance: fine-grained UI updates, visuals only when visible, change-driven synth sync |
+| [0014](decisions/0014-motif-designs-and-explaining-triggers.md) | Motif designs in scale steps; explaining why each note plays |

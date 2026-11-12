@@ -64,11 +64,16 @@ struct PianoRoll: View {
     var showChords = true
     /// Frames per second. Big "hero" rolls scroll smoothly at 24; small lanes are fine at 12.
     var fps: Double = 24
+    @State private var hover: CGPoint?
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1 / fps, paused: !model.visualsActive)) { tl in
             Canvas { gc, size in draw(&gc, size, now: model.engineNow(at: tl.date)) }
         }
+        .onContinuousHover { phase in
+            if case .active(let p) = phase { hover = p } else { hover = nil }
+        }
+        .help("Hover a note to see why it played")
     }
 
     private func draw(_ gc: inout GraphicsContext, _ size: CGSize, now: Double) {
@@ -132,6 +137,7 @@ struct PianoRoll: View {
         }
 
         // Notes: future (scheduled) ones are outlined.
+        var hovered: (EngineStatus.PlayedNote, CGRect)?
         for n in notes where n.note >= lo && n.note <= hi {
             let r = CGRect(x: x(n.time), y: y(n.note) + 0.5, width: max(x(n.time + n.duration) - x(n.time), 3), height: max(rowH - 1, 2))
             let colour = RoleStyle.color(n.role)
@@ -140,6 +146,20 @@ struct PianoRoll: View {
             } else {
                 gc.fill(Path(roundedRect: r, cornerRadius: 2), with: .color(colour.opacity(0.35 + 0.65 * Double(n.velocity) / 127)))
             }
+            if let h = hover, r.insetBy(dx: -2, dy: -3).contains(h) { hovered = (n, r) }
+        }
+
+        // Why did the hovered note play?
+        if let (n, r) = hovered {
+            gc.stroke(Path(roundedRect: r.insetBy(dx: -1.5, dy: -1.5), cornerRadius: 3), with: .color(.primary), lineWidth: 1.5)
+            let text = gc.resolve(Text("\(n.role) · \(Format.note(n.note)) · v\(n.velocity)\n\(n.why)").font(.system(size: 11)))
+            let ts = text.measure(in: CGSize(width: 360, height: 100))
+            var box = CGRect(x: r.minX, y: r.maxY + 6, width: ts.width + 12, height: ts.height + 8)
+            if box.maxX > size.width { box.origin.x = size.width - box.width - 2 }
+            if box.maxY > size.height { box.origin.y = r.minY - box.height - 6 }
+            gc.fill(Path(roundedRect: box, cornerRadius: 5), with: .color(Color(nsColor: .windowBackgroundColor).opacity(0.95)))
+            gc.stroke(Path(roundedRect: box, cornerRadius: 5), with: .color(RoleStyle.color(n.role)), lineWidth: 1)
+            gc.draw(text, in: box.insetBy(dx: 6, dy: 4))
         }
 
         // Playhead.

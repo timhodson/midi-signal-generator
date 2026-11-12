@@ -156,3 +156,38 @@ private let dDorian = HarmonyContext(root: 2, scale: .dorian)
         #expect(c.chordName(degree: 1) == "Dm7")
     }
 }
+
+@Suite struct MotifDesignTests {
+    @Test func matchingPrefersExactThenContainsThenWildcard() {
+        let designs = [MotifDesign(match: "*", steps: [0]), MotifDesign(match: "brave", steps: [1]),
+                       MotifDesign(match: "Brave Browser H", steps: [2])]
+        #expect(MotifDesign.best(for: "Brave Browser H", in: designs)?.steps == [2])
+        #expect(MotifDesign.best(for: "Brave Helper", in: designs)?.steps == [1])
+        #expect(MotifDesign.best(for: "Mail", in: designs)?.steps == [0])
+        #expect(MotifDesign.best(for: "Mail", in: [designs[1]]) == nil)
+    }
+
+    @Test func designedMotifPlaysScaleStepsOverTheChord() {
+        let gen = MotifGenerator()
+        gen.designs = [MotifDesign(match: "Safari", steps: [0, nil, 2, 4], anchor: .chord, octave: 4)]
+        let p = ParamStore()
+        p.register(gen.params)
+        var harmony = dDorian
+        harmony.chordDegree = 3                                      // G chord
+        var clock = MusicalClock()
+        _ = clock.advance(to: 1, bpm: 60)
+        let ctx = GeneratorContext(now: 1, clock: clock, beats: 0..<0, harmony: harmony, params: p, chordChanged: false,
+                                   activations: [Activation(key: "Safari", bytesPerSecond: 50_000, time: 1)], totalRate: 0)
+        var rng = SeededRandom(seed: 1)
+        let notes = gen.tick(ctx, rng: &rng).notes
+        #expect(notes.map(\.pitch) == [.exact(67), .exact(71), .exact(74)])   // G4 B4 D5, rest skipped
+        #expect(notes[1].time > notes[0].time + 0.5)                          // the rest kept its time
+    }
+
+    @Test func convertingGeneratedMotifKeepsLengthAndStaysInScale() {
+        let d = MotifDesign.fromGenerated(app: "Spotify", length: 6, range: 7, octave: 5, harmony: dDorian)
+        #expect(d.steps.count == 6)
+        #expect(d.steps.allSatisfy { $0 != nil })
+        #expect(d.anchor == .key)
+    }
+}

@@ -3,6 +3,7 @@ import AUHost
 import CoreAudioKit
 import Engine
 import Foundation
+import Music
 import Observation
 import Params
 import Router
@@ -127,6 +128,7 @@ final class AppModel {
             let baseValues = s.engine.params.baseValues
             cells = Dictionary(uniqueKeysWithValues: specs.map { ($0.id, ParamCell(id: $0.id, base: baseValues[$0.id] ?? $0.defaultValue)) })
             messages = s.notes
+            motifDesigns = scene.motifs
             history = []
             s.engine.onStatus = { [weak self] status in
                 Task { @MainActor in self?.apply(status) }
@@ -202,6 +204,33 @@ final class AppModel {
     // MARK: - Progressions
 
     func auditionChord(_ degree: Int) { session?.auditionChord(degree) }
+
+    // MARK: - Motifs
+
+    /// The motif designs being edited; pushed to the engine on every change.
+    var motifDesigns: [MotifDesign] = []
+
+    func setMotifDesigns(_ designs: [MotifDesign]) {
+        motifDesigns = designs
+        scene.motifs = designs
+        session?.setMotifs(designs)
+    }
+
+    func updateDesign(_ design: MotifDesign) {
+        var all = motifDesigns
+        if let i = all.firstIndex(where: { $0.id == design.id }) { all[i] = design } else { all.append(design) }
+        setMotifDesigns(all)
+    }
+
+    func deleteDesign(_ id: String) { setMotifDesigns(motifDesigns.filter { $0.id != id }) }
+
+    func previewMotif(for app: String) { session?.previewMotif(for: app) }
+
+    /// The current harmony, rebuilt from status (for resolving motif steps to notes in the UI).
+    var harmony: HarmonyContext? {
+        guard let s = status else { return nil }
+        return HarmonyContext(root: s.root, scaleSteps: s.scaleSteps, chordDegree: s.chordDegree, chordSize: s.chordSize)
+    }
 
     func setProgression(_ mood: String, _ degrees: [Int]) {
         guard !degrees.isEmpty else { return }

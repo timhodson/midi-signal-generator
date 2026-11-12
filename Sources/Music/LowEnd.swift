@@ -45,7 +45,7 @@ public final class BassGenerator: Generator {
             if ctx.chordChanged {
                 let beats = Double(p.int("harmony.barsPerChord") * ctx.clock.beatsPerBar) * max(p.value("gen.bass.length"), 0.25)
                 out.notes.append(NoteIntent(role: "bass", pitch: .chordTone(0, octave: octave), intensity: intensity,
-                                            time: ctx.now, beats: beats, essential: true, why: "bass hold"))
+                                            time: ctx.now, beats: beats, essential: true, why: "chord changed → hold root"))
             }
             return out
         }
@@ -62,14 +62,14 @@ public final class BassGenerator: Generator {
             }
             out.notes.append(NoteIntent(role: "bass", pitch: .chordTone(tone, octave: octave), intensity: intensity,
                                         time: ctx.clock.time(ofBeat: beat), beats: length, essential: true,
-                                        why: "bass \(Self.patterns[pattern].lowercased())"))
+                                        why: "\(Self.patterns[pattern].lowercased()) step \(i % (pattern == 3 ? 4 : 2) + 1) · every \(step.formatted()) beats"))
         }
         // Fills on the half-steps, only when traffic is up.
         for beat in MusicalClock.crossings(of: step / 2, in: ctx.beats)
         where Int((beat / (step / 2)).rounded()) % 2 == 1 && rng.chance(p.value("gen.bass.fills") * level) {
             out.notes.append(NoteIntent(role: "bass", pitch: .chordTone(rng.chance(0.5) ? 0 : 2, octave: octave),
                                         intensity: intensity * 0.8, time: ctx.clock.time(ofBeat: beat),
-                                        beats: length / 2, why: "bass fill @ \(formatRate(ctx.totalRate))"))
+                                        beats: length / 2, why: String(format: "fill · %.0f%% chance at traffic %@", p.value("gen.bass.fills") * level * 100, formatRate(ctx.totalRate))))
         }
         return out
     }
@@ -124,7 +124,7 @@ public final class SubDroneGenerator: Generator {
             beats = Double(p.int("harmony.barsPerChord") * ctx.clock.beatsPerBar) * 1.02
         }
         lastStart = ctx.now
-        let why = p.int("gen.sub.mode") == 0 ? "sub pedal" : "sub root"
+        let why = p.int("gen.sub.mode") == 0 ? "tonic pedal · re-struck every \(p.int("gen.sub.holdBars")) bars" : "chord changed → root"
         out.notes.append(NoteIntent(role: "sub", pitch: .exact(root), intensity: p.value("gen.sub.intensity"),
                                     time: ctx.now, beats: beats, essential: true, why: why))
         if p.bool("gen.sub.fifth") {

@@ -1,4 +1,5 @@
 import Foundation
+import Music
 
 /// A read-only picture of the engine, published ~10× a second for UIs and scopes.
 public struct EngineStatus: Sendable {
@@ -22,6 +23,16 @@ public struct EngineStatus: Sendable {
         public var rawPitch: Double?
         /// Generator intensity (0...1) before the velocity curve.
         public var intensity: Double = 0
+    }
+
+    /// An app the engine has seen, for the motif editor.
+    public struct AppInfo: Sendable, Hashable {
+        public var name: String
+        public var bytesPerSecond: Double
+        public var wakes: Int
+        /// Engine time of the last wake-up, if any.
+        public var lastWake: Double?
+        public var ignored: Bool
     }
 
     public struct ChordEvent: Sendable, Hashable {
@@ -75,4 +86,10 @@ public struct EngineStatus: Sendable {
     /// Pitch classes (0 = C) of the scale and of the current chord.
     public var scalePitchClasses: [Int]
     public var chordPitchClasses: [Int]
+    /// Enough to rebuild the HarmonyContext in a UI (e.g. to resolve motif steps to notes).
+    public var root: Int
+    public var scaleSteps: [Int]
+    public var chordSize: Int
+    public var apps: [AppInfo]
+    public var motifs: [MotifDesign]
 }

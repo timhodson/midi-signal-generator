@@ -174,11 +174,8 @@ struct ParamSection: View {
             filter.isEmpty || s.id.localizedCaseInsensitiveContains(filter) || s.label.localizedCaseInsensitiveContains(filter)
                 || s.help.localizedCaseInsensitiveContains(filter)
         }
-        let groups = Dictionary(grouping: specs) { s in
-            s.id.split(separator: ".").dropFirst(groupComponent).first.map(String.init) ?? ""
-        }
-        let order = specs.map { s in s.id.split(separator: ".").dropFirst(groupComponent).first.map(String.init) ?? "" }
-            .reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+        let groups = Dictionary(grouping: specs) { groupKey($0.id) }
+        let order = specs.map { groupKey($0.id) }.reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
 
         List {
             if model.specs.isEmpty {
@@ -208,9 +205,17 @@ struct ParamSection: View {
 }
 
 extension ParamSection {
-    /// "gen.drone.octave" with groupComponent 1 -> "gen.drone".
+    /// Which group an id belongs to: "gen.drone.octave" -> "drone" (groupComponent 1). Ids too short
+    /// to have that component ("activity.threshold") group by their first part instead.
+    func groupKey(_ id: String) -> String {
+        let parts = id.split(separator: ".").map(String.init)
+        return parts.count > groupComponent + 1 ? parts[groupComponent] : parts[0]
+    }
+
+    /// "gen.drone.octave" with groupComponent 1 -> "gen.drone"; "activity.threshold" -> "activity".
     func groupPrefix(_ id: String) -> String {
-        id.split(separator: ".").prefix(groupComponent + 1).joined(separator: ".")
+        let parts = id.split(separator: ".")
+        return parts.count > groupComponent + 1 ? parts.prefix(groupComponent + 1).joined(separator: ".") : String(parts[0])
     }
 
     static func title(_ group: String) -> String {

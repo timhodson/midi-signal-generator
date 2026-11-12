@@ -87,7 +87,7 @@ Mod routes address keyed streams as `id#key`, e.g. `net.app.bytesPerSec#Spotify`
 | Role | Generator | What it plays | Default MIDI ch |
 |---|---|---|---|
 | `pad` | Drone | the current chord, sustained | 1 |
-| `lead` | Motif | each app's own motif when it wakes | 2 |
+| `lead` | Motif | each app's own motif when it wakes: generated from its name, or a design (ADR 0014) | 2 |
 | `pulse` | Pulse | sparse grid notes, density follows traffic | 3 |
 | `bass` | Bass | chord root in a pattern (hold / beats / root–fifth / walk), fills when busy | 4 |
 | `sub` | Sub drone | very low tonic pedal or chord root, long | 5 |

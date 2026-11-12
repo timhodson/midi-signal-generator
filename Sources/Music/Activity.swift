@@ -6,6 +6,12 @@ public struct Activation: Sendable, Equatable {
     public var key: String
     public var bytesPerSecond: Double
     public var time: Double
+
+    public init(key: String, bytesPerSecond: Double, time: Double) {
+        self.key = key
+        self.bytesPerSecond = bytesPerSecond
+        self.time = time
+    }
 }
 
 /// Detects idle -> active transitions per key with a tunable threshold and cooldown.

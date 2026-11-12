@@ -1,6 +1,7 @@
 import AppKit
 import Engine
 import Foundation
+import Music
 import SwiftUI
 
 /// msg-app [--scene <file.json>] [--source live|synthetic]
@@ -100,6 +101,16 @@ enum Snapshot {
                 let url = directory.appendingPathComponent("\(item.rawValue.lowercased()).png")
                 await render(ContentView(selection: item).environment(model), to: url, size: NSSize(width: 1280, height: height))
                 print("wrote \(url.path)")
+            }
+            // The motif editor needs a selection: an app, and a design customised from it.
+            if let app = model.status?.apps.first(where: { !$0.ignored })?.name, let h = model.harmony {
+                await render(MotifsView(selection: .app(app)).environment(model),
+                             to: directory.appendingPathComponent("motifs-app.png"), size: NSSize(width: 1280, height: 700))
+                let d = MotifDesign.fromGenerated(app: app, length: 4, range: 7, octave: 5, harmony: h)
+                model.updateDesign(d)
+                await render(MotifsView(selection: .design(d.id)).environment(model),
+                             to: directory.appendingPathComponent("motifs-design.png"), size: NSSize(width: 1280, height: 1100))
+                print("wrote motif pages for \(app)")
             }
             model.stop()
             exit(0)

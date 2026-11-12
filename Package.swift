@@ -37,7 +37,7 @@ let package = Package(
         // Wires everything together and owns the clock.
         .target(name: "Engine", dependencies: ["Params", "SignalBus", "Music", "Router", "MIDIOut", "Sources"]),
         // Builds a session (hosted synths + MIDI + engine + source); shared by CLI and app.
-        .target(name: "Runtime", dependencies: ["Engine", "AUHost", "MIDIOut", "Router", "SignalBus", "Sources"]),
+        .target(name: "Runtime", dependencies: ["Engine", "AUHost", "MIDIOut", "Music", "Router", "SignalBus", "Sources"]),
         .executableTarget(name: "msg-spike", dependencies: ["Runtime", "Engine", "AUHost"]),
         // The Mac app: SwiftUI panels generated from ParamSpecs, scopes, synth editors.
         .executableTarget(name: "msg-app", dependencies: ["Runtime", "Engine", "AUHost", "Music", "Params", "Router", "Sources"]),

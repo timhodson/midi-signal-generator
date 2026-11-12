@@ -79,7 +79,7 @@ public final class DroneGenerator: Generator {
                 out.notes.append(NoteIntent(
                     role: "pad", pitch: .chordTone(i, octave: p.int("gen.drone.octave") + lift),
                     intensity: p.value("gen.drone.intensity"), time: ctx.now, beats: beats,
-                    essential: true, why: "chord \(ctx.harmony.chordDegree + 1)"
+                    essential: true, why: "chord changed → \(ctx.harmony.chordName(degree: ctx.harmony.chordDegree))"
                 ))
             }
         }
@@ -102,6 +102,8 @@ public final class DroneGenerator: Generator {
 /// "lead" role when that app wakes up. Like hearing who is talking.
 public final class MotifGenerator: Generator {
     public let id = "motif"
+    /// Hand-made motifs that replace the generated one for matching apps.
+    public var designs: [MotifDesign] = []
     public init() {}
 
     public var params: [ParamSpec] {
@@ -144,6 +146,10 @@ public final class MotifGenerator: Generator {
         guard p.bool("gen.motif.enabled") else { return out }
 
         for activation in ctx.activations.prefix(p.int("gen.motif.maxPerTick")) {
+            if let design = MotifDesign.best(for: activation.key, in: designs) {
+                out.notes += play(design, for: activation, ctx)
+                continue
+            }
             let shape = Self.shape(for: activation.key, length: p.int("gen.motif.length"),
                                    range: p.int("gen.motif.range"))
             let centre = Double(12 * (p.int("gen.motif.octave") + 1) + ctx.harmony.root + shape.start)
@@ -156,11 +162,29 @@ public final class MotifGenerator: Generator {
                 out.notes.append(NoteIntent(
                     role: "lead", pitch: .raw(centre + Double(offset)), intensity: intensity,
                     time: ctx.now + Double(i) * step, beats: p.value("gen.motif.noteBeats"),
-                    why: "\(activation.key) woke (\(formatRate(activation.bytesPerSecond)))"
+                    why: "\(activation.key) woke (\(formatRate(activation.bytesPerSecond))) · generated motif"
                 ))
             }
         }
         return out
+    }
+
+    private func play(_ design: MotifDesign, for activation: Activation, _ ctx: GeneratorContext) -> [NoteIntent] {
+        let p = ctx.params
+        let level = min(max((log10(max(activation.bytesPerSecond, 1)) - 3) / 4, 0), 1)
+        let d = p.value("gen.motif.dynamics")
+        let intensity = p.value("gen.motif.intensity") * ((1 - d) + d * level)
+        let step = (design.stepBeats ?? p.value("gen.motif.stepBeats")) * ctx.clock.secondsPerBeat
+        let anchor = design.anchor == .chord ? ctx.harmony.chordDegree : 0
+        let octave = design.octave ?? p.int("gen.motif.octave")
+        let label = design.match == "*" ? "default design" : "design “\(design.match)”"
+        return design.steps.enumerated().compactMap { i, s in
+            guard let s else { return nil }
+            return NoteIntent(role: "lead", pitch: .exact(ctx.harmony.note(degree: anchor + s, octave: octave)),
+                              intensity: intensity, time: ctx.now + Double(i) * step,
+                              beats: p.value("gen.motif.noteBeats"),
+                              why: "\(activation.key) woke (\(formatRate(activation.bytesPerSecond))) · \(label)")
+        }
     }
 }
 
@@ -201,7 +225,7 @@ public final class PulseGenerator: Generator {
             out.notes.append(NoteIntent(
                 role: "pulse", pitch: .raw(pitch), intensity: p.value("gen.pulse.intensity"),
                 time: ctx.clock.time(ofBeat: beat), beats: p.value("gen.pulse.noteBeats"),
-                why: "pulse @ \(formatRate(ctx.totalRate))"
+                why: String(format: "%.0f%% chance on this step · traffic %@", p.value("gen.pulse.density") * 100, formatRate(ctx.totalRate))
             ))
         }
         return out

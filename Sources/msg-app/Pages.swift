@@ -68,7 +68,10 @@ enum Pages {
 
     @MainActor static func generatorAccessory(_ group: String) -> AnyView? {
         guard let role = generatorRoles[group] else { return nil }
-        return AnyView(RoleLane(role: role))
+        return AnyView(VStack(spacing: 10) {
+            TriggerCard(role: role)
+            RoleLane(role: role)
+        })
     }
 
     // MARK: Voices

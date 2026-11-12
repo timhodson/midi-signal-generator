@@ -1,5 +1,6 @@
 import AUHost
 import Engine
+import Music
 import Foundation
 import MIDIOut
 import Router
@@ -149,6 +150,16 @@ public final class Session: @unchecked Sendable {
     /// How often the engine publishes status (e.g. slower while the UI is hidden), from any thread.
     public func setStatusInterval(_ seconds: Double) {
         engine.queue.async { [engine] in engine.statusInterval = seconds }
+    }
+
+    /// Replace the motif designs (live), from any thread.
+    public func setMotifs(_ designs: [MotifDesign]) {
+        engine.queue.async { [engine] in engine.setMotifs(designs) }
+    }
+
+    /// Play an app's motif now, from any thread.
+    public func previewMotif(for app: String) {
+        engine.queue.async { [engine] in engine.previewMotif(for: app) }
     }
 
     /// Hear a chord now, from any thread.
