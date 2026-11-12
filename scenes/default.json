@@ -14,6 +14,9 @@
     "rapportd",
     "identityservice"
   ],
+  "instruments" : [
+
+  ],
   "macros" : [
     {
       "help" : "0 = tidy and musical, 1 = raw sonification. Moves the quantise strengths and density.",

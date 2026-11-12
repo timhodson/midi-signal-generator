@@ -6,6 +6,7 @@ import Foundation
 import MIDIOut
 import Params
 import Router
+import Runtime
 import Sources
 
 let usage = """
@@ -139,9 +140,9 @@ if options.listInstruments {
 /// (AVAudioUnit delivers instantiation on the main queue).
 final class ResultBox<T>: @unchecked Sendable { var result: Result<T, Error>? }
 
-func blocking<T>(_ op: @escaping () async throws -> T) throws -> T {
+func blocking<T>(_ op: @escaping @MainActor () async throws -> T) throws -> T {
     let box = ResultBox<T>()
-    nonisolated(unsafe) let work = op
+    let work = op
     Task { @MainActor in
         do { box.result = .success(try await work()) } catch { box.result = .failure(error) }
     }
@@ -161,9 +162,9 @@ if options.listDestinations {
     exit(0)
 }
 
-let sink: MIDISink
-var coreMIDI: CoreMIDISink?
-let quiet = options.dryRun || options.dumpScene
+guard let source = SourceChoice(options.source, speed: options.speed, loop: options.loop) else {
+    fail("unknown source \(options.source)")
+}
 
 // Audio Unit plugins talk to AppKit (ViewBridge) even without showing a UI, so a hosting
 // process needs an NSApplication and a running main run loop. No Dock icon or menu bar.
@@ -171,46 +172,30 @@ if !scene.instruments.isEmpty {
     NSApplication.shared.setActivationPolicy(.prohibited)
 }
 
-// Hosted instruments: loaded for real runs, and for listings so their params show up.
-let auHost: AUHostSink? = {
-    guard !scene.instruments.isEmpty, !quiet else { return nil }
-    let configs = scene.instruments
-    do {
-        let host = try blocking { try await AUHostSink.load(configs) }
-        for i in configs { print("→ AU: \(i.id) = \(i.component)\(i.preset.map { " (\($0))" } ?? "")") }
-        return host
-    } catch { fail("could not load instruments: \(error)") }
-}()
-
-if quiet || options.listParams || options.listOptions != nil {
-    sink = CompositeSink(routes: auHost.map { [.init(claims: { $0.hasPrefix(InstrumentConfig.destinationPrefix) }, sink: $0)] } ?? [],
-                         fallback: PrintSink { _ in }) // notes are logged by the engine instead
-} else {
-    let external = Set(scene.voices.map(\.destination).filter { !$0.hasPrefix(InstrumentConfig.destinationPrefix) })
-    var fallback: MIDISink = PrintSink { _ in }
-    if !external.isEmpty {
-        let c = CoreMIDISink()
-        do { try c.start(destinations: external, enableNetworkSession: options.networkSession) } catch { fail("MIDI start failed: \(error)") }
-        coreMIDI = c
-        fallback = c
-    }
-    sink = CompositeSink(routes: auHost.map { [.init(claims: { $0.hasPrefix(InstrumentConfig.destinationPrefix) }, sink: $0)] } ?? [],
-                         fallback: fallback)
-}
-
-let engine: Engine
-do { engine = try Engine(scene: scene, sink: sink) } catch { fail("\(error)") }
+let listing = options.listParams || options.listOptions != nil
+let sessionOptions = SessionOptions(
+    source: source,
+    output: options.dryRun || options.dumpScene ? .silent : listing ? .listing : .live,
+    record: options.record.map { URL(fileURLWithPath: $0) },
+    networkSession: options.networkSession
+)
+let session: Session
+do {
+    let sceneToLoad = scene
+    session = try blocking { try await Session.make(scene: sceneToLoad, options: sessionOptions) }
+} catch { fail("\(error)") }
+let engine = session.engine
 
 if options.listParams {
-    for id in engine.params.order {
-        let s = engine.params.specs[id]!
-        let range = s.kind == .choice && s.options.count > 16
-            ? "0…\(s.options.count - 1): \(s.options.count) options, see --list-options \(id)"
-            : s.kind == .choice
-            ? s.options.enumerated().map { "\($0.offset)=\($0.element)" }.joined(separator: " ")
-            : "\(s.range.lowerBound)…\(s.range.upperBound)\(s.unit.isEmpty ? "" : " \(s.unit)")"
-        let mod = s.modulatable ? " [mod]" : ""
-        print("\(id) = \(engine.params.baseValue(id))  (\(range))\(mod)\n    \(s.help)")
+    for spec in engine.paramSpecs {
+        let id = spec.id
+        let range = spec.kind == .choice && spec.options.count > 16
+            ? "0…\(spec.options.count - 1): \(spec.options.count) options, see --list-options \(id)"
+            : spec.kind == .choice
+            ? spec.options.enumerated().map { "\($0.offset)=\($0.element)" }.joined(separator: " ")
+            : "\(spec.range.lowerBound)…\(spec.range.upperBound)\(spec.unit.isEmpty ? "" : " \(spec.unit)")"
+        let mod = spec.modulatable ? " [mod]" : ""
+        print("\(id) = \(engine.params.baseValue(id))  (\(range))\(mod)\n    \(spec.help)")
     }
     exit(0)
 }
@@ -222,56 +207,18 @@ if let id = options.listOptions {
 }
 
 if options.dumpScene {
-    var effective = scene
-    // Macros are left out (their effect is already in the target values) so the dump
-    // round-trips; route depths go back into the routes themselves.
-    effective.params = engine.params.baseValues.filter { !$0.key.hasPrefix("mod.") && !$0.key.hasPrefix("macro.") }
-    // Instruments aren't loaded for a dump, so keep the scene's own au.* values.
-    for (id, v) in scene.params where id.hasPrefix("au.") { effective.params[id] = v }
-    for i in effective.routes.indices { effective.routes[i].amount = engine.params.baseValue("mod.\(i).amount") }
-    print(String(decoding: try! effective.encoded(), as: UTF8.self))
+    print(String(decoding: try! session.currentScene().encoded(), as: UTF8.self))
     exit(0)
 }
 
-if let c = coreMIDI {
-    for (name, ok) in c.connectedDestinations().sorted(by: { $0.key < $1.key }) {
-        if ok {
-            print("→ MIDI: \(name)")
-        } else if name == CoreMIDISink.networkDestination {
-            print("⚠︎ Network MIDI session is disabled. Enable it in Audio MIDI Setup → Window → Show MIDI Studio → Network, then restart.")
-        } else {
-            print("⚠︎ MIDI destination \"\(name)\" not found yet — will connect when it appears. Try --list-destinations.")
-        }
-    }
-}
-
+session.notes.forEach { print($0) }
 engine.logNotes = options.dryRun || options.verbose
-switch options.source {
-case "nettop": engine.add(NettopSource())
-case "synthetic": engine.add(SyntheticSource(seed: scene.seed))
-case let s where s.hasPrefix("replay:"):
-    let path = String(s.dropFirst("replay:".count))
-    do {
-        let replay = try ReplaySource(url: URL(fileURLWithPath: path), speed: options.speed, loop: options.loop)
-        print(String(format: "▶︎ replaying %@: %d batches, %.0f s (recorded %@ from %@)", path, replay.batches.count,
-                     replay.duration, replay.header.recorded.formatted(), replay.header.sources.joined(separator: ", ")))
-        engine.add(replay)
-    } catch { fail("\(error)") }
-default: fail("unknown source \(options.source)")
-}
-if let path = options.record {
-    do {
-        engine.recorder = try SignalRecorder(url: URL(fileURLWithPath: path), sources: [options.source])
-        print("● recording signals to \(path)")
-    } catch { fail("could not record: \(error)") }
-}
 
-do { try engine.start() } catch { fail("could not start: \(error)") }
+do { try session.start() } catch { fail("could not start: \(error)") }
 print("Running \"\(scene.name)\". Ctrl-C to stop.")
 
 func shutdown() -> Never {
-    engine.stop()
-    auHost?.stop()
+    session.stop()
     print("\nstopped, all notes off.")
     exit(0)
 }
@@ -287,7 +234,7 @@ sigterm.resume()
 if let d = options.duration {
     DispatchQueue.main.asyncAfter(deadline: .now() + d) { shutdown() }
 }
-if let host = auHost {
+if let host = session.auHost {
     if options.verbose {
         Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
             let db = 20 * log10(max(Double(host.takePeak()), 1e-6))

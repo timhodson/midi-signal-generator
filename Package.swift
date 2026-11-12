@@ -6,6 +6,7 @@ let package = Package(
     platforms: [.macOS(.v15)],
     products: [
         .executable(name: "msg-spike", targets: ["msg-spike"]),
+        .executable(name: "msg-app", targets: ["msg-app"]),
         .library(name: "MSGEngine", targets: ["Engine"]),
     ],
     dependencies: [
@@ -35,7 +36,11 @@ let package = Package(
         .target(name: "Sources", dependencies: ["SignalBus"]),
         // Wires everything together and owns the clock.
         .target(name: "Engine", dependencies: ["Params", "SignalBus", "Music", "Router", "MIDIOut", "Sources"]),
-        .executableTarget(name: "msg-spike", dependencies: ["Engine", "AUHost"]),
+        // Builds a session (hosted synths + MIDI + engine + source); shared by CLI and app.
+        .target(name: "Runtime", dependencies: ["Engine", "AUHost", "MIDIOut", "Router", "SignalBus", "Sources"]),
+        .executableTarget(name: "msg-spike", dependencies: ["Runtime", "Engine", "AUHost"]),
+        // The Mac app: SwiftUI panels generated from ParamSpecs, scopes, synth editors.
+        .executableTarget(name: "msg-app", dependencies: ["Runtime", "Engine", "AUHost", "Params", "Router", "Sources"]),
 
         .testTarget(name: "ParamsTests", dependencies: ["Params"]),
         .testTarget(name: "MusicTests", dependencies: ["Music", "Params", "SignalBus"]),

@@ -9,6 +9,7 @@
 - [x] CoreMIDI out: virtual port, network session, named destinations; scheduler with note ledger
 - [x] Hosted Audio Unit instruments, one per voice, with plugin params as mod targets (ADR 0010). Heard on the Mac
 - [x] Record / replay signals (`--record`, `--source replay:`, ADR 0011)
+- [x] Mac app v1: generated param panels, overview scopes, instruments with editors, mod matrix, scenes (ADR 0012)
 - [ ] **Listen to it on the iPad** and tune the default and hosted scenes by ear
 
 ## Next
@@ -16,11 +17,8 @@
 2. **OSC in** (ADR 0008), for both signals and param control (`/param/quant.pitch.strength 0.4`).
 3. **pcap helper** (privileged, separate process). Packet-level features: protocol mix, DNS
    → pickup notes, SYN/FIN → phrase start/end, TLS hello, mDNS/SSDP chatter → texture.
-4. **SwiftUI app** on top of `Engine`:
-   - parameter panels generated from `ParamSpec` (AudioKit Controls)
-   - voice/range mapper using AudioKit Keyboard, showing sounding notes
-   - mod-matrix grid, macro knobs, scene save/load/A–B
-   - live signal scopes (Swift Charts)
+4. **App, next round:** voice routing and range editing in the UI (AudioKit Keyboard), adding
+   and removing hosted instruments, scene A/B comparison, MIDI-learn for params, an app bundle.
 5. **MIDI clock** out (and in, to follow a DAW). CoreMIDI timestamped sends.
 6. More generators: arpeggiator over the chord, flow-voice (one voice per live connection with voice stealing), percussion.
 

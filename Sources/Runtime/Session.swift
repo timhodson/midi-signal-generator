@@ -1,0 +1,153 @@
+import AUHost
+import Engine
+import Foundation
+import MIDIOut
+import Router
+import SignalBus
+import Sources
+
+/// Where signals come from.
+public enum SourceChoice: Sendable, Equatable {
+    case nettop
+    case synthetic
+    case replay(URL, speed: Double, loop: Bool)
+
+    /// Parses the CLI form: "nettop", "synthetic", "replay:<path>".
+    public init?(_ text: String, speed: Double = 1, loop: Bool = false) {
+        switch text {
+        case "nettop": self = .nettop
+        case "synthetic": self = .synthetic
+        case let s where s.hasPrefix("replay:"):
+            self = .replay(URL(fileURLWithPath: String(s.dropFirst("replay:".count))), speed: speed, loop: loop)
+        default: return nil
+        }
+    }
+
+    public var label: String {
+        switch self {
+        case .nettop: "Live traffic (this Mac)"
+        case .synthetic: "Synthetic"
+        case .replay(let url, let speed, let loop):
+            "Replay \(url.lastPathComponent)\(speed != 1 ? " ×\(speed.formatted())" : "")\(loop ? " (loop)" : "")"
+        }
+    }
+}
+
+public struct SessionOptions: Sendable {
+    public enum Output: Sendable {
+        /// Hosted synths and MIDI destinations, for real.
+        case live
+        /// Load hosted synths (so their params exist) but send nothing anywhere.
+        case listing
+        /// Load nothing, send nothing (dry run, scene dump).
+        case silent
+    }
+
+    public var source: SourceChoice
+    public var output: Output
+    public var record: URL?
+    public var networkSession: Bool
+
+    public init(source: SourceChoice = .nettop, output: Output = .live, record: URL? = nil, networkSession: Bool = false) {
+        self.source = source
+        self.output = output
+        self.record = record
+        self.networkSession = networkSession
+    }
+}
+
+/// One running (or ready-to-run) configuration: hosted synths + MIDI outputs + engine +
+/// source. Shared by the CLI and the app so both build sessions the same way.
+public final class Session: @unchecked Sendable {
+    public let scene: Scene
+    public let options: SessionOptions
+    public let engine: Engine
+    public let auHost: AUHostSink?
+    public let coreMIDI: CoreMIDISink?
+    public let replay: ReplaySource?
+    /// Human-readable notes about setup (loaded synths, missing destinations…).
+    public private(set) var notes: [String] = []
+
+    /// Build a session. Must be awaited on the main actor: Audio Units are delivered there.
+    @MainActor
+    public static func make(scene: Scene, options: SessionOptions) async throws -> Session {
+        var notes: [String] = []
+        var auHost: AUHostSink?
+        if !scene.instruments.isEmpty, options.output != .silent {
+            let host = try await AUHostSink.load(scene.instruments)
+            for i in scene.instruments { notes.append("→ AU: \(i.id) = \(i.component)\(i.preset.map { " (\($0))" } ?? "")") }
+            auHost = host
+        }
+
+        var coreMIDI: CoreMIDISink?
+        var fallback: MIDISink = PrintSink { _ in } // the engine logs notes itself
+        let external = Set(scene.voices.map(\.destination).filter { !$0.hasPrefix(InstrumentConfig.destinationPrefix) })
+        if options.output == .live, !external.isEmpty {
+            let c = CoreMIDISink()
+            try c.start(destinations: external, enableNetworkSession: options.networkSession)
+            for (name, ok) in c.connectedDestinations().sorted(by: { $0.key < $1.key }) {
+                if ok {
+                    notes.append("→ MIDI: \(name)")
+                } else if name == CoreMIDISink.networkDestination {
+                    notes.append("⚠︎ Network MIDI session is disabled. Enable it in Audio MIDI Setup → Window → Show MIDI Studio → Network, then restart.")
+                } else {
+                    notes.append("⚠︎ MIDI destination \"\(name)\" not found yet — will connect when it appears.")
+                }
+            }
+            coreMIDI = c
+            fallback = c
+        }
+        let sink = CompositeSink(
+            routes: auHost.map { [.init(claims: { $0.hasPrefix(InstrumentConfig.destinationPrefix) }, sink: $0)] } ?? [],
+            fallback: fallback
+        )
+        let engine = try Engine(scene: scene, sink: sink)
+
+        var replay: ReplaySource?
+        switch options.source {
+        case .nettop: engine.add(NettopSource())
+        case .synthetic: engine.add(SyntheticSource(seed: scene.seed))
+        case .replay(let url, let speed, let loop):
+            let r = try ReplaySource(url: url, speed: speed, loop: loop)
+            notes.append(String(format: "▶︎ replaying %@: %d batches, %.0f s (recorded %@ from %@)", url.lastPathComponent,
+                                r.batches.count, r.duration, r.header.recorded.formatted(),
+                                r.header.sources.joined(separator: ", ")))
+            engine.add(r)
+            replay = r
+        }
+        if let url = options.record {
+            engine.recorder = try SignalRecorder(url: url, sources: [options.source.label])
+            notes.append("● recording signals to \(url.path)")
+        }
+
+        let session = Session(scene: scene, options: options, engine: engine, auHost: auHost, coreMIDI: coreMIDI, replay: replay)
+        session.notes = notes
+        return session
+    }
+
+    private init(scene: Scene, options: SessionOptions, engine: Engine, auHost: AUHostSink?,
+                 coreMIDI: CoreMIDISink?, replay: ReplaySource?) {
+        self.scene = scene
+        self.options = options
+        self.engine = engine
+        self.auHost = auHost
+        self.coreMIDI = coreMIDI
+        self.replay = replay
+    }
+
+    public func start() throws { try engine.start() }
+
+    /// Stop sources, release notes, let synth tails ring for `tail` seconds, stop audio.
+    public func stop(tail: TimeInterval = 1.5) {
+        engine.stop()
+        auHost?.stop(tail: tail)
+    }
+
+    /// The scene including every tweak made since it was loaded.
+    public func currentScene() -> Scene { engine.queue.sync { engine.currentScene() } }
+
+    /// Set a param from any thread.
+    public func set(_ id: String, _ value: Double) {
+        engine.queue.async { [engine] in try? engine.setParam(id, value) }
+    }
+}

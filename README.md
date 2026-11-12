@@ -12,6 +12,7 @@ is a tunable parameter**, from raw sonification to tidy ambient music.
 ## Quick start
 
 ```sh
+swift run msg-app --scene scenes/audiokit-hosted.json   # the Mac app
 swift build
 .build/debug/msg-spike --source synthetic --dry-run   # hear nothing, see the notes
 .build/debug/msg-spike --verbose                      # real traffic → virtual MIDI port "MIDI Signal Generator"
@@ -29,6 +30,7 @@ Voices: `pad` = ch 1, `lead` = ch 2, `pulse` = ch 3 (all tunable).
 ## Docs
 
 - [Architecture](docs/architecture.md)
+- [The app](docs/decisions/0012-mac-app-generated-from-params.md)
 - [Decisions (ADRs)](docs/README.md#decisions-adrs)
 - [MIDI setup (hosted AU synths, iPad, DAW, Bluetooth)](docs/midi-setup.md)
 - [Development](docs/development.md) · [Roadmap](docs/roadmap.md)

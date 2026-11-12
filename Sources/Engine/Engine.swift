@@ -40,6 +40,11 @@ public final class Engine: @unchecked Sendable {
     private var seenAppVersion = 0
     private var lastStatus: Double = 0
     private var firstTick = true
+    private var lastPublish: Double = 0
+    private var recentNotes: [EngineStatus.PlayedNote] = []
+    private var noteCounter = 0
+    /// Called on the engine queue about 10× a second with a snapshot (for UIs).
+    public var onStatus: (@Sendable (EngineStatus) -> Void)?
 
     public static let tickInterval: Double = 0.005
     /// Generators look this far ahead so notes are scheduled before they're due.
@@ -176,6 +181,10 @@ public final class Engine: @unchecked Sendable {
                 guard let resolved = quantiser.resolve(intent, harmony: harmony, clock: clock, params: params, rng: &rng),
                       let routed = router.route(resolved, params: params) else { continue }
                 scheduler.schedule(routed)
+                noteCounter += 1
+                recentNotes.append(.init(id: noteCounter, time: routed.start, role: routed.role, note: routed.note,
+                                         velocity: routed.velocity, why: routed.why))
+                if recentNotes.count > 64 { recentNotes.removeFirst(recentNotes.count - 64) }
                 if logNotes {
                     log("\(String(format: "%8.2f", routed.start))s \(routed.role.padding(5)) ch\(String(routed.channel + 1).padding(2)) "
                         + "\(noteName(routed.note).padding(4)) v\(String(routed.velocity).padding(3)) "
@@ -189,12 +198,54 @@ public final class Engine: @unchecked Sendable {
 
         scheduler.fire(now: t)
 
+        if let onStatus, t - lastPublish >= 0.1 {
+            lastPublish = t
+            onStatus(status(at: t, harmony: harmony, total: total))
+        }
+
         if t - lastStatus >= 10 {
             lastStatus = t
             let top = (bus.streams["net.app.bytesPerSec"] ?? [:]).sorted { $0.value > $1.value }.prefix(3)
                 .map { "\($0.key) \(formatRate($0.value))" }.joined(separator: ", ")
             log("· total \(formatRate(total)) (smoothed \(formatRate(conductor.smoothedRate))) | mood \(conductor.mood.rawValue) | sounding \(scheduler.soundingCount) | \(top)")
         }
+    }
+}
+
+extension Engine {
+    /// Param specs in registration order. Call on `queue`, or before `start()`.
+    public var paramSpecs: [ParamSpec] { params.order.compactMap { params.specs[$0] } }
+
+    /// The scene as it stands now, including every tweak, ready to save. Call on `queue`.
+    public func currentScene() -> Scene {
+        var s = scene
+        // Macros are left out (their effect is already in the target values) so the scene
+        // round-trips; route depths go back into the routes themselves.
+        s.params = params.baseValues.filter { !$0.key.hasPrefix("mod.") && !$0.key.hasPrefix("macro.") }
+        // Keep the scene's own au.* values when instruments aren't loaded (e.g. --dry-run).
+        for (id, v) in scene.params where id.hasPrefix("au.") && params.specs[id] == nil { s.params[id] = v }
+        for i in s.routes.indices { s.routes[i].amount = params.baseValue("mod.\(i).amount") }
+        return s
+    }
+
+    fileprivate func status(at t: Double, harmony: HarmonyContext, total: Double) -> EngineStatus {
+        var signals: [String: Double] = [:]
+        for (id, keyed) in bus.streams {
+            for (key, v) in keyed { signals[key.isEmpty ? id : "\(id)#\(key)"] = v }
+        }
+        let apps = (bus.streams["net.app.bytesPerSec"] ?? [:]).sorted { $0.value > $1.value }.prefix(8)
+            .map { EngineStatus.AppRate(app: $0.key, bytesPerSecond: $0.value) }
+        var values: [String: Double] = [:]
+        for id in params.order { values[id] = params.value(id) }
+        return EngineStatus(
+            time: t, beat: clock.beat, bpm: clock.bpm, mood: conductor.mood.rawValue,
+            chordDegree: harmony.chordDegree,
+            chord: harmony.chordDegrees.map { String(noteName(harmony.note(degree: $0)).dropLast()) },
+            key: "\(ScaleCatalogue.rootNames[harmony.root]) \(ScaleCatalogue.names[params.int("harmony.scale")])",
+            totalRate: total, smoothedRate: conductor.smoothedRate, topApps: Array(apps),
+            sounding: scheduler.soundingCount, values: values, bases: params.baseValues, signals: signals,
+            recentNotes: recentNotes
+        )
     }
 }
 

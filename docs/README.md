@@ -23,3 +23,4 @@ is made or reversed; don't rewrite history. Mark superseded ones in their status
 | [0009](decisions/0009-seeded-randomness-and-leitmotifs.md) | Seeded randomness and per-app leitmotifs |
 | [0010](decisions/0010-hosted-audio-unit-instruments.md) | Host Audio Unit instruments (Synth One J6, King of FM) in-app, one per voice |
 | [0011](decisions/0011-record-and-replay-signals.md) | Record and replay signals for repeatable tuning |
+| [0012](decisions/0012-mac-app-generated-from-params.md) | The Mac app: SwiftUI panels generated from ParamSpecs, shared Runtime |

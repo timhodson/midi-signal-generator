@@ -13,7 +13,9 @@ Sources/
   AUHost/      AUHostSink: hosted Audio Unit instruments
   Sources/     NettopSource (+ parser), SyntheticSource
   Engine/      Engine (tick loop), Scene
+  Runtime/     Session: one place that builds synths + MIDI + engine + source
   msg-spike/   CLI
+  msg-app/     SwiftUI app
 Tests/         Swift Testing suites per module
 scenes/        default.json, ipad-network.json, audiokit-hosted.json
 docs/          this folder; decisions/ holds the ADRs
@@ -28,6 +30,15 @@ swift build
 .build/debug/msg-spike --dry-run                            # real traffic, print notes
 .build/debug/msg-spike --list-params                        # every tunable value
 .build/debug/msg-spike --set macro.faithfulness=0.8 --set harmony.scale=4 --verbose
+```
+
+## The app
+
+```sh
+swift run msg-app --scene scenes/audiokit-hosted.json
+swift run msg-app --source synthetic                       # no network needed
+# headless check: render every screen to PNGs and exit (no window appears)
+swift run msg-app --scene scenes/audiokit-hosted.json --source synthetic --snapshot /tmp/msg-snap --seconds 10
 ```
 
 ## Tests

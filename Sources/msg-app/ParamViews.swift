@@ -1,0 +1,180 @@
+import Params
+import SwiftUI
+
+/// One control for any `ParamSpec`, picked by kind. This is what "every musical decision is a
+/// parameter" buys: no hand-built UI per setting.
+struct ParamRow: View {
+    @Environment(AppModel.self) private var model
+    let spec: ParamSpec
+    /// Replaces the spec's label (e.g. "Depth" on a mod route).
+    var label: String?
+
+    private var base: Double { model.base(spec.id) }
+    private var effective: Double { model.effective(spec.id) }
+    private var modulated: Bool { abs(effective - base) > max(spec.span * 0.002, 1e-6) }
+
+    /// Byte-rate thresholds span decades, so their sliders work on a log scale.
+    private var isLog: Bool { spec.unit == "B/s" }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(label ?? (spec.label == spec.id ? Self.shortLabel(spec.id) : spec.label))
+                    .lineLimit(1)
+                Text(spec.id).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1)
+            }
+            .frame(width: 240, alignment: .leading)
+
+            control.frame(maxWidth: .infinity)
+
+            VStack(alignment: .trailing, spacing: 1) {
+                Text(Self.format(base, spec)).monospacedDigit()
+                if modulated {
+                    Text("~ \(Self.format(effective, spec))")
+                        .font(.caption).monospacedDigit().foregroundStyle(.orange)
+                        .help("Current value including modulation")
+                }
+            }
+            .frame(width: 110, alignment: .trailing)
+        }
+        .padding(.vertical, 2)
+        .help(spec.help)
+    }
+
+    @ViewBuilder private var control: some View {
+        switch spec.kind {
+        case .toggle:
+            Toggle("", isOn: Binding(get: { base >= 0.5 }, set: { model.set(spec.id, $0 ? 1 : 0) }))
+                .labelsHidden().toggleStyle(.switch).frame(maxWidth: .infinity, alignment: .leading)
+        case .choice:
+            Picker("", selection: Binding(get: { Int(base) }, set: { model.set(spec.id, Double($0)) })) {
+                ForEach(Array(spec.options.enumerated()), id: \.offset) { i, name in
+                    Text(name.trimmingCharacters(in: .whitespaces)).tag(i)
+                }
+            }
+            .labelsHidden()
+        case .integer:
+            HStack {
+                Slider(value: Binding(get: { base }, set: { model.set(spec.id, $0.rounded()) }),
+                       in: spec.range, step: 1)
+                Stepper("", value: Binding(get: { base }, set: { model.set(spec.id, $0) }), in: spec.range, step: 1)
+                    .labelsHidden()
+            }
+        case .normalised, .continuous:
+            ZStack(alignment: .bottomLeading) {
+                Slider(value: sliderBinding, in: 0...1)
+                if modulated {
+                    GeometryReader { geo in
+                        Capsule().fill(.orange)
+                            .frame(width: 3, height: 8)
+                            .offset(x: max(0, min(geo.size.width - 3, geo.size.width * position(of: effective))), y: -1)
+                    }
+                    .frame(height: 8)
+                    .allowsHitTesting(false)
+                }
+            }
+        }
+    }
+
+    /// Slider works on 0...1; map to the param's range (log for byte rates).
+    private var sliderBinding: Binding<Double> {
+        Binding(get: { position(of: base) }, set: { model.set(spec.id, value(at: $0)) })
+    }
+
+    private func position(of v: Double) -> Double {
+        if isLog {
+            let lo = log10(max(spec.range.lowerBound, 1)), hi = log10(max(spec.range.upperBound, 10))
+            return (log10(max(v, 1)) - lo) / (hi - lo)
+        }
+        return (v - spec.range.lowerBound) / max(spec.span, .ulpOfOne)
+    }
+
+    private func value(at p: Double) -> Double {
+        if isLog {
+            let lo = log10(max(spec.range.lowerBound, 1)), hi = log10(max(spec.range.upperBound, 10))
+            return pow(10, lo + p * (hi - lo))
+        }
+        return spec.range.lowerBound + p * spec.span
+    }
+
+    static func shortLabel(_ id: String) -> String {
+        let last = id.split(separator: ".").last.map(String.init) ?? id
+        // camelCase -> "camel case"
+        var out = ""
+        for c in last {
+            if c.isUppercase, !out.isEmpty { out.append(" ") }
+            out.append(c)
+        }
+        return out.prefix(1).uppercased() + out.dropFirst().lowercased()
+    }
+
+    static func format(_ v: Double, _ spec: ParamSpec) -> String {
+        switch spec.kind {
+        case .toggle: return v >= 0.5 ? "on" : "off"
+        case .choice:
+            return spec.options.indices.contains(Int(v)) ? "#\(Int(v))" : "\(Int(v))"
+        case .integer: return "\(Int(v))\(spec.unit.isEmpty ? "" : " \(spec.unit)")"
+        case .normalised, .continuous:
+            if spec.unit == "B/s" { return Format.rate(v) }
+            let digits = spec.span >= 100 ? 0 : spec.span >= 10 ? 1 : 2
+            return String(format: "%.\(digits)f", v) + (spec.unit.isEmpty ? "" : " \(spec.unit)")
+        }
+    }
+}
+
+/// A searchable list of param rows, grouped by the id component after the prefix.
+struct ParamSection: View {
+    @Environment(AppModel.self) private var model
+    let title: String
+    let prefixes: [String]
+    /// Which id component names the group: 1 = "gen.drone.x" -> "drone".
+    var groupComponent = 0
+    @State private var filter = ""
+
+    var body: some View {
+        let specs = model.specs(withPrefix: prefixes).filter { s in
+            filter.isEmpty || s.id.localizedCaseInsensitiveContains(filter) || s.label.localizedCaseInsensitiveContains(filter)
+                || s.help.localizedCaseInsensitiveContains(filter)
+        }
+        let groups = Dictionary(grouping: specs) { s in
+            s.id.split(separator: ".").dropFirst(groupComponent).first.map(String.init) ?? ""
+        }
+        let order = specs.map { s in s.id.split(separator: ".").dropFirst(groupComponent).first.map(String.init) ?? "" }
+            .reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+
+        List {
+            if model.specs.isEmpty {
+                NotRunningHint()
+            }
+            ForEach(order, id: \.self) { group in
+                Section(group.capitalized) {
+                    ForEach(groups[group] ?? [], id: \.id) { ParamRow(spec: $0) }
+                }
+            }
+        }
+        .searchable(text: $filter, placement: .toolbar, prompt: "Filter \(title.lowercased())")
+        .navigationTitle(title)
+    }
+}
+
+struct NotRunningHint: View {
+    var body: some View {
+        ContentUnavailableView("Not running", systemImage: "waveform.slash",
+                               description: Text("Press Start to load the scene. Parameters appear once it runs."))
+    }
+}
+
+enum Format {
+    static func rate(_ bytesPerSecond: Double) -> String {
+        switch bytesPerSecond {
+        case ..<1_000: String(format: "%.0f B/s", bytesPerSecond)
+        case ..<1_000_000: String(format: "%.1f kB/s", bytesPerSecond / 1_000)
+        default: String(format: "%.1f MB/s", bytesPerSecond / 1_000_000)
+        }
+    }
+
+    static func note(_ n: Int) -> String {
+        let names = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"]
+        return "\(names[((n % 12) + 12) % 12])\(n / 12 - 1)"
+    }
+}

@@ -57,8 +57,10 @@ something pleasant: only interpretation changes.
 | `MIDIOut` | Router, Params, SwiftMIDIIO | `NoteScheduler`, `MIDISink`, `ParameterisedSink`, `CompositeSink`, `CoreMIDISink`, `PrintSink` |
 | `AUHost` | MIDIOut, Router, Params, AVFoundation | `AUHostSink`: hosted Audio Unit instruments, their params, output meter |
 | `Sources` | SignalBus | `NettopParser`, `NettopSource`, `SyntheticSource` |
-| `Engine` | all | `Engine` (tick loop), `Scene` (JSON) |
-| `msg-spike` | Engine | CLI |
+| `Engine` | Params, SignalBus, Music, Router, MIDIOut, Sources | `Engine` (tick loop, `onStatus`), `Scene` (JSON), `EngineStatus` |
+| `Runtime` | Engine, AUHost, MIDIOut, Sources | `Session`: builds synths + sinks + engine + source + recorder |
+| `msg-spike` | Runtime | CLI |
+| `msg-app` | Runtime | SwiftUI app (ADR 0012) |
 
 `Params`, `SignalBus`, `Music` and `Router` contain no I/O, so the future SwiftUI app and the tests use the same code.
 
@@ -86,8 +88,8 @@ Everything musical runs on one serial `DispatchQueue` in `Engine`, driven by a 5
 timer. Sources call back from any thread and hop onto that queue to post samples. Engine
 types are `@unchecked Sendable` because the queue is their isolation. There are no locks on the hot path.
 
-## Where the future app goes
+## The app
 
-The SwiftUI app will sit on top of `Engine` (see [roadmap](roadmap.md)). Parameter UIs are
-generated from `ParamSpec`. AudioKit's **Controls** package provides the knobs and XY pads, its
-**Keyboard** package shows voice ranges and sounding notes, and Swift Charts provides the signal scopes.
+`msg-app` sits on `Runtime.Session`. It reads `EngineStatus` about 10× a second and sets params
+through the session. Its parameter panels are generated from `ParamSpec`. See
+[ADR 0012](decisions/0012-mac-app-generated-from-params.md).
