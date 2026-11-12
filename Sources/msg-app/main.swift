@@ -29,7 +29,8 @@ MainActor.assumeIsolated {
     if arg("--source") == "synthetic" { model.sourceKind = .synthetic }
 
     if let dir = arg("--snapshot") {
-        Snapshot.run(model: model, directory: URL(fileURLWithPath: dir), seconds: Double(arg("--seconds") ?? "") ?? 8)
+        Snapshot.run(model: model, directory: URL(fileURLWithPath: dir), seconds: Double(arg("--seconds") ?? "") ?? 8,
+                     height: Double(arg("--height") ?? "") ?? 860)
     } else {
         MSGApp.initialModel = model
         MSGApp.main()
@@ -80,7 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 @MainActor
 enum Snapshot {
-    static func run(model: AppModel, directory: URL, seconds: Double) {
+    static func run(model: AppModel, directory: URL, seconds: Double, height: Double = 860) {
         setvbuf(stdout, nil, _IOLBF, 0)
         NSApplication.shared.setActivationPolicy(.prohibited)
         Task { @MainActor in
@@ -90,7 +91,7 @@ enum Snapshot {
             try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             for item in SidebarItem.allCases {
                 let url = directory.appendingPathComponent("\(item.rawValue.lowercased()).png")
-                await render(ContentView(selection: item).environment(model), to: url)
+                await render(ContentView(selection: item).environment(model), to: url, size: NSSize(width: 1280, height: height))
                 print("wrote \(url.path)")
             }
             model.stop()

@@ -9,11 +9,38 @@ public struct EngineStatus: Sendable {
 
     public struct PlayedNote: Sendable, Hashable, Identifiable {
         public var id: Int
+        /// When it sounds (after quantise, routing latency).
         public var time: Double
         public var role: String
         public var note: Int
         public var velocity: Int
         public var why: String
+        public var duration: Double = 0
+        /// When the generator asked for it, before time quantising.
+        public var rawTime: Double = 0
+        /// The data-derived pitch before pitch quantising (nil for chord tones / exact notes).
+        public var rawPitch: Double?
+        /// Generator intensity (0...1) before the velocity curve.
+        public var intensity: Double = 0
+    }
+
+    public struct ChordEvent: Sendable, Hashable {
+        public var time: Double
+        public var name: String
+        public var numeral: String
+        public var mood: String
+    }
+
+    /// A chord the scale offers, for the progression editor.
+    public struct ChordChoice: Sendable, Hashable {
+        public var degree: Int
+        public var name: String
+        public var numeral: String
+        /// Note names, root first: ["D", "F", "A"].
+        public var notes: [String]
+        /// Which scale steps it's built from, 1-based: [1, 3, 5].
+        public var steps: [Int]
+        public var pitchClasses: [Int]
     }
 
     public var time: Double
@@ -39,4 +66,13 @@ public struct EngineStatus: Sendable {
     /// Every mood's progression in the current key, and which step is playing.
     public var progressions: [MoodProgression]
     public var progressionIndex: Int
+    /// Gesture sequences (e.g. "flurry"), named in the current key.
+    public var gestures: [MoodProgression]
+    /// The chord on each scale degree, in the current key.
+    public var chordChoices: [ChordChoice]
+    /// Recent chord changes, oldest first.
+    public var chordHistory: [ChordEvent]
+    /// Pitch classes (0 = C) of the scale and of the current chord.
+    public var scalePitchClasses: [Int]
+    public var chordPitchClasses: [Int]
 }

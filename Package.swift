@@ -40,13 +40,14 @@ let package = Package(
         .target(name: "Runtime", dependencies: ["Engine", "AUHost", "MIDIOut", "Router", "SignalBus", "Sources"]),
         .executableTarget(name: "msg-spike", dependencies: ["Runtime", "Engine", "AUHost"]),
         // The Mac app: SwiftUI panels generated from ParamSpecs, scopes, synth editors.
-        .executableTarget(name: "msg-app", dependencies: ["Runtime", "Engine", "AUHost", "Params", "Router", "Sources"]),
+        .executableTarget(name: "msg-app", dependencies: ["Runtime", "Engine", "AUHost", "Music", "Params", "Router", "Sources"]),
 
         .testTarget(name: "ParamsTests", dependencies: ["Params"]),
         .testTarget(name: "MusicTests", dependencies: ["Music", "Params", "SignalBus"]),
         .testTarget(name: "RouterTests", dependencies: ["Router", "Music", "Params"]),
         .testTarget(name: "SourcesTests", dependencies: ["Sources", "SignalBus"]),
         .testTarget(name: "MIDIOutTests", dependencies: ["MIDIOut", "Router", "Params"]),
+        .testTarget(name: "EngineTests", dependencies: ["Engine", "MIDIOut"]),
         .testTarget(name: "AUHostTests", dependencies: ["AUHost", "Params", "Router"]),
     ]
 )

@@ -44,6 +44,8 @@ public final class Engine: @unchecked Sendable {
     private var recentNotes: [EngineStatus.PlayedNote] = []
     private var noteCounter = 0
     private var unroutedRoles: Set<String> = []
+    private var chordHistory: [EngineStatus.ChordEvent] = []
+    private var auditionPending = false
     /// Called on the engine queue about 10× a second with a snapshot (for UIs).
     public var onStatus: (@Sendable (EngineStatus) -> Void)?
 
@@ -167,8 +169,15 @@ public final class Engine: @unchecked Sendable {
             if conductor.mood != before { log("♪ mood \(before.rawValue) → \(conductor.mood.rawValue)") }
         }
         if firstTick { chordChanged = true; firstTick = false } // sound the first chord immediately
+        if auditionPending { chordChanged = true; auditionPending = false }
 
         let harmony = conductor.harmony(params)
+        if chordChanged {
+            chordHistory.append(.init(time: horizon, name: harmony.chordName(degree: harmony.chordDegree),
+                                      numeral: harmony.romanNumeral(degree: harmony.chordDegree),
+                                      mood: conductor.mood.rawValue))
+            if chordHistory.count > 32 { chordHistory.removeFirst(chordHistory.count - 32) }
+        }
         if chordChanged, logNotes {
             let names = harmony.chordDegrees.map { noteName(harmony.note(degree: $0)).dropLast() }
             log("♪ chord \(harmony.chordDegree + 1) [\(names.joined(separator: " "))] mood=\(conductor.mood.rawValue)")
@@ -189,9 +198,12 @@ public final class Engine: @unchecked Sendable {
                       let routed = router.route(resolved, params: params) else { continue }
                 scheduler.schedule(routed)
                 noteCounter += 1
+                var rawPitch: Double?
+                if case .raw(let p) = intent.pitch { rawPitch = p }
                 recentNotes.append(.init(id: noteCounter, time: routed.start, role: routed.role, note: routed.note,
-                                         velocity: routed.velocity, why: routed.why))
-                if recentNotes.count > 64 { recentNotes.removeFirst(recentNotes.count - 64) }
+                                         velocity: routed.velocity, why: routed.why, duration: routed.duration,
+                                         rawTime: intent.time, rawPitch: rawPitch, intensity: intent.intensity))
+                if recentNotes.count > 400 { recentNotes.removeFirst(recentNotes.count - 400) }
                 if logNotes {
                     log("\(String(format: "%8.2f", routed.start))s \(routed.role.padding(5)) ch\(String(routed.channel + 1).padding(2)) "
                         + "\(noteName(routed.note).padding(4)) v\(String(routed.velocity).padding(3)) "
@@ -232,7 +244,26 @@ extension Engine {
         // Keep the scene's own au.* values when instruments aren't loaded (e.g. --dry-run).
         for (id, v) in scene.params where id.hasPrefix("au.") && params.specs[id] == nil { s.params[id] = v }
         for i in s.routes.indices { s.routes[i].amount = params.baseValue("mod.\(i).amount") }
+        s.progressions = Dictionary(uniqueKeysWithValues: conductor.progressions.map { ($0.key.rawValue, $0.value) })
+        s.gestures = conductor.gestures
         return s
+    }
+
+    /// Switch to a chord right now so it can be heard (pads, bass and sub re-strike). Call on `queue`.
+    public func auditionChord(_ degree: Int) {
+        conductor.force(chord: degree)
+        auditionPending = true
+    }
+
+    /// Replace a mood's chord progression (scale degrees, 0 = tonic). Call on `queue`.
+    /// An empty list is ignored: every mood needs at least one chord.
+    public func setProgression(_ mood: String, _ degrees: [Int]) {
+        guard !degrees.isEmpty else { return }
+        if let m = Conductor.Mood(rawValue: mood) {
+            conductor.progressions[m] = degrees
+        } else {
+            conductor.gestures[mood] = degrees
+        }
     }
 
     fileprivate func status(at t: Double, harmony: HarmonyContext, total: Double) -> EngineStatus {
@@ -253,7 +284,20 @@ extension Engine {
             sounding: scheduler.soundingCount, values: values, bases: params.baseValues, signals: signals,
             recentNotes: recentNotes,
             progressions: conductor.describedProgressions(in: harmony),
-            progressionIndex: conductor.progressionIndex
+            progressionIndex: conductor.progressionIndex,
+            gestures: conductor.describedGestures(in: harmony),
+            chordChoices: (0..<harmony.scaleSteps.count).map { d in
+                var c = harmony
+                c.chordDegree = d
+                let tones = c.chordDegrees.map { c.note(degree: $0) }
+                return .init(degree: d, name: harmony.chordName(degree: d), numeral: harmony.romanNumeral(degree: d),
+                             notes: tones.map { ScaleCatalogue.sharpNames[(($0 % 12) + 12) % 12] },
+                             steps: c.chordDegrees.map { $0 % harmony.scaleSteps.count + 1 },
+                             pitchClasses: tones.map { (($0 % 12) + 12) % 12 })
+            },
+            chordHistory: chordHistory,
+            scalePitchClasses: harmony.scalePitchClasses.sorted(),
+            chordPitchClasses: harmony.chordPitchClasses.sorted()
         )
     }
 }

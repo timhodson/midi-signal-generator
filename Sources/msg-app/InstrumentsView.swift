@@ -48,6 +48,7 @@ struct InstrumentPanel: View {
                     Spacer()
                     Button { model.openEditor(config.id) } label: { Label("Open Editor", systemImage: "macwindow") }
                 }
+                ForEach(roles, id: \.self) { RoleLane(role: $0) }
                 ForEach(["preset", "volume", "pan"], id: \.self) { name in
                     if let spec = model.specsByID[prefix + name] { ParamRow(spec: spec) }
                 }

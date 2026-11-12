@@ -35,6 +35,7 @@ public enum ParamDocs {
 /// One mood's progression, named in the current key (for the app's mood table).
 public struct MoodProgression: Sendable, Hashable {
     public var mood: String
+    public var degrees: [Int]
     public var chords: [String]
     public var numerals: [String]
 }
@@ -43,7 +44,16 @@ extension Conductor {
     public func describedProgressions(in harmony: HarmonyContext) -> [MoodProgression] {
         Mood.allCases.map { mood in
             let degrees = progressions[mood] ?? []
-            return MoodProgression(mood: mood.rawValue,
+            return MoodProgression(mood: mood.rawValue, degrees: degrees,
+                                   chords: degrees.map { harmony.chordName(degree: $0) },
+                                   numerals: degrees.map { harmony.romanNumeral(degree: $0) })
+        }
+    }
+
+    public func describedGestures(in harmony: HarmonyContext) -> [MoodProgression] {
+        gestures.keys.sorted().map { name in
+            let degrees = gestures[name] ?? []
+            return MoodProgression(mood: name, degrees: degrees,
                                    chords: degrees.map { harmony.chordName(degree: $0) },
                                    numerals: degrees.map { harmony.romanNumeral(degree: $0) })
         }

@@ -12,6 +12,12 @@ import Runtime
 @MainActor
 @Observable
 final class AppModel {
+    struct TracePoint: Identifiable {
+        let id: Int
+        let time: Double
+        let value: Double
+    }
+
     struct TrafficPoint: Identifiable {
         let id: Int
         let time: Double
@@ -43,6 +49,11 @@ final class AppModel {
     private(set) var specs: [ParamSpec] = []
     private(set) var specsByID: [String: ParamSpec] = [:]
     private(set) var status: EngineStatus?
+    /// When `status` arrived, so visuals can extrapolate engine time smoothly between updates.
+    private(set) var statusReceivedAt = Date()
+    /// Short histories (≈60 s at 4 Hz) of route inputs and targets, for the modulation sparklines.
+    private(set) var traces: [String: [TracePoint]] = [:]
+    private var lastTrace: Double = 0
     /// Base values, updated optimistically when the user moves a control.
     private(set) var bases: [String: Double] = [:]
     private(set) var history: [TrafficPoint] = []
@@ -114,9 +125,23 @@ final class AppModel {
         await start()
     }
 
+    /// Engine time now, extrapolated from the last status (for smooth scrolling visuals).
+    func engineNow(at date: Date = Date()) -> Double {
+        guard let s = status else { return 0 }
+        return s.time + min(date.timeIntervalSince(statusReceivedAt), 0.5)
+    }
+
     private func apply(_ s: EngineStatus) {
         guard session != nil else { return }
         status = s
+        statusReceivedAt = Date()
+        if s.time - lastTrace >= 0.25 {
+            lastTrace = s.time
+            for route in routes {
+                trace(route.source, s.time, s.signals[route.source] ?? 0)
+                trace("param:" + route.target, s.time, s.values[route.target] ?? 0)
+            }
+        }
         bases = s.bases
         pointCounter += 1
         // One chart point per second is plenty; skip the silence before the first data arrives.
@@ -129,6 +154,23 @@ final class AppModel {
             let db = 20 * log10(max(p, 1e-6))
             peakDB = max(db, peakDB - 3) // fall back gently
         }
+    }
+
+    private func trace(_ key: String, _ t: Double, _ v: Double) {
+        pointCounter += 1
+        var list = traces[key, default: []]
+        list.append(.init(id: pointCounter, time: t, value: v))
+        if list.count > 240 { list.removeFirst(list.count - 240) }
+        traces[key] = list
+    }
+
+    // MARK: - Progressions
+
+    func auditionChord(_ degree: Int) { session?.auditionChord(degree) }
+
+    func setProgression(_ mood: String, _ degrees: [Int]) {
+        guard !degrees.isEmpty else { return }
+        session?.setProgression(mood, degrees)
     }
 
     // MARK: - Params

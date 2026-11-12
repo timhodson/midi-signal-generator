@@ -54,10 +54,16 @@ struct ContentView: View {
     @ViewBuilder func detail(_ item: SidebarItem) -> some View {
         switch item {
         case .overview: OverviewView()
-        case .harmony: ParamSection(title: "Harmony", prefixes: ["clock.", "harmony.", "conductor."])
-        case .quantise: ParamSection(title: "Quantise", prefixes: ["macro.", "quant."], groupComponent: 0)
-        case .generators: ParamSection(title: "Generators", prefixes: ["gen.", "activity."], groupComponent: 1)
-        case .voices: ParamSection(title: "Voices", prefixes: ["voice."], groupComponent: 1)
+        case .harmony:
+            ParamSection(title: "Harmony", prefixes: ["clock.", "harmony.", "conductor."],
+                         hero: Pages.harmonyHero, accessory: Pages.harmonyAccessory)
+        case .quantise:
+            ParamSection(title: "Quantise", prefixes: ["macro.", "quant."], groupComponent: 0, hero: Pages.quantiseHero)
+        case .generators:
+            ParamSection(title: "Generators", prefixes: ["gen.", "activity."], groupComponent: 1,
+                         hero: Pages.generatorsHero, accessory: Pages.generatorAccessory)
+        case .voices:
+            ParamSection(title: "Voices", prefixes: ["voice."], groupComponent: 1, accessory: Pages.voiceAccessory)
         case .instruments: InstrumentsView()
         case .modulation: ModulationView()
         }

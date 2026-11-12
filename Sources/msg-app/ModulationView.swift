@@ -1,3 +1,4 @@
+import Charts
 import Params
 import SwiftUI
 
@@ -57,6 +58,16 @@ struct RouteRow: View {
                 Text("\(route.scale.rawValue) \(Format.rate(route.inputMin))…\(Format.rate(route.inputMax)), curve \(route.curve.formatted()), smooth \(route.smoothing.formatted()) s")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            HStack(spacing: 12) {
+                Sparkline(title: "input, as the route sees it (0–1)",
+                          points: (model.traces[route.source] ?? []).map { ($0.time, route.normalise($0.value)) },
+                          domain: 0...1, color: .teal)
+                Sparkline(title: "\(target?.label ?? route.target), base + modulation",
+                          points: (model.traces["param:" + route.target] ?? []).map { ($0.time, $0.value) },
+                          domain: target.map { $0.range } ?? 0...1, color: .orange,
+                          baseline: model.base(route.target))
+            }
+            .frame(height: 70)
             if let depth = model.specsByID["mod.\(index).amount"] { ParamRow(spec: depth, label: "Depth") }
         }
         .padding(.vertical, 4)
@@ -109,5 +120,36 @@ struct AddRouteSheet: View {
         }
         .padding(20)
         .frame(width: 560)
+    }
+}
+
+/// A small live line chart (last ~60 s), with an optional dashed baseline (e.g. the base value).
+struct Sparkline: View {
+    let title: String
+    let points: [(Double, Double)]
+    let domain: ClosedRange<Double>
+    var color: Color = .accentColor
+    var baseline: Double?
+
+    var body: some View {
+        let now = points.last?.0 ?? 0
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+            Chart {
+                ForEach(Array(points.enumerated()), id: \.offset) { _, p in
+                    LineMark(x: .value("t", p.0 - now), y: .value("v", min(max(p.1, domain.lowerBound), domain.upperBound)))
+                        .foregroundStyle(color)
+                }
+                if let baseline {
+                    RuleMark(y: .value("base", baseline)).foregroundStyle(.secondary).lineStyle(StrokeStyle(dash: [3, 3]))
+                }
+            }
+            .chartXScale(domain: -60...0)
+            .chartYScale(domain: domain.lowerBound...max(domain.upperBound, domain.lowerBound + 0.0001))
+            .chartXAxis(.hidden)
+            .chartYAxis(.hidden)
+            .padding(4)
+            .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 6))
+        }
     }
 }

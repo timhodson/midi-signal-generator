@@ -146,6 +146,16 @@ public final class Session: @unchecked Sendable {
     /// The scene including every tweak made since it was loaded.
     public func currentScene() -> Scene { engine.queue.sync { engine.currentScene() } }
 
+    /// Hear a chord now, from any thread.
+    public func auditionChord(_ degree: Int) {
+        engine.queue.async { [engine] in engine.auditionChord(degree) }
+    }
+
+    /// Replace a mood's (or gesture's) chord progression, from any thread.
+    public func setProgression(_ mood: String, _ degrees: [Int]) {
+        engine.queue.async { [engine] in engine.setProgression(mood, degrees) }
+    }
+
     /// Set a param from any thread.
     public func set(_ id: String, _ value: Double) {
         engine.queue.async { [engine] in try? engine.setParam(id, value) }

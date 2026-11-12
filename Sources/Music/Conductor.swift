@@ -120,6 +120,10 @@ public final class Conductor: @unchecked Sendable {
         return notes
     }
 
+    /// Jump to a chord now (audition). The progression carries on from where it was at the
+    /// next chord boundary.
+    public func force(chord degree: Int) { chordDegree = degree }
+
     /// Call on every bar line. Returns true on a chord boundary (even if the new chord has the
     /// same degree, so pads re-articulate).
     public func onBar(_ bar: Int, now: Double, params p: ParamStore) -> Bool {

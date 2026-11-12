@@ -76,8 +76,11 @@ struct ParamRow: View {
             .labelsHidden()
         case .integer:
             HStack {
-                Slider(value: Binding(get: { base }, set: { model.set(spec.id, $0.rounded()) }),
-                       in: spec.range, step: 1)
+                if spec.span <= 24 {
+                    Slider(value: Binding(get: { base }, set: { model.set(spec.id, $0.rounded()) }), in: spec.range, step: 1)
+                } else {
+                    Slider(value: Binding(get: { base }, set: { model.set(spec.id, $0.rounded()) }), in: spec.range)
+                }
                 Stepper("", value: Binding(get: { base }, set: { model.set(spec.id, $0) }), in: spec.range, step: 1)
                     .labelsHidden()
             }
@@ -118,12 +121,17 @@ struct ParamRow: View {
         return spec.range.lowerBound + p * spec.span
     }
 
+    /// "quant.pitch.strength" -> "Pitch strength"; "gen.drone.octave" -> "Octave" (the group
+    /// header already says which generator); "harmony.chordSize" -> "Chord size".
     static func shortLabel(_ id: String) -> String {
-        let last = id.split(separator: ".").last.map(String.init) ?? id
-        // camelCase -> "camel case"
+        var parts = id.split(separator: ".").map(String.init)
+        parts.removeFirst()
+        if ["gen", "voice", "au", "mod"].contains(String(id.split(separator: ".").first ?? "")), parts.count > 1 {
+            parts.removeFirst()
+        }
         var out = ""
-        for c in last {
-            if c.isUppercase, !out.isEmpty { out.append(" ") }
+        for c in parts.joined(separator: " ") {
+            if c.isUppercase, !out.isEmpty, out.last != " " { out.append(" ") }
             out.append(c)
         }
         return out.prefix(1).uppercased() + out.dropFirst().lowercased()
@@ -134,7 +142,11 @@ struct ParamRow: View {
         case .toggle: return v >= 0.5 ? "on" : "off"
         case .choice:
             return spec.options.indices.contains(Int(v)) ? "#\(Int(v))" : "\(Int(v))"
-        case .integer: return "\(Int(v))\(spec.unit.isEmpty ? "" : " \(spec.unit)")"
+        case .integer:
+            if spec.id.hasPrefix("voice."), spec.id.hasSuffix(".low") || spec.id.hasSuffix(".high") {
+                return "\(Format.note(Int(v)))  (\(Int(v)))"
+            }
+            return "\(Int(v))\(spec.unit.isEmpty ? "" : " \(spec.unit)")"
         case .normalised, .continuous:
             if spec.unit == "B/s" { return Format.rate(v) }
             let digits = spec.span >= 100 ? 0 : spec.span >= 10 ? 1 : 2
@@ -150,6 +162,10 @@ struct ParamSection: View {
     let prefixes: [String]
     /// Which id component names the group: 1 = "gen.drone.x" -> "drone".
     var groupComponent = 0
+    /// Live visual shown above everything (what's playing, and what these controls change).
+    var hero: AnyView?
+    /// Extra view at the top of a group, by group key ("conductor", "bass"…).
+    var accessory: (String) -> AnyView? = { _ in nil }
     @State private var filter = ""
 
     var body: some View {
@@ -166,16 +182,19 @@ struct ParamSection: View {
         List {
             if model.specs.isEmpty {
                 NotRunningHint()
+            } else if let hero, filter.isEmpty {
+                Section { hero.listRowSeparator(.hidden).padding(.vertical, 6) }
             }
             ForEach(order, id: \.self) { group in
                 Section {
                     if let first = groups[group]?.first,
-                       let doc = ParamDocs.description(for: groupPrefix(first.id)) {
+                       let doc = ParamDocs.description(for: groupPrefix(first.id)),
+                       group == order.first(where: { g in groups[g]?.first.flatMap { ParamDocs.description(for: groupPrefix($0.id)) } == doc }) {
                         Text(doc).font(.callout).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.vertical, 4)
                     }
-                    if group == "conductor" { MoodTable().padding(.bottom, 6) }
+                    if filter.isEmpty, let extra = accessory(group) { extra.listRowSeparator(.hidden).padding(.bottom, 6) }
                     ForEach(groups[group] ?? [], id: \.id) { ParamRow(spec: $0) }
                 } header: {
                     Text(Self.title(group)).font(.headline)
@@ -196,61 +215,6 @@ extension ParamSection {
     static func title(_ group: String) -> String {
         ["gen": "Generators", "quant": "Quantise", "macro": "Macros", "sub": "Sub drone", "drone": "Pad (drone)",
          "motif": "Lead (motifs)", "pulse": "Pulse", "bass": "Bass", "activity": "App activity"][group] ?? group.capitalized
-    }
-}
-
-/// What each mood plays, and when the network counts as that mood, at the current settings.
-struct MoodTable: View {
-    @Environment(AppModel.self) private var model
-
-    private func condition(_ mood: String) -> String {
-        let quiet = Format.rate(model.effective("conductor.quietBelow"))
-        let busy = Format.rate(model.effective("conductor.busyAbove"))
-        let focus = Int((model.effective("conductor.focusRatio") * 100).rounded())
-        switch mood {
-        case "quiet": return "traffic below \(quiet)"
-        case "calm": return "\(quiet) – \(busy)"
-        case "busy": return "above \(busy), spread across apps"
-        case "focused": return "above \(busy), one app ≥ \(focus)%"
-        default: return ""
-        }
-    }
-
-    var body: some View {
-        let status = model.status
-        Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
-            GridRow {
-                Text("Mood").font(.caption).foregroundStyle(.secondary)
-                Text("When (smoothed traffic)").font(.caption).foregroundStyle(.secondary)
-                Text("Chord progression").font(.caption).foregroundStyle(.secondary)
-            }
-            ForEach(status?.progressions ?? [], id: \.mood) { p in
-                let now = status?.mood == p.mood
-                GridRow {
-                    Text(p.mood.capitalized).fontWeight(now ? .bold : .regular)
-                        .foregroundStyle(now ? Color.accentColor : .primary)
-                    Text(condition(p.mood)).foregroundStyle(.secondary)
-                    HStack(spacing: 10) {
-                        ForEach(Array(zip(p.chords, p.numerals).enumerated()), id: \.offset) { i, chord in
-                            let playing = now && i == status?.progressionIndex
-                            VStack(spacing: 0) {
-                                Text(chord.0).fontWeight(playing ? .bold : .regular)
-                                Text(chord.1).font(.caption2).foregroundStyle(.secondary)
-                            }
-                            .padding(.horizontal, 6).padding(.vertical, 2)
-                            .background(playing ? Color.accentColor.opacity(0.25) : .clear, in: RoundedRectangle(cornerRadius: 4))
-                        }
-                    }
-                }
-            }
-        }
-        .padding(10)
-        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
-        .overlay(alignment: .topTrailing) {
-            if let s = status {
-                Text("now: \(s.mood) at \(Format.rate(s.smoothedRate))").font(.caption).foregroundStyle(.secondary).padding(8)
-            }
-        }
     }
 }
 

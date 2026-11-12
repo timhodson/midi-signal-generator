@@ -35,6 +35,28 @@ MIDI outputs, source, recorder).
   every section offscreen to PNG, and exits. It paints the window background itself, because an
   offscreen capture doesn't draw it.
 
+## Live visuals (second round)
+
+Settings pages open with a picture of what their controls change, drawn from the same params
+the sliders edit, so moving a control changes the picture immediately:
+
+- **Harmony:** a mood bar (log traffic axis, quiet/calm/busy bands, draggable thresholds,
+  smoothed and raw markers), a keyboard of the scale, the current chord and the sounding notes,
+  and a piano roll with a chord band. Above Root/Scale/Chord size: **Chords in this key**, every
+  chord the scale offers, with its scale steps (1·3·5…), notes and a mini keyboard. Click one to
+  audition it (`Engine.auditionChord`). Then **Chord progressions by mood**, an editor with a popover for
+  each chord (pick any scale chord, move, duplicate, remove), add, reset to default. Edits go live
+  through `Engine.setProgression` and are saved in the scene.
+- **Quantise:** pitch asked→played, timing asked→played against the grid and swing, the velocity curve
+  with recent notes, and a density meter against the limit. Needs `PlayedNote.rawPitch/rawTime/intensity`.
+- **Generators:** an all-voices piano roll, and a lane per generator.
+- **Voices:** a keyboard per voice with draggable range handles, plus its piano roll.
+- **Instruments:** a lane for each voice the synth plays. **Modulation:** live sparklines for each route's
+  input and the target's value.
+
+Visuals scroll smoothly by extrapolating engine time between the 10 Hz status updates.
+(Menus with custom labels lose their styling on macOS, so editable chips are buttons with popovers.)
+
 ## Consequences
 
 - New params appear in the UI with no UI work.
