@@ -31,7 +31,8 @@ something pleasant: only interpretation changes.
  │ ActivityTracker per-app idle→active detection (threshold, cooldown)             │
  │ Conductor      smoothed traffic → mood → progression; chord changes on bars;    │
  │                activation flurries → cadence gesture                            │
- │ Generators     Drone (pad), Motif (lead, one per app), Pulse (pulse)            │
+ │ Generators     Drone (pad), Motif (lead, one per app), Pulse (pulse), Bass, Sub,│
+ │                Packets (network events), Drums (groove per mood)                │
  │                  → NoteIntent (role, raw pitch or chord tone, intensity, time)  │
  │ Quantiser      density gate → pitch (raw→scale→chord) → time (grid) → velocity  │
  │ VoiceRouter    role → destination / channel / range fold / transpose / latency  │
@@ -92,7 +93,8 @@ Mod routes address keyed streams as `id#key`, e.g. `net.app.bytesPerSec#Spotify`
 | Event (ms–s) | lookup / handshake / close / LAN announcement | Pickup, call-and-answer, falling figure, twinkle (`gen.packets`, pulse by default) |
 | Stream (s) | total bytes/s | Pulse density, pad CC74, pad level (via mod matrix); bass fills and dynamics |
 | State (10 s–min) | mood: quiet / calm / busy / focused | Choice of progression (and so the pad, bass and sub notes) |
-| Combination | ≥ N activations in a window ("flurry") | Cadence gesture inserted ahead of the progression |
+| Combination | ≥ N activations in a window ("flurry") | Cadence gesture inserted ahead of the progression; drum fill and crash |
+| Stream + state | smoothed traffic, mood, phrase position | Drum groove per mood, its complexity, fills at phrase ends, rests when idle (`gen.drums`) |
 
 ## Voices (roles)
 
@@ -103,6 +105,7 @@ Mod routes address keyed streams as `id#key`, e.g. `net.app.bytesPerSec#Spotify`
 | `pulse` | Pulse | sparse grid notes, density follows traffic | 3 |
 | `bass` | Bass | chord root in a pattern (hold / beats / root–fifth / walk), fills when busy | 4 |
 | `sub` | Sub drone | very low tonic pedal or chord root, long | 5 |
+| `drums` | Drums | a groove per mood; locked intents (no time quantise), kit-map notes (ADR 0016) | 10 |
 
 A generator whose role has no voice in the scene logs a warning once and stays silent.
 

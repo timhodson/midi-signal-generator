@@ -17,6 +17,8 @@ public struct Scene: Codable, Sendable {
     public var instruments: [InstrumentConfig] = []
     /// Hand-designed motifs for matching apps (see MotifDesign).
     public var motifs: [MotifDesign] = []
+    /// Drum grooves edited in the app; they replace the built-in groove of the same name.
+    public var grooves: [DrumGroove] = []
     public var progressions: [String: [Int]]
     public var gestures: [String: [Int]]
     /// Apps that never trigger motifs (always-on daemons) while `activity.ignore` is on.
@@ -53,6 +55,7 @@ public struct Scene: Codable, Sendable {
             VoiceConfig(role: "pulse", destination: "virtual", channel: 3, low: 48, high: 84, maxPolyphony: 3),
             VoiceConfig(role: "bass", destination: "virtual", channel: 4, low: 28, high: 55, maxPolyphony: 2),
             VoiceConfig(role: "sub", destination: "virtual", channel: 5, low: 21, high: 45, maxPolyphony: 2),
+            Scene.drumVoice(destination: "virtual"),
         ],
         progressions: Dictionary(uniqueKeysWithValues: Conductor.defaultProgressions.map { ($0.key.rawValue, $0.value) }),
         gestures: Conductor.defaultGestures,
@@ -60,7 +63,7 @@ public struct Scene: Codable, Sendable {
     )
 
     private enum CodingKeys: String, CodingKey {
-        case name, seed, params, routes, macros, voices, instruments, motifs, progressions, gestures, ignoreApps
+        case name, seed, params, routes, macros, voices, instruments, motifs, grooves, progressions, gestures, ignoreApps
     }
 
     public init(name: String, seed: UInt64, params: [String: Double], routes: [ModRoute], macros: [Macro],
@@ -88,9 +91,32 @@ public struct Scene: Codable, Sendable {
         voices = try c.decode([VoiceConfig].self, forKey: .voices)
         instruments = try c.decodeIfPresent([InstrumentConfig].self, forKey: .instruments) ?? []
         motifs = try c.decodeIfPresent([MotifDesign].self, forKey: .motifs) ?? []
+        grooves = try c.decodeIfPresent([DrumGroove].self, forKey: .grooves) ?? []
         progressions = try c.decode([String: [Int]].self, forKey: .progressions)
         gestures = try c.decode([String: [Int]].self, forKey: .gestures)
         ignoreApps = try c.decode([String].self, forKey: .ignoreApps)
+        addDrumsIfMissing()
+    }
+
+    /// The drums voice: General MIDI channel 10, every note allowed (the kit map picks them).
+    public static func drumVoice(destination: String) -> VoiceConfig {
+        VoiceConfig(role: DrumGenerator.role, destination: destination, channel: 10, low: 0, high: 127, maxPolyphony: 16)
+    }
+
+    /// Apple's built-in General MIDI synth, which plays drums on channel 10: drums with no setup.
+    public static let builtInDrumKit = InstrumentConfig(id: "drums", component: "DLSMusicDevice", volume: 0.7, outOfProcess: false)
+
+    /// Scenes from before the drummer get a drums voice: on Apple's built-in GM kit when every
+    /// voice is a hosted synth, otherwise on the pad's destination, channel 10.
+    public mutating func addDrumsIfMissing() {
+        guard !voices.contains(where: { $0.role == DrumGenerator.role }) else { return }
+        let hosted = !voices.isEmpty && voices.allSatisfy { $0.destination.hasPrefix(InstrumentConfig.destinationPrefix) }
+        if hosted {
+            if !instruments.contains(where: { $0.id == Self.builtInDrumKit.id }) { instruments.append(Self.builtInDrumKit) }
+            voices.append(Self.drumVoice(destination: Self.builtInDrumKit.destination))
+        } else {
+            voices.append(Self.drumVoice(destination: voices.first(where: { $0.role == "pad" })?.destination ?? voices.first?.destination ?? "virtual"))
+        }
     }
 
     public static func load(_ url: URL) throws -> Scene {

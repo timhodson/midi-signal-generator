@@ -41,7 +41,7 @@ public struct Quantiser {
         params p: ParamStore, rng: inout SeededRandom
     ) -> ResolvedNote? {
         // Density: probability gate then token bucket.
-        if !intent.essential {
+        if !intent.essential, !intent.locked {
             guard rng.chance(p.value("quant.density.probability")) else { return nil }
             let rate = p.value("quant.density.maxPerSecond")
             if let last = lastRefill {
@@ -65,7 +65,7 @@ public struct Quantiser {
                                       harmony: harmony, roll: rng.unit())
         }
 
-        let start = Self.quantiseTime(
+        let start = intent.locked ? intent.time : Self.quantiseTime(
             intent.time, clock: clock,
             grid: Self.gridOptions[p.int("quant.time.grid")].beats,
             strength: p.value("quant.time.strength"),

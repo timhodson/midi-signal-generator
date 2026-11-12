@@ -4,7 +4,10 @@ import SwiftUI
 
 /// One colour per voice role, used everywhere notes are drawn.
 enum RoleStyle {
-    static let order = ["pad", "lead", "pulse", "bass", "sub"]
+    static let order = ["pad", "lead", "pulse", "bass", "sub", "drums"]
+    /// Roles whose notes are drum sounds, not pitches: left out of keyboards and pitched rolls
+    /// unless asked for by name.
+    static let unpitched: Set<String> = ["drums"]
 
     static func color(_ role: String) -> Color {
         switch role {
@@ -13,13 +16,14 @@ enum RoleStyle {
         case "pulse": .teal
         case "bass": .blue
         case "sub": .indigo
+        case "drums": .pink
         default: .gray
         }
     }
 }
 
 struct RoleLegend: View {
-    var roles: [String] = RoleStyle.order
+    var roles: [String] = RoleStyle.order.filter { !RoleStyle.unpitched.contains($0) }
     var body: some View {
         HStack(spacing: 14) {
             ForEach(roles, id: \.self) { r in
@@ -114,7 +118,7 @@ struct PianoRoll: View {
         Perf.canvasFrames += 1
         guard let s = status else { return }
         let start = now - window, end = now + ahead
-        let notes = s.recentNotes.filter { (roles?.contains($0.role) ?? true) && $0.time + $0.duration >= start && $0.time <= end }
+        let notes = s.recentNotes.filter { (roles?.contains($0.role) ?? !RoleStyle.unpitched.contains($0.role)) && $0.time + $0.duration >= start && $0.time <= end }
         let band: CGFloat = showChords ? 18 : 0
         var lo = pitchRange?.lowerBound ?? (notes.map(\.note).min() ?? 48) - 3
         var hi = pitchRange?.upperBound ?? (notes.map(\.note).max() ?? 72) + 3
@@ -322,7 +326,7 @@ extension AppModel {
         guard let s = status else { return [:] }
         let now = engineNow()
         var out: [Int: Color] = [:]
-        for n in s.recentNotes where (roles?.contains(n.role) ?? true) && n.time <= now && now < n.time + n.duration {
+        for n in s.recentNotes where (roles?.contains(n.role) ?? !RoleStyle.unpitched.contains(n.role)) && n.time <= now && now < n.time + n.duration {
             out[n.note] = RoleStyle.color(n.role)
         }
         return out

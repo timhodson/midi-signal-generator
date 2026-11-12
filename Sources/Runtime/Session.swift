@@ -209,6 +209,11 @@ public final class Session: @unchecked Sendable {
         engine.queue.async { [engine] in engine.setMotifs(designs) }
     }
 
+    /// Replace the edited drum grooves (live), from any thread.
+    public func setGrooves(_ grooves: [DrumGroove]) {
+        engine.queue.async { [engine] in engine.setGrooves(grooves) }
+    }
+
     /// Play an app's motif now, from any thread.
     public func previewMotif(for app: String) {
         engine.queue.async { [engine] in engine.previewMotif(for: app) }

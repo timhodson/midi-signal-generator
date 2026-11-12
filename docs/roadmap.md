@@ -14,6 +14,7 @@
 - [x] Live visuals on every settings page; chord palette with audition; per-mood progression editor
 - [x] Motif designer (scale-step grid, per app / pattern / default) and trigger explanations (ADR 0014)
 - [x] Packet capture helper `msg-pcap`: DNS lookups, handshakes with round trips, closes and LAN chatter as figures; features over OSC (ADR 0015)
+- [x] Drummer: a groove per mood with presence and complexity, fills at phrase ends and flurries, idle rests, Euclidean grooves, network accents; built-in GM kit; editable step grid (ADR 0016)
 - [ ] **Listen to it on the iPad** and tune the default and hosted scenes by ear
 
 ## Next
@@ -25,7 +26,8 @@
 3. **App, next round:** voice routing and range editing in the UI (AudioKit Keyboard), adding
    and removing hosted instruments, scene A/B comparison, MIDI-learn for params, an app bundle.
 4. **MIDI clock** out (and in, to follow a DAW). CoreMIDI timestamped sends.
-5. More generators: arpeggiator over the chord, flow-voice (one voice per live connection with voice stealing), percussion.
+5. More generators: arpeggiator over the chord, flow-voice (one voice per live connection with voice stealing).
+6. Drums, next: more grooves and odd meters, per-lane timing feel (laid-back snare), groove morphing between moods.
 
 ## Later
 

@@ -27,7 +27,8 @@ swift build
 .build/debug/msg-spike --source replay:recordings/evening.jsonl  # …and replay it while tuning
 ```
 
-Voices: `pad` = ch 1, `lead` = ch 2, `pulse` = ch 3 (all tunable).
+Voices: `pad` = ch 1, `lead` = ch 2, `pulse` = ch 3, `bass` = ch 4, `sub` = ch 5, `drums` = ch 10 (all tunable).
+The drummer (ADR 0016) plays General MIDI drums; hosted scenes get Apple's built-in kit automatically.
 
 ## Docs
 

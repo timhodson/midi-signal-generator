@@ -64,7 +64,7 @@ enum Pages {
         })
     }
 
-    static let generatorRoles = ["drone": "pad", "motif": "lead", "pulse": "pulse", "bass": "bass", "sub": "sub"]
+    static let generatorRoles = ["drone": "pad", "motif": "lead", "pulse": "pulse", "bass": "bass", "sub": "sub", "drums": "drums"]
 
     /// Knob colour: a voice's colour for its generator / voice group, accent otherwise.
     static func color(forGroup group: String) -> Color {
@@ -76,6 +76,7 @@ enum Pages {
 
     @MainActor static func generatorAccessory(_ group: String) -> AnyView? {
         if group == "packets" { return AnyView(NetworkEventsCard()) }
+        if group == "drums" { return AnyView(DrumsCard()) }
         guard let role = generatorRoles[group] else { return nil }
         return AnyView(VStack(spacing: 10) {
             TriggerCard(role: role)

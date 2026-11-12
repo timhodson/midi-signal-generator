@@ -22,6 +22,7 @@ public enum ParamDocs {
         "gen.pulse": "PULSE (pulse voice): sparse random notes on the grid. Their density and height follow total traffic.",
         "gen.bass": "BASS (bass voice): the chord root, low, in a pattern. Heavy traffic adds fills and dynamics.",
         "gen.packets": "NETWORK EVENTS (pulse voice by default): the network negotiating, from the packet capture helper. Lookups are pickups into the beat, connections are a call and an answer a stretched round trip apart, closes fall and resolve, LAN announcements twinkle.",
+        "gen.drums": "DRUMS (drums voice, MIDI channel 10): a groove for each mood, played by a drummer who follows the network. Presence sets how much kit plays (a shaker texture up to a full kit); complexity sets how many optional steps and ghost notes fill in, and traffic adds to it. Fills come at the ends of phrases and after flurries; an idle network thins the groove and then rests it.",
         "gen.sub": "SUB (sub voice): a deep, long drone under everything, either holding the home note or following the chords.",
         "voice": "Where each role's notes go (MIDI channel), and the register it may use. Notes outside a voice's range are moved by octaves, so the melody keeps its shape.",
         "au": "Hosted synths. Every control here is the synth's own, and each can be driven by traffic in Modulation.",

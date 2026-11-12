@@ -48,6 +48,8 @@ public final class Engine: @unchecked Sendable {
     private var auditionPending = false
     private let motif = MotifGenerator()
     private let packets = PacketGenerator()
+    private let drums = DrumGenerator()
+    private var seenFlurries = 0
     private var netEvents: [EngineStatus.NetEvent] = []
     private var netEventCounter = 0
     private var captureVersion = 0
@@ -74,7 +76,8 @@ public final class Engine: @unchecked Sendable {
         }
         conductor = Conductor(progressions: progressions, gestures: scene.gestures)
         motif.designs = scene.motifs
-        generators = [DroneGenerator(), motif, PulseGenerator(), BassGenerator(), SubDroneGenerator(), packets]
+        drums.custom = scene.grooves
+        generators = [DroneGenerator(), motif, PulseGenerator(), BassGenerator(), SubDroneGenerator(), packets, drums]
         router = VoiceRouter(voices: scene.voices)
         scheduler = NoteScheduler(sink: sink)
         parameterisedSink = sink as? ParameterisedSink
@@ -202,9 +205,14 @@ public final class Engine: @unchecked Sendable {
             log("♪ chord \(harmony.chordDegree + 1) [\(names.joined(separator: " "))] mood=\(conductor.mood.rawValue)")
         }
 
+        let flurry = conductor.flurries != seenFlurries
+        seenFlurries = conductor.flurries
         let ctx = GeneratorContext(now: horizon, clock: clock, beats: beats, harmony: harmony, params: params,
                                    chordChanged: chordChanged, activations: activations, totalRate: total,
-                                   events: events)
+                                   events: events, mood: conductor.mood.rawValue,
+                                   progressionIndex: conductor.progressionIndex,
+                                   progressionLength: conductor.progressionLength,
+                                   gesturePending: conductor.gesturePending, flurry: flurry)
         for g in generators {
             let out = g.tick(ctx, rng: &rng)
             for intent in out.notes {
@@ -224,7 +232,7 @@ public final class Engine: @unchecked Sendable {
                                          velocity: routed.velocity, why: routed.why, duration: routed.duration,
                                          rawTime: intent.time, rawPitch: rawPitch, intensity: intent.intensity,
                                          motif: intent.motif))
-                if recentNotes.count > 400 { recentNotes.removeFirst(recentNotes.count - 400) }
+                if recentNotes.count > 800 { recentNotes.removeFirst(recentNotes.count - 800) }
                 if logNotes {
                     log("\(String(format: "%8.2f", routed.start))s \(routed.role.padding(5)) ch\(String(routed.channel + 1).padding(2)) "
                         + "\(noteName(routed.note).padding(4)) v\(String(routed.velocity).padding(3)) "
@@ -276,11 +284,15 @@ extension Engine {
         s.progressions = Dictionary(uniqueKeysWithValues: conductor.progressions.map { ($0.key.rawValue, $0.value) })
         s.gestures = conductor.gestures
         s.motifs = motif.designs
+        s.grooves = drums.custom
         return s
     }
 
     /// Replace the motif designs (live). Call on `queue`.
     public func setMotifs(_ designs: [MotifDesign]) { motif.designs = designs }
+
+    /// Replace the edited drum grooves (live). Call on `queue`.
+    public func setGrooves(_ grooves: [DrumGroove]) { drums.custom = grooves }
 
     /// Play an app's motif (designed or generated) on the next tick, as if it had woken. Call on `queue`.
     public func previewMotif(for app: String) {
@@ -349,7 +361,8 @@ extension Engine {
             scalePitchClasses: harmony.scalePitchClasses.sorted(),
             chordPitchClasses: harmony.chordPitchClasses.sorted(),
             root: harmony.root, scaleSteps: harmony.scaleSteps, chordSize: harmony.chordSize,
-            apps: appInfos(), motifs: motif.designs, netEvents: netEvents, capture: capture
+            apps: appInfos(), motifs: motif.designs, netEvents: netEvents, capture: capture,
+            drums: drums.status(params: params)
         )
     }
 }

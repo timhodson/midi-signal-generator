@@ -128,6 +128,8 @@ enum Snapshot {
             }
             await render(NetworkEventsCard().environment(model).frame(width: 1100).padding(20),
                          to: directory.appendingPathComponent("network-events.png"), size: NSSize(width: 1140, height: 820))
+            await render(DrumsCard().environment(model).frame(width: 1100).padding(20),
+                         to: directory.appendingPathComponent("drums.png"), size: NSSize(width: 1140, height: 900))
             model.stop()
             exit(0)
         }

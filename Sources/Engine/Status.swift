@@ -98,6 +98,8 @@ public struct EngineStatus: Sendable {
     public var netEvents: [NetEvent] = []
     /// The capture helper's interface and when it last reported (nil = never heard from it).
     public var capture: Capture?
+    /// The drummer: groove, complexity, fills and recent hits.
+    public var drums: DrumStatus?
 
     public struct NetEvent: Sendable, Hashable, Identifiable {
         public var id: Int

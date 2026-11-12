@@ -27,3 +27,4 @@ is made or reversed; don't rewrite history. Mark superseded ones in their status
 | [0013](decisions/0013-ui-and-engine-performance.md) | Performance: fine-grained UI updates, visuals only when visible, change-driven synth sync |
 | [0014](decisions/0014-motif-designs-and-explaining-triggers.md) | Motif designs in scale steps; explaining why each note plays |
 | [0015](decisions/0015-packet-capture-helper.md) | Packet capture helper: features over OSC, heard as network negotiation |
+| [0016](decisions/0016-drummer.md) | The drummer: steady grooves whose feel follows the data |

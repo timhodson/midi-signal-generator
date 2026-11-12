@@ -137,6 +137,7 @@ final class AppModel {
             cells = Dictionary(uniqueKeysWithValues: specs.map { ($0.id, ParamCell(id: $0.id, base: baseValues[$0.id] ?? $0.defaultValue)) })
             messages = s.notes
             motifDesigns = scene.motifs
+            drumGrooves = scene.grooves
             history = []
             s.engine.onStatus = { [weak self] status in
                 Task { @MainActor in self?.apply(status) }
@@ -259,6 +260,21 @@ final class AppModel {
     }
 
     func deleteDesign(_ id: String) { setMotifDesigns(motifDesigns.filter { $0.id != id }) }
+
+    /// Drum grooves edited here (replacing the built-in of the same name); pushed to the engine on every change.
+    var drumGrooves: [DrumGroove] = []
+
+    func updateGroove(_ groove: DrumGroove) {
+        var all = drumGrooves.filter { $0.name != groove.name }
+        if DrumGroove.builtIn.first(where: { $0.name == groove.name }) != groove { all.append(groove) }
+        drumGrooves = all
+        scene.grooves = all
+        session?.setGrooves(all)
+    }
+
+    func resetGroove(_ name: String) {
+        if let g = DrumGroove.builtIn.first(where: { $0.name == name }) { updateGroove(g) }
+    }
 
     func previewMotif(for app: String) { session?.previewMotif(for: app) }
 

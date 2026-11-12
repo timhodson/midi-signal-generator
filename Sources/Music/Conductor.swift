@@ -57,6 +57,12 @@ public final class Conductor: @unchecked Sendable {
     public var smoothedRate: Double { smoothedTotal ?? 0 }
     public private(set) var progressionIndex = 0
     public private(set) var chordDegree = 0
+    /// A gesture is queued for the next chord boundaries.
+    public var gesturePending: Bool { !gestureQueue.isEmpty }
+    /// Chords in the current mood's progression.
+    public var progressionLength: Int { max(progressions[mood]?.count ?? 1, 1) }
+    /// Bumped every time a flurry fires.
+    public private(set) var flurries = 0
     private var candidate: Mood = .quiet
     private var candidateSince: Double = 0
     private var gestureQueue: [Int] = []
@@ -114,6 +120,7 @@ public final class Conductor: @unchecked Sendable {
            let gesture = gestures["flurry"], !gesture.isEmpty {
             gestureQueue.append(contentsOf: gesture)
             lastFlurry = now
+            flurries += 1
             recentActivations.removeAll()
             notes.append("flurry of \(p.int("conductor.flurryApps"))+ apps → gesture \(gesture)")
         }

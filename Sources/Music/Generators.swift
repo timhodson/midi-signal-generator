@@ -17,11 +17,26 @@ public struct GeneratorContext {
     public var totalRate: Double
     /// Events received since the previous tick (DNS lookups, handshakes…).
     public var events: [SignalSample]
+    /// The conductor's mood ("quiet", "calm", "busy", "focused").
+    public var mood: String
+    /// Which chord of the mood's progression is playing, and how many it has: the phrase.
+    public var progressionIndex: Int
+    public var progressionLength: Int
+    /// A gesture (e.g. the flurry cadence) is queued and will take over the next chord(s).
+    public var gesturePending: Bool
+    /// True on the tick a flurry of apps waking was detected.
+    public var flurry: Bool
 
     public init(now: Double, clock: MusicalClock, beats: Range<Double>, harmony: HarmonyContext,
                 params: ParamStore, chordChanged: Bool, activations: [Activation], totalRate: Double,
-                events: [SignalSample] = []) {
+                events: [SignalSample] = [], mood: String = "quiet", progressionIndex: Int = 0,
+                progressionLength: Int = 1, gesturePending: Bool = false, flurry: Bool = false) {
         self.events = events
+        self.mood = mood
+        self.progressionIndex = progressionIndex
+        self.progressionLength = progressionLength
+        self.gesturePending = gesturePending
+        self.flurry = flurry
         self.now = now
         self.clock = clock
         self.beats = beats

@@ -24,6 +24,9 @@ public struct NoteIntent: Sendable, Equatable {
     public var beats: Double
     /// Exempt from the density limiter (e.g. pad chords that define the harmony).
     public var essential: Bool
+    /// Already musical (a drummer's hits): skip time quantising and the density limiter. The
+    /// generator has placed, swung and humanised it itself.
+    public var locked: Bool
     /// Human-readable reason, shown in dry-run logs.
     public var why: String
     /// For motif notes: which app, which step, and which design (nil = generated).
@@ -44,8 +47,9 @@ public struct NoteIntent: Sendable, Equatable {
     }
 
     public init(role: String, pitch: Pitch, intensity: Double, time: Double, beats: Double,
-                essential: Bool = false, why: String = "", motif: MotifTag? = nil) {
+                essential: Bool = false, locked: Bool = false, why: String = "", motif: MotifTag? = nil) {
         self.motif = motif
+        self.locked = locked
         self.role = role
         self.pitch = pitch
         self.intensity = intensity
