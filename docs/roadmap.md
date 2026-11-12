@@ -32,11 +32,25 @@
    - **open several in their own windows**, or **pin them to a "tabletop"**: a free-form, tiled
      workspace where the chosen panels sit side by side for tweaking together
    (saved per scene or per user).
-4. **App, next round:** adding
+4. **Mixer page (feedback 2026-11-12):** styled like a hardware mixer: a channel strip per voice
+   with a fader, pan, mute/solo, a meter and EQ knobs (low / mid with frequency / high), plus
+   **buses** for grouping and shared FX (e.g. a reverb bus and a delay bus with per-channel send
+   knobs, a drums bus), and a master strip. Notes:
+   - Only voices on **hosted synths** have audio in the app; strips for voices sent out over MIDI
+     can offer MIDI volume/pan (CC7/CC10) and say so.
+   - Audio: the hosted graph already gives each synth its own mixer node, so EQ and sends slot in
+     there. Apple's built-in units (`AVAudioUnitEQ`, `AVAudioUnitReverb`, `AVAudioUnitDelay`) need
+     no new dependencies; AudioKit's effect packages (SoundpipeAudioKit and friends) offer more
+     if those aren't enough.
+   - Controls: AudioKit Controls (already used for the knobs) has knobs, sliders and wheels but no
+     fader, so the fader is built on its `Control` base to match.
+   - Every fader, knob and send is a param, so traffic can ride them in Modulation.
+   (Replaces "effects on the hosted mix" under Later.)
+5. **App, next round:** adding
    and removing hosted instruments, scene A/B comparison, MIDI-learn for params, an app bundle.
-5. **MIDI clock** out (and in, to follow a DAW). CoreMIDI timestamped sends.
-6. More generators: arpeggiator over the chord, flow-voice (one voice per live connection with voice stealing).
-7. Drums, next: more grooves and odd meters, per-lane timing feel (laid-back snare), groove morphing between moods.
+6. **MIDI clock** out (and in, to follow a DAW). CoreMIDI timestamped sends.
+7. More generators: arpeggiator over the chord, flow-voice (one voice per live connection with voice stealing).
+8. Drums, next: more grooves and odd meters, per-lane timing feel (laid-back snare), groove morphing between moods.
 
 ## Later
 
@@ -44,4 +58,4 @@
 - MQTT bridge (Home Assistant / Zigbee2MQTT) for temperature, humidity and motion. Mostly the
   state layer: mode, key and tempo drift.
 - Scene morphing, including choice params switching on boundaries.
-- Effects on the hosted mix (reverb/delay sends), and the plugins' own editor windows in the app.
+- The plugins' own editor windows docked in the app (effects moved to the Mixer page, Next).
