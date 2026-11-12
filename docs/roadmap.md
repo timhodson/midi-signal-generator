@@ -24,11 +24,19 @@
    (`/param/quant.pitch.strength 0.4`) and accepting from the LAN.
 2. **Packets, next:** per-process attribution via PKTAP (link events to app motifs), a packet
    source for whole-LAN capture on a Pi.
-3. **App, next round:** adding
+3. **App, layout (feedback 2026-11-12):** Voices and Generators take a lot of scrolling to find
+   anything. Instead:
+   - an overview of small **tiles**, one per voice / generator, each showing at a glance what it's
+     doing now (live mini-visual, key numbers, on/off)
+   - **click to expand just that one** (the others stay as tiles)
+   - **open several in their own windows**, or **pin them to a "tabletop"**: a free-form, tiled
+     workspace where the chosen panels sit side by side for tweaking together
+   (saved per scene or per user).
+4. **App, next round:** adding
    and removing hosted instruments, scene A/B comparison, MIDI-learn for params, an app bundle.
-4. **MIDI clock** out (and in, to follow a DAW). CoreMIDI timestamped sends.
-5. More generators: arpeggiator over the chord, flow-voice (one voice per live connection with voice stealing).
-6. Drums, next: more grooves and odd meters, per-lane timing feel (laid-back snare), groove morphing between moods.
+5. **MIDI clock** out (and in, to follow a DAW). CoreMIDI timestamped sends.
+6. More generators: arpeggiator over the chord, flow-voice (one voice per live connection with voice stealing).
+7. Drums, next: more grooves and odd meters, per-lane timing feel (laid-back snare), groove morphing between moods.
 
 ## Later
 
