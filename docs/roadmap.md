@@ -46,11 +46,31 @@
      fader, so the fader is built on its `Control` base to match.
    - Every fader, knob and send is a param, so traffic can ride them in Modulation.
    (Replaces "effects on the hosted mix" under Later.)
-5. **App, next round:** adding
+5. **A hardware-style skin (feedback 2026-11-12)**, in the spirit of AudioKit's apps (King of FM 2
+   as the reference): an original look, not their artwork. What makes that style:
+   - dark charcoal panels with a fine grain, divided into labelled sections by inset/bevel lines
+   - big 3D knobs (soft radial shading, drop shadow, a single light pointer line), labels in small
+     caps underneath, value arcs and scale labels around the important ones
+   - one typeface for everything: an all-caps, slightly technical / LCD-like font
+   - a green-tinted **LCD screen** for the preset name and a short text blurb: a natural home for our
+     "why did that play" explanations and live status
+   - square LED toggles ("ON", "LO-FI"), segmented tab buttons (MAIN / PCM / FX / SEQ), arrow
+     steppers for numbers (BPM, octave), a transport/footer bar, and a keyboard strip
+   How to build it:
+   - a `Skin` in the SwiftUI environment (colours, fonts, panel and LCD styles), so the system look
+     stays available as a choice and every page picks the skin up without rewriting controls
+   - draw knobs, LEDs, faders and panels in code (Canvas / gradients, procedural grain) so they're
+     sharp at any size and need no image assets; build on AudioKit Controls' `Control` base, as the
+     current knobs do
+   - bundle an open-licensed font (e.g. an OFL dot-matrix or technical mono) for labels and the LCD
+   - apply it first to the new tiles, mixer and tabletop (items 3–4) rather than restyling the long
+     pages that those replace
+   - check licences before reusing anything from AudioKit's open-source apps; default to our own art
+6. **App, next round:** adding
    and removing hosted instruments, scene A/B comparison, MIDI-learn for params, an app bundle.
-6. **MIDI clock** out (and in, to follow a DAW). CoreMIDI timestamped sends.
-7. More generators: arpeggiator over the chord, flow-voice (one voice per live connection with voice stealing).
-8. Drums, next: more grooves and odd meters, per-lane timing feel (laid-back snare), groove morphing between moods.
+7. **MIDI clock** out (and in, to follow a DAW). CoreMIDI timestamped sends.
+8. More generators: arpeggiator over the chord, flow-voice (one voice per live connection with voice stealing).
+9. Drums, next: more grooves and odd meters, per-lane timing feel (laid-back snare), groove morphing between moods.
 
 ## Later
 
