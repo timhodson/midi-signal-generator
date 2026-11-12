@@ -1,5 +1,6 @@
 import Foundation
 import Params
+import SignalBus
 
 /// Everything a generator may look at during one engine tick.
 public struct GeneratorContext {
@@ -14,9 +15,13 @@ public struct GeneratorContext {
     public var activations: [Activation]
     /// Total bytes/s, latest.
     public var totalRate: Double
+    /// Events received since the previous tick (DNS lookups, handshakes…).
+    public var events: [SignalSample]
 
     public init(now: Double, clock: MusicalClock, beats: Range<Double>, harmony: HarmonyContext,
-                params: ParamStore, chordChanged: Bool, activations: [Activation], totalRate: Double) {
+                params: ParamStore, chordChanged: Bool, activations: [Activation], totalRate: Double,
+                events: [SignalSample] = []) {
+        self.events = events
         self.now = now
         self.clock = clock
         self.beats = beats

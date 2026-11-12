@@ -47,6 +47,11 @@ public final class Engine: @unchecked Sendable {
     private var chordHistory: [EngineStatus.ChordEvent] = []
     private var auditionPending = false
     private let motif = MotifGenerator()
+    private let packets = PacketGenerator()
+    private var netEvents: [EngineStatus.NetEvent] = []
+    private var netEventCounter = 0
+    private var captureVersion = 0
+    private var capture: EngineStatus.Capture?
     private var pendingPreviews: [Activation] = []
     private var appStats: [String: (wakes: Int, last: Double)] = [:]
     /// Seconds between status snapshots. A UI slows this down while it isn't visible. Engine queue only.
@@ -69,7 +74,7 @@ public final class Engine: @unchecked Sendable {
         }
         conductor = Conductor(progressions: progressions, gestures: scene.gestures)
         motif.designs = scene.motifs
-        generators = [DroneGenerator(), motif, PulseGenerator(), BassGenerator(), SubDroneGenerator()]
+        generators = [DroneGenerator(), motif, PulseGenerator(), BassGenerator(), SubDroneGenerator(), packets]
         router = VoiceRouter(voices: scene.voices)
         scheduler = NoteScheduler(sink: sink)
         parameterisedSink = sink as? ParameterisedSink
@@ -165,7 +170,12 @@ public final class Engine: @unchecked Sendable {
                 log("♪ \(line)")
             }
         }
-        _ = bus.drainEvents() // no event-producing sources yet; keep the buffer bounded
+        let events = bus.drainEvents()
+        if let v = bus.streamVersion["net.capture.active"], v != captureVersion {
+            captureVersion = v
+            capture = .init(interface: bus.streams["net.capture.active"]?.keys.sorted().first ?? "?", lastSeen: t,
+                            packetsPerSecond: bus.value("net.pkt.perSec") ?? 0)
+        }
         for a in activations { appStats[a.key, default: (0, 0)] = (appStats[a.key, default: (0, 0)].wakes + 1, t) }
         activations += pendingPreviews.map { var a = $0; a.time = horizon; return a }
         pendingPreviews.removeAll()
@@ -193,7 +203,8 @@ public final class Engine: @unchecked Sendable {
         }
 
         let ctx = GeneratorContext(now: horizon, clock: clock, beats: beats, harmony: harmony, params: params,
-                                   chordChanged: chordChanged, activations: activations, totalRate: total)
+                                   chordChanged: chordChanged, activations: activations, totalRate: total,
+                                   events: events)
         for g in generators {
             let out = g.tick(ctx, rng: &rng)
             for intent in out.notes {
@@ -224,6 +235,14 @@ public final class Engine: @unchecked Sendable {
                 if let routed = router.route(control, params: params) { scheduler.schedule(routed) }
             }
         }
+
+        for d in packets.drainDecisions() {
+            netEventCounter += 1
+            netEvents.append(.init(id: netEventCounter, time: t, kind: d.id, name: d.key, value: d.value,
+                                   played: d.played, reason: d.reason))
+            if logNotes { log("◦ \(d.id) \(d.key) → \(d.played ? "played" : "skipped: \(d.reason)")") }
+        }
+        if netEvents.count > 80 { netEvents.removeFirst(netEvents.count - 80) }
 
         scheduler.fire(now: t)
 
@@ -330,7 +349,7 @@ extension Engine {
             scalePitchClasses: harmony.scalePitchClasses.sorted(),
             chordPitchClasses: harmony.chordPitchClasses.sorted(),
             root: harmony.root, scaleSteps: harmony.scaleSteps, chordSize: harmony.chordSize,
-            apps: appInfos(), motifs: motif.designs
+            apps: appInfos(), motifs: motif.designs, netEvents: netEvents, capture: capture
         )
     }
 }

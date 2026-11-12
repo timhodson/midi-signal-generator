@@ -28,6 +28,7 @@ if let path = arg("--scene") {
 MainActor.assumeIsolated {
     let model = AppModel(scene: scene, sceneURL: sceneURL)
     if arg("--source") == "synthetic" { model.sourceKind = .synthetic }
+    if CommandLine.arguments.contains("--no-packets") { model.packetCapture = false }
 
     if let name = arg("--profile") {
         guard let section = SidebarItem.allCases.first(where: { $0.rawValue.lowercased() == name.lowercased() }) else {
@@ -125,6 +126,8 @@ enum Snapshot {
                              to: directory.appendingPathComponent("motifs-design.png"), size: NSSize(width: 1280, height: 1100))
                 print("wrote motif pages for \(app)")
             }
+            await render(NetworkEventsCard().environment(model).frame(width: 1100).padding(20),
+                         to: directory.appendingPathComponent("network-events.png"), size: NSSize(width: 1140, height: 820))
             model.stop()
             exit(0)
         }

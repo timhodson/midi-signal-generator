@@ -1,6 +1,7 @@
 import Testing
 @testable import Music
 import Params
+import SignalBus
 
 private let dDorian = HarmonyContext(root: 2, scale: .dorian)
 
@@ -203,5 +204,80 @@ private let dDorian = HarmonyContext(root: 2, scale: .dorian)
         }
         let any = MotifDesign.randomSteps(count: 12, chordNotesOnly: false, using: &rng)
         #expect(any.compactMap { $0 }.allSatisfy { (-3...11).contains($0) })
+    }
+}
+
+@Suite struct PacketGeneratorTests {
+    let harmony = HarmonyContext(root: 2, scaleSteps: [0, 2, 3, 5, 7, 9, 10]) // D Dorian
+
+    func context(_ events: [SignalSample], at now: Double = 10, gen: PacketGenerator, params: ParamStore) -> GeneratorContext {
+        var clock = MusicalClock()
+        _ = clock.advance(to: 1, bpm: 60)   // beat 0 at t = 1, then 1 beat = 1 s
+        _ = clock.advance(to: now, bpm: 60)
+        return GeneratorContext(now: now, clock: clock, beats: 0..<0, harmony: harmony, params: params, chordChanged: false,
+                                activations: [], totalRate: 0, events: events)
+    }
+
+    func setup(_ sets: [String: Double] = [:]) -> (PacketGenerator, ParamStore) {
+        let g = PacketGenerator()
+        let p = ParamStore()
+        p.register(g.params)
+        for (k, v) in sets { try! p.set(k, v) }
+        return (g, p)
+    }
+
+    @Test func sitesGroupSubdomains() {
+        #expect(PacketGenerator.site(of: "lb-140-82-121-4.iad.github.com") == "github.com")
+        #expect(PacketGenerator.site(of: "www.bbc.co.uk.") == "bbc.co.uk")
+        #expect(PacketGenerator.site(of: "140.82.121.4") == "140.82.121.4")
+        #expect(PacketGenerator.site(of: "2606:50c0::153") == "2606:50c0::153")
+    }
+
+    @Test func lookupIsAPickupJustBeforeTheNextBeat() throws {
+        let (g, p) = setup()
+        var rng = SeededRandom(seed: 1)
+        let notes = g.tick(context([.event("net.dns.query", key: "github.com")], at: 10.1, gen: g, params: p), rng: &rng).notes
+        let n = try #require(notes.first)
+        #expect(notes.count == 1)
+        #expect(abs(n.time - 10.75) < 1e-9)   // a sixteenth before beat 11
+        #expect(n.role == "pulse")
+        // Same site, same scale step, every time.
+        let d = PacketGenerator.degree(for: "github.com", steps: 7)
+        #expect(n.pitch == .exact(harmony.note(degree: d, octave: 5)))
+    }
+
+    @Test func handshakeAnswerArrivesAfterTheStretchedRoundTrip() {
+        let (g, p) = setup(["gen.packets.stretch": 10])
+        var rng = SeededRandom(seed: 1)
+        let tcp = g.tick(context([.event("net.tcp.open", key: "github.com", 0.03)], gen: g, params: p), rng: &rng).notes
+        #expect(tcp.count == 3)
+        #expect(abs(tcp[1].time - tcp[0].time - 0.3) < 1e-9)
+        let quic = g.tick(context([.event("net.quic.open", key: "google.com", 0.02)], at: 20, gen: g, params: p), rng: &rng).notes
+        #expect(quic.count == 2)                                           // no separate ACK
+    }
+
+    @Test func cooldownAndLimitSkipWithReasons() {
+        let (g, p) = setup(["gen.packets.maxPerSecond": 1, "gen.packets.cooldown": 30])
+        var rng = SeededRandom(seed: 1)
+        let burst: [SignalSample] = [
+            .event("net.dns.query", key: "a.example.com"),
+            .event("net.dns.query", key: "b.example.com"),   // same site: cooldown
+            .event("net.dns.query", key: "other.org"),       // limit: one token
+            .event("net.tls.hello", key: "other.org"),       // names only
+        ]
+        let notes = g.tick(context(burst, gen: g, params: p), rng: &rng).notes
+        #expect(notes.count == 1)
+        let d = g.drainDecisions()
+        #expect(d.map(\.played) == [true, false, false, false])
+        #expect(d[1].reason.contains("cooldown"))
+        #expect(d[2].reason.contains("limit"))
+        #expect(g.drainDecisions().isEmpty)
+    }
+
+    @Test func switchedOffKindsAreSkipped() {
+        let (g, p) = setup(["gen.packets.lan": 0])
+        var rng = SeededRandom(seed: 1)
+        #expect(g.tick(context([.event("net.lan.announce", key: "_airplay._tcp")], gen: g, params: p), rng: &rng).notes.isEmpty)
+        #expect(g.drainDecisions().first?.played == false)
     }
 }

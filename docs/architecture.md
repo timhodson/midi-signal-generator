@@ -7,7 +7,7 @@ streams for one or more synths. Think of 90s modem handshake sounds, re-imagined
 
 | Job | Question it answers | Where |
 |---|---|---|
-| **Sensing** | What is happening in the world? | `Sources` (nettop today; pcap, MQTT, OSC later) |
+| **Sensing** | What is happening in the world? | `Sources` (nettop, OSC in) and the `msg-pcap` helper; MQTT later |
 | **Interpretation** | What does it *mean* musically? | `SignalBus`, `Params` (mod matrix), `Music` (Conductor, generators, quantiser) |
 | **Rendering** | Which note, on which device, when? | `Router`, `MIDIOut` |
 
@@ -18,9 +18,10 @@ something pleasant: only interpretation changes.
 
 ```
  ┌───────────── SOURCES ──────────────┐   today: in-process, behind `SignalSource`
- │ NettopSource  (per-app bytes/s)    │   later: separate processes speaking OSC
- │ SyntheticSource (fake apps)        │          (pcap helper, MQTT bridge, Pi on a
- └─────────────────┬──────────────────┘           mirror port) — see ADR 0008
+ │ NettopSource  (per-app bytes/s)    │   out of process, over OSC (ADR 0008):
+ │ SyntheticSource (fake apps)        │   msg-pcap ──udp 57121──▶ OSCSource
+ │ OSCSource  (anything speaking OSC) │   (later: MQTT bridge, Pi on a mirror port)
+ └─────────────────┬──────────────────┘
                    │  SignalSample (.stream / .event)
  ┌─────────────────▼──────────────────────────── ENGINE (serial queue, 5 ms tick) ─┐
  │ SignalBus      latest stream values per (id, key) + pending events             │
@@ -56,7 +57,10 @@ something pleasant: only interpretation changes.
 | `Router` | Params, Music | `VoiceConfig`, `VoiceRouter`, range folding |
 | `MIDIOut` | Router, Params, SwiftMIDIIO | `NoteScheduler`, `MIDISink`, `ParameterisedSink`, `CompositeSink`, `CoreMIDISink`, `PrintSink` |
 | `AUHost` | MIDIOut, Router, Params, AVFoundation | `AUHostSink`: hosted Audio Unit instruments, their params, output meter |
-| `Sources` | SignalBus | `NettopParser`, `NettopSource`, `SyntheticSource` |
+| `OSC` | SignalBus | `OSCMessage` codec, `SignalSample` ↔ OSC, `OSCSender` |
+| `Sources` | SignalBus, OSC | `NettopParser`, `NettopSource`, `SyntheticSource`, `OSCSource`, recorder / replay |
+| `PacketFeatures` | SignalBus | `PacketDecoder`, `DNSMessage`, `TLSClientHello`, `FeatureExtractor` (pure Swift) |
+| `msg-pcap` | CPcap (system libpcap), PacketFeatures, OSC | the capture helper (ADR 0015) |
 | `Engine` | Params, SignalBus, Music, Router, MIDIOut, Sources | `Engine` (tick loop, `onStatus`), `Scene` (JSON), `EngineStatus` |
 | `Runtime` | Engine, AUHost, MIDIOut, Sources | `Session`: builds synths + sinks + engine + source + recorder |
 | `msg-spike` | Runtime | CLI |
@@ -71,6 +75,13 @@ something pleasant: only interpretation changes.
 | `net.total.bytesPerSec` | stream | – | nettop / synthetic |
 | `net.app.bytesPerSec` | stream | app name | nettop / synthetic |
 
+| `net.pkt.perSec`, `net.flows.tcp` | stream | – | msg-pcap |
+| `net.proto.bytesPerSec` | stream | tcp / quic / dns / lan / udp / other | msg-pcap |
+| `net.dns.query`, `net.tls.hello` | event | name | msg-pcap |
+| `net.tcp.open`, `net.quic.open` | event | server name; value = round trip (s) | msg-pcap |
+| `net.tcp.close` | event | server name; value 1 = reset | msg-pcap |
+| `net.lan.announce` | event | mDNS / SSDP name | msg-pcap |
+
 Mod routes address keyed streams as `id#key`, e.g. `net.app.bytesPerSec#Spotify`.
 
 ## Musical layers and timescales
@@ -78,6 +89,7 @@ Mod routes address keyed streams as `id#key`, e.g. `net.app.bytesPerSec#Spotify`
 | Timescale | Signal | Drives |
 |---|---|---|
 | Event (ms–s) | app activation | Motif on `lead` |
+| Event (ms–s) | lookup / handshake / close / LAN announcement | Pickup, call-and-answer, falling figure, twinkle (`gen.packets`, pulse by default) |
 | Stream (s) | total bytes/s | Pulse density, pad CC74, pad level (via mod matrix); bass fills and dynamics |
 | State (10 s–min) | mood: quiet / calm / busy / focused | Choice of progression (and so the pad, bass and sub notes) |
 | Combination | ≥ N activations in a window ("flurry") | Cadence gesture inserted ahead of the progression |

@@ -17,6 +17,11 @@ USAGE: msg-spike [options]
   --source nettop|synthetic|replay:<file>
                               Data source (default: nettop = real per-app traffic).
                               replay plays back a --record file with its original timing.
+  --packets                   Also listen for packet events (DNS lookups, connection
+                              handshakes, LAN chatter) from the capture helper msg-pcap.
+                              Starts it if you may capture; otherwise says how (sudo).
+  --packets-port <port>       UDP port for packet events / any OSC signals (default 57121).
+  --interface <name>          Interface for the helper to capture (default: default route).
   --record <file.jsonl>       Also record every incoming signal to this file.
   --speed <x>                 Replay speed (default 1; 4 = four times faster).
   --loop                      Loop the replay.
@@ -60,6 +65,9 @@ struct Options {
     var listParams = false
     var listDestinations = false
     var dumpScene = false
+    var packets = false
+    var packetsPort = OSCSource.defaultPort
+    var interface: String?
 }
 
 func fail(_ message: String) -> Never {
@@ -78,6 +86,12 @@ func parse(_ args: [String]) -> Options {
         switch a {
         case "--source": o.source = value(a)
         case "--record": o.record = value(a)
+        case "--packets": o.packets = true
+        case "--packets-port":
+            guard let p = UInt16(value(a)) else { fail("--packets-port needs a port number") }
+            o.packetsPort = p
+            o.packets = true
+        case "--interface": o.interface = value(a); o.packets = true
         case "--speed":
             guard let v = Double(value(a)), v > 0 else { fail("--speed needs a positive number") }
             o.speed = v
@@ -177,7 +191,9 @@ let sessionOptions = SessionOptions(
     source: source,
     output: options.dryRun || options.dumpScene ? .silent : listing ? .listing : .live,
     record: options.record.map { URL(fileURLWithPath: $0) },
-    networkSession: options.networkSession
+    networkSession: options.networkSession,
+    packets: options.packets && !listing && !options.dumpScene
+        ? .init(port: options.packetsPort, interface: options.interface) : nil
 )
 let session: Session
 do {

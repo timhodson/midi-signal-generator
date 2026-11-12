@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .executable(name: "msg-spike", targets: ["msg-spike"]),
         .executable(name: "msg-app", targets: ["msg-app"]),
+        .executable(name: "msg-pcap", targets: ["msg-pcap"]),
         .library(name: "MSGEngine", targets: ["Engine"]),
     ],
     dependencies: [
@@ -33,8 +34,16 @@ let package = Package(
         ]),
         // Hosts Audio Unit instruments (e.g. Synth One J6, King of FM) as MIDI destinations.
         .target(name: "AUHost", dependencies: ["MIDIOut", "Router", "Params"]),
-        // Data sources (nettop process traffic, synthetic).
-        .target(name: "Sources", dependencies: ["SignalBus"]),
+        // Minimal OSC codec; signals travel between processes as OSC (ADR 0008).
+        .target(name: "OSC", dependencies: ["SignalBus"]),
+        // Data sources (nettop process traffic, synthetic, OSC in).
+        .target(name: "Sources", dependencies: ["SignalBus", "OSC"]),
+        // Packet decoding and musical features (DNS, handshakes, LAN chatter). Pure Swift, no libpcap.
+        .target(name: "PacketFeatures", dependencies: ["SignalBus"]),
+        // libpcap, as shipped with macOS.
+        .systemLibrary(name: "CPcap"),
+        // The packet capture helper: needs capture permission, sends features to the engine as OSC (ADR 0015).
+        .executableTarget(name: "msg-pcap", dependencies: ["CPcap", "PacketFeatures", "OSC", "SignalBus"]),
         // Wires everything together and owns the clock.
         .target(name: "Engine", dependencies: ["Params", "SignalBus", "Music", "Router", "MIDIOut", "Sources"]),
         // Builds a session (hosted synths + MIDI + engine + source); shared by CLI and app.
@@ -49,7 +58,8 @@ let package = Package(
         .testTarget(name: "ParamsTests", dependencies: ["Params"]),
         .testTarget(name: "MusicTests", dependencies: ["Music", "Params", "SignalBus"]),
         .testTarget(name: "RouterTests", dependencies: ["Router", "Music", "Params"]),
-        .testTarget(name: "SourcesTests", dependencies: ["Sources", "SignalBus"]),
+        .testTarget(name: "SourcesTests", dependencies: ["Sources", "SignalBus", "OSC"]),
+        .testTarget(name: "PacketFeaturesTests", dependencies: ["PacketFeatures", "SignalBus"]),
         .testTarget(name: "MIDIOutTests", dependencies: ["MIDIOut", "Router", "Params"]),
         .testTarget(name: "EngineTests", dependencies: ["Engine", "MIDIOut"]),
         .testTarget(name: "AUHostTests", dependencies: ["AUHost", "Params", "Router"]),

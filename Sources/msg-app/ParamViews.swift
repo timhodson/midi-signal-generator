@@ -253,7 +253,8 @@ extension ParamSection {
 
     static func title(_ group: String) -> String {
         ["gen": "Generators", "quant": "Quantise", "macro": "Macros", "sub": "Sub drone", "drone": "Pad (drone)",
-         "motif": "Lead (motifs)", "pulse": "Pulse", "bass": "Bass", "activity": "App activity"][group] ?? group.capitalized
+         "motif": "Lead (motifs)", "pulse": "Pulse", "bass": "Bass", "activity": "App activity",
+         "packets": "Network events"][group] ?? group.capitalized
     }
 }
 

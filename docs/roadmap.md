@@ -13,17 +13,19 @@
 - [x] Bass and sub-drone voices; plain-language help on every param, group intros and a mood table in the app; two-way sync with synth editor windows
 - [x] Live visuals on every settings page; chord palette with audition; per-mood progression editor
 - [x] Motif designer (scale-step grid, per app / pattern / default) and trigger explanations (ADR 0014)
+- [x] Packet capture helper `msg-pcap`: DNS lookups, handshakes with round trips, closes and LAN chatter as figures; features over OSC (ADR 0015)
 - [ ] **Listen to it on the iPad** and tune the default and hosted scenes by ear
 
 ## Next
 
-2. **OSC in** (ADR 0008), for both signals and param control (`/param/quant.pitch.strength 0.4`).
-3. **pcap helper** (privileged, separate process). Packet-level features: protocol mix, DNS
-   → pickup notes, SYN/FIN → phrase start/end, TLS hello, mDNS/SSDP chatter → texture.
-4. **App, next round:** voice routing and range editing in the UI (AudioKit Keyboard), adding
+1. **OSC in, the rest**: signals already arrive over OSC (ADR 0015); still to do: param control
+   (`/param/quant.pitch.strength 0.4`) and accepting from the LAN.
+2. **Packets, next:** per-process attribution via PKTAP (link events to app motifs), a packet
+   source for whole-LAN capture on a Pi.
+3. **App, next round:** voice routing and range editing in the UI (AudioKit Keyboard), adding
    and removing hosted instruments, scene A/B comparison, MIDI-learn for params, an app bundle.
-5. **MIDI clock** out (and in, to follow a DAW). CoreMIDI timestamped sends.
-6. More generators: arpeggiator over the chord, flow-voice (one voice per live connection with voice stealing), percussion.
+4. **MIDI clock** out (and in, to follow a DAW). CoreMIDI timestamped sends.
+5. More generators: arpeggiator over the chord, flow-voice (one voice per live connection with voice stealing), percussion.
 
 ## Later
 

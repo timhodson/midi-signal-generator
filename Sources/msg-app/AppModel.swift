@@ -63,6 +63,8 @@ final class AppModel {
     var showExplanations = true
     /// Knobs (AudioKit style) or sliders for continuous settings.
     var useKnobs = true
+    /// Listen for packet events from msg-pcap (and start it when allowed). Not used when replaying.
+    var packetCapture = true
 
     // Running state
     private(set) var session: Session?
@@ -96,6 +98,8 @@ final class AppModel {
     private var editorWindows: [String: NSWindow] = [:]
 
     var isRunning: Bool { session != nil }
+    /// How to get packet capture going, when it was wanted but couldn't start.
+    var packetHint: String? { session?.packetHint }
 
     init(scene: Scene, sceneURL: URL? = nil) {
         self.scene = scene
@@ -123,7 +127,9 @@ final class AppModel {
         error = nil
         do {
             let record = recording ? try Self.newRecordingURL() : nil
-            let s = try await Session.make(scene: scene, options: .init(source: source, output: .live, record: record))
+            let s = try await Session.make(scene: scene, options: .init(
+                source: source, output: .live, record: record,
+                packets: packetCapture && sourceKind != .replay ? .init() : nil))
             let specs = s.engine.paramSpecs
             self.specs = specs
             specsByID = Dictionary(uniqueKeysWithValues: specs.map { ($0.id, $0) })

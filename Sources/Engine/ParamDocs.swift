@@ -21,6 +21,7 @@ public enum ParamDocs {
         "gen.motif": "LEAD (lead voice): every app has its own short tune, played when it wakes up, so you can hear who's talking.",
         "gen.pulse": "PULSE (pulse voice): sparse random notes on the grid. Their density and height follow total traffic.",
         "gen.bass": "BASS (bass voice): the chord root, low, in a pattern. Heavy traffic adds fills and dynamics.",
+        "gen.packets": "NETWORK EVENTS (pulse voice by default): the network negotiating, from the packet capture helper. Lookups are pickups into the beat, connections are a call and an answer a stretched round trip apart, closes fall and resolve, LAN announcements twinkle.",
         "gen.sub": "SUB (sub voice): a deep, long drone under everything, either holding the home note or following the chords.",
         "voice": "Where each role's notes go (MIDI channel), and the register it may use. Notes outside a voice's range are moved by octaves, so the melody keeps its shape.",
         "au": "Hosted synths. Every control here is the synth's own, and each can be driven by traffic in Modulation.",

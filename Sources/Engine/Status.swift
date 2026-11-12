@@ -94,4 +94,28 @@ public struct EngineStatus: Sendable {
     public var chordSize: Int
     public var apps: [AppInfo]
     public var motifs: [MotifDesign]
+    /// Recent network events from the packet capture helper, newest last, and what they played.
+    public var netEvents: [NetEvent] = []
+    /// The capture helper's interface and when it last reported (nil = never heard from it).
+    public var capture: Capture?
+
+    public struct NetEvent: Sendable, Hashable, Identifiable {
+        public var id: Int
+        public var time: Double
+        /// Signal id, e.g. "net.dns.query".
+        public var kind: String
+        /// Host / service name.
+        public var name: String
+        /// Round trip in seconds for handshakes; 1 = reset for closes.
+        public var value: Double
+        public var played: Bool
+        /// What it played, or why it didn't.
+        public var reason: String
+    }
+
+    public struct Capture: Sendable, Hashable {
+        public var interface: String
+        public var lastSeen: Double
+        public var packetsPerSecond: Double
+    }
 }

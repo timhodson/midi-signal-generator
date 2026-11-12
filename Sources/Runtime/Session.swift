@@ -24,6 +24,10 @@ public enum SourceChoice: Sendable, Equatable {
         }
     }
 
+    public var isReplay: Bool {
+        if case .replay = self { true } else { false }
+    }
+
     public var label: String {
         switch self {
         case .nettop: "Live traffic (this Mac)"
@@ -44,12 +48,29 @@ public struct SessionOptions: Sendable {
         case silent
     }
 
+    /// Packet-level events (DNS, handshakes…) from the capture helper, over OSC.
+    public struct Packets: Sendable, Equatable {
+        public var port: UInt16
+        /// Start msg-pcap ourselves when this user may capture.
+        public var startHelper: Bool
+        public var interface: String?
+        public init(port: UInt16 = OSCSource.defaultPort, startHelper: Bool = true, interface: String? = nil) {
+            self.port = port
+            self.startHelper = startHelper
+            self.interface = interface
+        }
+    }
+
     public var source: SourceChoice
     public var output: Output
     public var record: URL?
     public var networkSession: Bool
+    /// Listen for packet events (ignored when replaying: a recording already holds them).
+    public var packets: Packets?
 
-    public init(source: SourceChoice = .nettop, output: Output = .live, record: URL? = nil, networkSession: Bool = false) {
+    public init(source: SourceChoice = .nettop, output: Output = .live, record: URL? = nil, networkSession: Bool = false,
+                packets: Packets? = nil) {
+        self.packets = packets
         self.source = source
         self.output = output
         self.record = record
@@ -66,6 +87,10 @@ public final class Session: @unchecked Sendable {
     public let auHost: AUHostSink?
     public let coreMIDI: CoreMIDISink?
     public let replay: ReplaySource?
+    /// The capture helper, when this session started it.
+    public private(set) var packetHelper: Process?
+    /// Set when packet capture is wanted but not running: how to get it going.
+    public private(set) var packetHint: String?
     /// Human-readable notes about setup (loaded synths, missing destinations…).
     public private(set) var notes: [String] = []
 
@@ -116,6 +141,30 @@ public final class Session: @unchecked Sendable {
             engine.add(r)
             replay = r
         }
+        var helper: Process?
+        var packetHint: String?
+        if let po = options.packets, options.output != .listing, !options.source.isReplay {
+            do {
+                engine.add(try OSCSource(port: po.port))
+                let exe = PacketHelper.locate()
+                if po.startHelper, let exe, PacketHelper.canCapture {
+                    helper = try PacketHelper.launch(exe, port: po.port, interface: po.interface) { [engine] status in
+                        if status != 0, status != 15 { engine.queue.async { engine.log("⚠︎ msg-pcap exited (\(status))") } }
+                    }
+                    notes.append("→ packets: msg-pcap capturing\(po.interface.map { " on \($0)" } ?? ""), features on udp \(po.port)")
+                } else if exe == nil {
+                    packetHint = "msg-pcap wasn't found next to this app. Build it with `swift build`, then run it with sudo."
+                    notes.append("⚠︎ \(packetHint!)")
+                } else {
+                    packetHint = PacketHelper.permissionHint(helper: exe, port: po.port)
+                    notes.append("⚠︎ \(packetHint!) (listening on udp \(po.port) meanwhile)")
+                }
+            } catch {
+                packetHint = "\(error)"
+                notes.append("⚠︎ packets: \(error)")
+            }
+        }
+
         if let url = options.record {
             engine.recorder = try SignalRecorder(url: url, sources: [options.source.label])
             notes.append("● recording signals to \(url.path)")
@@ -123,6 +172,8 @@ public final class Session: @unchecked Sendable {
 
         let session = Session(scene: scene, options: options, engine: engine, auHost: auHost, coreMIDI: coreMIDI, replay: replay)
         session.notes = notes
+        session.packetHelper = helper
+        session.packetHint = packetHint
         return session
     }
 
@@ -140,6 +191,7 @@ public final class Session: @unchecked Sendable {
 
     /// Stop sources, release notes, let synth tails ring for `tail` seconds, stop audio.
     public func stop(tail: TimeInterval = 1.5) {
+        if let h = packetHelper, h.isRunning { h.terminate() }
         engine.stop()
         auHost?.stop(tail: tail)
     }
