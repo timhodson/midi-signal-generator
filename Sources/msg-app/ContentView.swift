@@ -39,6 +39,9 @@ struct ContentView: View {
         }
         .toolbar {
             ToolbarItemGroup {
+                @Bindable var model = model
+                Toggle(isOn: $model.showExplanations) { Label("Explanations", systemImage: "text.bubble") }
+                    .help("Show what each setting does under its control")
                 Button { Task { await model.openScene() } } label: { Label("Open Scene", systemImage: "folder") }
                     .help("Open a scene (JSON)")
                 Button { model.saveScene() } label: { Label("Save Scene", systemImage: "square.and.arrow.down") }

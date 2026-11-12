@@ -185,6 +185,8 @@ struct RecentNotes: View {
         case "pad": .purple
         case "lead": .orange
         case "pulse": .teal
+        case "bass": .blue
+        case "sub": .indigo
         default: .gray
         }
     }

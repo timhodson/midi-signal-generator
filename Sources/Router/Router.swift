@@ -32,21 +32,21 @@ public struct VoiceConfig: Codable, Sendable, Equatable {
     public func params() -> [ParamSpec] {
         let r = "voice.\(role)"
         return [
-            ParamSpec("\(r).enabled", kind: .toggle, default: 1, help: "Send the \(role) role."),
+            ParamSpec("\(r).enabled", kind: .toggle, default: 1, help: "Mute or unmute the \(role) voice entirely."),
             ParamSpec("\(r).channel", kind: .integer, range: 1...16, default: Double(channel), modulatable: false,
-                      help: "MIDI channel for \(role)."),
+                      help: "MIDI channel the \(role) voice sends on. Match it to the synth listening for it (hosted synths listen on all channels)."),
             ParamSpec("\(r).low", kind: .integer, range: 0...127, default: Double(low), modulatable: false,
-                      help: "Lowest note \(role) may play; lower notes fold up by octaves."),
+                      help: "Lowest note the \(role) voice may play. Lower notes are moved up by octaves, so this shapes the register without changing the melody."),
             ParamSpec("\(r).high", kind: .integer, range: 0...127, default: Double(high), modulatable: false,
-                      help: "Highest note \(role) may play; higher notes fold down by octaves."),
+                      help: "Highest note the \(role) voice may play. Higher notes are moved down by octaves."),
             ParamSpec("\(r).transpose", kind: .integer, range: -48...48, default: Double(transpose), modulatable: false,
-                      help: "Semitones added before range folding."),
+                      help: "Shift the \(role) voice up or down in semitones (12 = an octave) before the range is applied."),
             ParamSpec("\(r).latencyMs", kind: .continuous, range: 0...500, default: latencyMs, unit: "ms", modulatable: false,
-                      help: "Delay added to \(role) so slower links (e.g. Bluetooth) line up with the others."),
+                      help: "Delay the \(role) voice to line up with slower links. E.g. if a Bluetooth synth lags, delay the other voices by the same amount."),
             ParamSpec("\(r).maxPolyphony", kind: .integer, range: 1...32, default: Double(maxPolyphony), modulatable: false,
-                      help: "Max simultaneous notes; the oldest is released when exceeded."),
+                      help: "Max notes the \(role) voice holds at once. When exceeded, the oldest note is released. Lower = cleaner, less smeared."),
             ParamSpec("\(r).velocityScale", kind: .continuous, range: 0...2, default: 1,
-                      help: "Per-voice velocity trim."),
+                      help: "Loudness trim for the \(role) voice: 1 = as played, 0.5 = half velocity, 2 = double (capped)."),
         ]
     }
 }

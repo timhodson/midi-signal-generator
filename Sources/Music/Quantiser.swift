@@ -10,25 +10,25 @@ public struct Quantiser {
 
     public static let params: [ParamSpec] = [
         ParamSpec("quant.pitch.strength", default: 0.75,
-                  help: "0 = raw chromatic data pitch, 0.5 = always in scale, 1 = always a chord tone. In between is probabilistic."),
+                  help: "How much data-driven melodies (lead, pulse) are pulled into key. 0 = raw data pitches, often out of key and alien; 0.5 = always in the scale; 1 = only chord notes, very consonant. In between it's a mix."),
         ParamSpec("quant.time.strength", default: 0.9,
-                  help: "0 = notes fire the moment data arrives, 1 = snapped to the grid."),
+                  help: "How much notes snap to the beat. 0 = they sound the instant the data arrives (loose, organic); 1 = locked to the grid (rhythmic, tidy)."),
         ParamSpec("quant.time.grid", kind: .choice, default: 3, options: gridOptions.map(\.label),
-                  help: "Grid used by time quantise."),
+                  help: "The beat subdivision notes snap to: 1/4 = on the beat, 1/16 = finer. Coarser grids make the rhythm simpler and more regular."),
         ParamSpec("quant.time.swing", kind: .continuous, range: 0...0.5, default: 0,
-                  help: "Delay of every second grid step, as a fraction of the step."),
+                  help: "Delays every second grid step for a lilting, shuffled feel. 0 = straight; 0.33 is a typical swing."),
         ParamSpec("quant.time.humanise", kind: .continuous, range: 0...60, default: 6, unit: "ms",
-                  help: "Random timing spread added after quantising."),
+                  help: "Random timing wobble after snapping, in ms. A little (5–15) makes it feel played rather than mechanical."),
         ParamSpec("quant.velocity.curve", kind: .continuous, range: 0.25...4, default: 1,
-                  help: "Exponent on intensity: <1 lifts quiet data, >1 makes only peaks loud."),
+                  help: "How data intensity becomes loudness. Below 1 lifts quiet events (more even); above 1 makes only strong events loud (more dramatic contrast)."),
         ParamSpec("quant.velocity.floor", kind: .integer, range: 1...127, default: 28,
-                  help: "Velocity at zero intensity."),
+                  help: "Velocity of the softest notes. Raise it if quiet notes disappear."),
         ParamSpec("quant.velocity.ceiling", kind: .integer, range: 1...127, default: 108,
-                  help: "Velocity at full intensity."),
+                  help: "Velocity of the loudest notes. Lower it to tame peaks."),
         ParamSpec("quant.density.probability", default: 1,
-                  help: "Chance each non-essential note survives (thins busy data)."),
+                  help: "Chance that each melodic note plays. Below 1 thins out busy passages randomly. Pad, bass and sub are never thinned."),
         ParamSpec("quant.density.maxPerSecond", kind: .continuous, range: 0.25...40, default: 6, unit: "notes/s",
-                  help: "Hard ceiling on non-essential notes per second (token bucket)."),
+                  help: "Hard limit on melodic notes per second. Stops a traffic storm becoming a wall of notes. Pad, bass and sub aren't counted."),
     ]
 
     private var tokens: Double = 0
@@ -58,6 +58,8 @@ public struct Quantiser {
         switch intent.pitch {
         case .chordTone(let i, let octave):
             note = harmony.chordTone(i, octave: octave)
+        case .exact(let n):
+            note = n
         case .raw(let pitch):
             note = Self.quantisePitch(pitch, strength: p.value("quant.pitch.strength"),
                                       harmony: harmony, roll: rng.unit())

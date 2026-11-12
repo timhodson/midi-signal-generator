@@ -11,6 +11,8 @@ public enum ScaleCatalogue {
 
     public static var names: [String] { scales.map(\.description) }
 
+    public static let sharpNames = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"]
+
     /// Index = semitones above C.
     public static let rootNames = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"]
 }
@@ -70,6 +72,46 @@ public struct HarmonyContext: Sendable, Equatable {
         let i = ((index % size) + size) % size
         let up = Int((Double(index) / Double(size)).rounded(.down))
         return note(degree: chordDegrees[i], octave: octave + up)
+    }
+
+    /// Chord built on a scale degree, as a name like "Dm", "G", "B°" or "Cmaj7".
+    public func chordName(degree: Int) -> String {
+        var c = self
+        c.chordDegree = degree
+        let tones = c.chordDegrees.map { c.note(degree: $0) }
+        let root = ScaleCatalogue.sharpNames[((tones[0] % 12) + 12) % 12]
+        guard tones.count >= 3 else { return root }
+        let third = tones[1] - tones[0], fifth = tones[2] - tones[0]
+        let base: String
+        switch (third, fifth) {
+        case (4, 7): base = root
+        case (3, 7): base = root + "m"
+        case (3, 6): base = root + "°"
+        case (4, 8): base = root + "+"
+        default: base = root + "(\(third),\(fifth))"
+        }
+        guard tones.count >= 4 else { return base }
+        let seventh = tones[3] - tones[0]
+        switch (base.hasSuffix("m"), seventh) {
+        case (false, 11) where !base.hasSuffix("°"): return root + "maj7"
+        case (false, 10) where !base.hasSuffix("°"): return root + "7"
+        case (true, 10): return base + "7"
+        case (true, 11): return base + "(maj7)"
+        default: return base + "7"
+        }
+    }
+
+    /// Roman numeral for a degree, upper case for major chords: "i", "iv", "VI", "ii°".
+    public func romanNumeral(degree: Int) -> String {
+        let numerals = ["i", "ii", "iii", "iv", "v", "vi", "vii"]
+        let n = numerals[((degree % 7) + 7) % 7]
+        var c = self
+        c.chordDegree = degree
+        let tones = c.chordDegrees.map { c.note(degree: $0) }
+        guard tones.count >= 3 else { return n.uppercased() }
+        let third = tones[1] - tones[0], fifth = tones[2] - tones[0]
+        if third == 3, fifth == 6 { return n + "°" }
+        return third == 3 ? n : n.uppercased()
     }
 
     /// Nearest MIDI note whose pitch class is in `classes` (ties go down).

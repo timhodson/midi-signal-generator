@@ -10,6 +10,7 @@
 - [x] Hosted Audio Unit instruments, one per voice, with plugin params as mod targets (ADR 0010). Heard on the Mac
 - [x] Record / replay signals (`--record`, `--source replay:`, ADR 0011)
 - [x] Mac app v1: generated param panels, overview scopes, instruments with editors, mod matrix, scenes (ADR 0012)
+- [x] Bass and sub-drone voices; plain-language help on every param, group intros and a mood table in the app; two-way sync with synth editor windows
 - [ ] **Listen to it on the iPad** and tune the default and hosted scenes by ear
 
 ## Next

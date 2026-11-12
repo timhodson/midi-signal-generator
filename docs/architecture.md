@@ -78,9 +78,21 @@ Mod routes address keyed streams as `id#key`, e.g. `net.app.bytesPerSec#Spotify`
 | Timescale | Signal | Drives |
 |---|---|---|
 | Event (ms–s) | app activation | Motif on `lead` |
-| Stream (s) | total bytes/s | Pulse density, pad CC74, pad level (via mod matrix) |
-| State (10 s–min) | mood: quiet / calm / busy / focused | Choice of progression |
+| Stream (s) | total bytes/s | Pulse density, pad CC74, pad level (via mod matrix); bass fills and dynamics |
+| State (10 s–min) | mood: quiet / calm / busy / focused | Choice of progression (and so the pad, bass and sub notes) |
 | Combination | ≥ N activations in a window ("flurry") | Cadence gesture inserted ahead of the progression |
+
+## Voices (roles)
+
+| Role | Generator | What it plays | Default MIDI ch |
+|---|---|---|---|
+| `pad` | Drone | the current chord, sustained | 1 |
+| `lead` | Motif | each app's own motif when it wakes | 2 |
+| `pulse` | Pulse | sparse grid notes, density follows traffic | 3 |
+| `bass` | Bass | chord root in a pattern (hold / beats / root–fifth / walk), fills when busy | 4 |
+| `sub` | Sub drone | very low tonic pedal or chord root, long | 5 |
+
+A generator whose role has no voice in the scene logs a warning once and stays silent.
 
 ## Threading
 

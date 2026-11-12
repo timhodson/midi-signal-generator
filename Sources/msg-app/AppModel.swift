@@ -34,6 +34,8 @@ final class AppModel {
     var replaySpeed: Double = 1
     var replayLoop = true
     var recording = false
+    /// Show each parameter's explanation under its control (not just as a tooltip).
+    var showExplanations = true
 
     // Running state
     private(set) var session: Session?

@@ -65,7 +65,7 @@ public final class ModMatrix: @unchecked Sendable {
             store.register(ParamSpec(
                 "mod.\(i).amount", label: "\(route.source) → \(route.target)",
                 kind: .continuous, range: -1...1, default: route.amount, modulatable: false,
-                help: "Depth of modulation route \(i), as a fraction of the target's range."
+                help: "How strongly \(route.source) moves \(route.target). 0 = no effect; 0.5 = up to half the target's range; negative = inverted (more signal pushes it down)."
             ))
         }
     }

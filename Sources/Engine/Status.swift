@@ -36,4 +36,7 @@ public struct EngineStatus: Sendable {
     public var signals: [String: Double]
     /// Most recent notes, newest last.
     public var recentNotes: [PlayedNote]
+    /// Every mood's progression in the current key, and which step is playing.
+    public var progressions: [MoodProgression]
+    public var progressionIndex: Int
 }

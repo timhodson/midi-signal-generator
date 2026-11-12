@@ -47,6 +47,6 @@ let package = Package(
         .testTarget(name: "RouterTests", dependencies: ["Router", "Music", "Params"]),
         .testTarget(name: "SourcesTests", dependencies: ["Sources", "SignalBus"]),
         .testTarget(name: "MIDIOutTests", dependencies: ["MIDIOut", "Router", "Params"]),
-        .testTarget(name: "AUHostTests", dependencies: ["AUHost"]),
+        .testTarget(name: "AUHostTests", dependencies: ["AUHost", "Params", "Router"]),
     ]
 )

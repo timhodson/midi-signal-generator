@@ -25,6 +25,14 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
         let presetNames: [String]
         /// When to re-read the plugin's values after a preset change.
         var resyncAt: Date?
+        /// Changes made outside the app (the plugin's own editor window), collected from
+        /// observer callbacks on any thread and applied on the engine queue.
+        let inbox = ExternalChanges()
+        var observerToken: AUParameterObserverToken?
+        var presetObservation: NSKeyValueObservation?
+        var idByAddress: [AUParameterAddress: String] = [:]
+        var lastPresetPoll = Date.distantPast
+        lazy var presetNumbers: [Int] = (unit.auAudioUnit.factoryPresets ?? []).map(\.number)
 
         init(config: InstrumentConfig, unit: AVAudioUnit) {
             self.config = config
@@ -173,6 +181,9 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
         guard let preset = inst.unit.auAudioUnit.factoryPresets?[safe: index] else { return }
         inst.unit.auAudioUnit.currentPreset = preset
         inst.presetIndex = index
+        // The plugin may keep reporting the old preset for a while; don't mistake that for
+        // the user picking it again in the plugin's window.
+        inst.lastPresetPoll = Date().addingTimeInterval(2.5)
     }
 
     /// Stop audio after letting release tails ring for `tail` seconds.
@@ -217,15 +228,16 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
     public func registerParams(in store: ParamStore) {
         for inst in instruments.values.sorted(by: { $0.config.id < $1.config.id }) {
             let p = inst.prefix
-            store.register(ParamSpec("\(p).volume", default: inst.config.volume, help: "Output level of \(inst.config.component)."))
+            store.register(ParamSpec("\(p).volume", default: inst.config.volume,
+                                     help: "How loud \(inst.config.component) is in the mix. Balance layers here; keep the Output peak below about −3 dBFS."))
             store.register(ParamSpec("\(p).pan", kind: .continuous, range: -1...1, default: inst.config.pan,
-                                     help: "Stereo position of \(inst.config.component)."))
+                                     help: "Where \(inst.config.component) sits left (−1) to right (+1). Spreading layers apart makes the mix clearer and wider."))
             inst.pushed["\(p).volume"] = inst.config.volume
             inst.pushed["\(p).pan"] = inst.config.pan
             if !inst.presetNames.isEmpty {
                 store.register(ParamSpec("\(p).preset", kind: .choice, default: Double(inst.presetIndex ?? 0),
                                          options: inst.presetNames,
-                                         help: "Factory preset of \(inst.config.component) (see --list-options \(p).preset)."))
+                                         help: "The factory sound of \(inst.config.component). Changing it reloads all of the synth's settings. Picking a preset in the synth's own window updates this too."))
                 inst.pushed["\(p).preset"] = Double(inst.presetIndex ?? 0)
             }
             let params = inst.unit.auAudioUnit.parameterTree?.allParameters ?? []
@@ -236,12 +248,59 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
                     id, label: param.displayName, kind: .continuous,
                     range: Double(param.minValue)...Double(max(param.maxValue, param.minValue + .ulpOfOne)),
                     default: Double(param.value),
-                    help: "\(inst.config.component): \(param.displayName)"
+                    help: "\(inst.config.component)'s own \"\(param.displayName)\" control, the same as turning it in the synth's window. Route traffic to it in Modulation to make it move with the network."
                 ))
                 inst.parameters[id] = param
                 inst.pushed[id] = Double(param.value)
+                inst.idByAddress[param.address] = id
+            }
+            observeExternalChanges(inst)
+        }
+    }
+
+    /// Two-way sync: when the user turns a knob or picks a preset in the plugin's own window,
+    /// pull that into our params so the app (and saved scenes) follow.
+    private func observeExternalChanges(_ inst: Instrument) {
+        let au = inst.unit.auAudioUnit
+        let inbox = inst.inbox
+        // Our own writes pass this token as originator, so they don't echo back.
+        inst.observerToken = au.parameterTree?.token(byAddingParameterObserver: { address, value in
+            inbox.param(address, value)
+        })
+        let numbers = (au.factoryPresets ?? []).map(\.number)
+        inst.presetObservation = au.observe(\.currentPreset, options: [.new]) { au, _ in
+            guard let preset = au.currentPreset else { return }
+            inbox.preset(numbers.firstIndex(of: preset.number), name: preset.name)
+        }
+    }
+
+    /// Apply changes made in the plugin's own window to the store.
+    private func drainExternalChanges(_ inst: Instrument, _ store: ParamStore) {
+        var (params, preset) = inst.inbox.take()
+        // Some plugins (Synth One J6) update `currentPreset` asynchronously without KVO, so also
+        // poll it twice a second. Skip while one of our own preset changes is settling.
+        if preset == nil, inst.resyncAt == nil, Date().timeIntervalSince(inst.lastPresetPoll) > 0.5 {
+            inst.lastPresetPoll = Date()
+            if let current = inst.unit.auAudioUnit.currentPreset,
+               let index = inst.presetNumbers.firstIndex(of: current.number), index != inst.presetIndex {
+                preset = .init(index: index, name: current.name)
             }
         }
+        for (address, value) in params {
+            guard let id = inst.idByAddress[address] else { continue }
+            try? store.set(id, Double(value))
+            inst.pushed[id] = store.value(id)
+        }
+        guard let preset else { return }
+        let id = "\(inst.prefix).preset"
+        if let index = preset.index, index != inst.presetIndex {
+            try? store.set(id, Double(index))
+            inst.pushed[id] = Double(index)
+            inst.presetIndex = index
+            log("♪ \(inst.config.id) preset → \(preset.name) (from the synth's window)")
+        }
+        // A user preset (not in the factory list) still changes every value: re-read them.
+        inst.resyncAt = Date().addingTimeInterval(0.6)
     }
 
     /// Plugin parameter ids often share a prefix ("neoncutoffLayer1", "neonverbMix"). Strip it
@@ -259,6 +318,7 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
     public func applyParams(_ store: ParamStore) {
         for inst in instruments.values {
             let p = inst.prefix
+            drainExternalChanges(inst, store)
             if let v = changed("\(p).preset", inst, store) {
                 select(preset: Int(v), on: inst)
                 // The plugin updates its values asynchronously; adopt them a moment later.
@@ -272,7 +332,7 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
             if let v = changed("\(p).volume", inst, store) { inst.mixer.outputVolume = Float(v) }
             if let v = changed("\(p).pan", inst, store) { inst.mixer.pan = Float(v) }
             for (id, param) in inst.parameters {
-                if let v = changed(id, inst, store) { param.setValue(AUValue(v), originator: nil) }
+                if let v = changed(id, inst, store) { param.setValue(AUValue(v), originator: inst.observerToken) }
             }
         }
     }
@@ -290,6 +350,24 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
         for (id, param) in inst.parameters {
             try? store.set(id, Double(param.value))
             inst.pushed[id] = store.value(id)
+        }
+    }
+}
+
+/// Thread-safe mailbox for changes reported by plugin observers.
+final class ExternalChanges: @unchecked Sendable {
+    struct Preset { var index: Int?; var name: String }
+    private let lock = NSLock()
+    private var params: [AUParameterAddress: AUValue] = [:]
+    private var preset: Preset?
+
+    func param(_ address: AUParameterAddress, _ value: AUValue) { lock.withLock { params[address] = value } }
+    func preset(_ index: Int?, name: String) { lock.withLock { preset = Preset(index: index, name: name) } }
+
+    func take() -> ([AUParameterAddress: AUValue], Preset?) {
+        lock.withLock {
+            defer { params.removeAll(); preset = nil }
+            return (params, preset)
         }
     }
 }

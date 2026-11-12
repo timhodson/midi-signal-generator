@@ -43,6 +43,7 @@ public final class Engine: @unchecked Sendable {
     private var lastPublish: Double = 0
     private var recentNotes: [EngineStatus.PlayedNote] = []
     private var noteCounter = 0
+    private var unroutedRoles: Set<String> = []
     /// Called on the engine queue about 10× a second with a snapshot (for UIs).
     public var onStatus: (@Sendable (EngineStatus) -> Void)?
 
@@ -60,7 +61,7 @@ public final class Engine: @unchecked Sendable {
             progressions[mood] = v
         }
         conductor = Conductor(progressions: progressions, gestures: scene.gestures)
-        generators = [DroneGenerator(), MotifGenerator(), PulseGenerator()]
+        generators = [DroneGenerator(), MotifGenerator(), PulseGenerator(), BassGenerator(), SubDroneGenerator()]
         router = VoiceRouter(voices: scene.voices)
         scheduler = NoteScheduler(sink: sink)
         parameterisedSink = sink as? ParameterisedSink
@@ -178,6 +179,12 @@ public final class Engine: @unchecked Sendable {
         for g in generators {
             let out = g.tick(ctx, rng: &rng)
             for intent in out.notes {
+                guard router.voices[intent.role] != nil else {
+                    if unroutedRoles.insert(intent.role).inserted {
+                        log("⚠︎ the \(intent.role) generator is playing but this scene has no \"\(intent.role)\" voice — add one to hear it")
+                    }
+                    continue
+                }
                 guard let resolved = quantiser.resolve(intent, harmony: harmony, clock: clock, params: params, rng: &rng),
                       let routed = router.route(resolved, params: params) else { continue }
                 scheduler.schedule(routed)
@@ -244,7 +251,9 @@ extension Engine {
             key: "\(ScaleCatalogue.rootNames[harmony.root]) \(ScaleCatalogue.names[params.int("harmony.scale")])",
             totalRate: total, smoothedRate: conductor.smoothedRate, topApps: Array(apps),
             sounding: scheduler.soundingCount, values: values, bases: params.baseValues, signals: signals,
-            recentNotes: recentNotes
+            recentNotes: recentNotes,
+            progressions: conductor.describedProgressions(in: harmony),
+            progressionIndex: conductor.progressionIndex
         )
     }
 }

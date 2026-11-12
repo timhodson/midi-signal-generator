@@ -9,6 +9,8 @@ public struct NoteIntent: Sendable, Equatable {
         case raw(Double)
         /// An exact chord tone (index 0 = chord root) at an octave. Not pitch-quantised.
         case chordTone(Int, octave: Int)
+        /// An exact MIDI note (e.g. a tonic pedal). Not pitch-quantised.
+        case exact(Int)
     }
 
     /// Voice role, e.g. "pad", "lead", "pulse". The router maps roles to devices.

@@ -43,6 +43,12 @@ host them, but it plays live MIDI into the selected track only, so one synth per
   after `engine.start()` and waits until the values have changed and held still for 200 ms (2 s
   timeout) before reading them as param defaults. It warns if nothing changed. A preset changed at
   runtime is re-read after 0.6 s.
+- **Two-way sync.** Changes made in the plugin's own editor window flow back into our params.
+  A parameter observer catches knob changes; our own writes pass the observer token as
+  originator, so they don't echo back. Preset changes are caught by KVO on `currentPreset`
+  *and* by polling it twice a second, because the J6 updates it asynchronously without a reliable KVO
+  notification. Polling pauses for 2.5 s after the app itself picks a preset, because the plugin keeps
+  reporting the old one for a while. Covered by an integration test that runs when the J6 is installed.
 - Factory preset names can have trailing spaces and curly apostrophes ("Heaven’s Gate Pad "), so
   lookup is trimmed, case-insensitive and apostrophe-agnostic. A number selects by index.
 - Fixing a plugin param in a scene (as the hosted scene first did with the J6 cutoff) overrides

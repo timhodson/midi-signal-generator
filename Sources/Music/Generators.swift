@@ -51,16 +51,16 @@ public final class DroneGenerator: Generator {
 
     public var params: [ParamSpec] {
         [
-            ParamSpec("gen.drone.enabled", kind: .toggle, default: 1, help: "Play the pad chord."),
-            ParamSpec("gen.drone.octave", kind: .integer, range: 1...6, default: 3, help: "Octave of the chord root."),
-            ParamSpec("gen.drone.intensity", default: 0.35, help: "Pad loudness (good mod target)."),
+            ParamSpec("gen.drone.enabled", kind: .toggle, default: 1, help: "The pad: the current chord, held. The harmonic bed everything else sits on."),
+            ParamSpec("gen.drone.octave", kind: .integer, range: 1...6, default: 3, help: "Register of the pad chord. 3 = warm middle; 4 = brighter and thinner; 2 = darker and muddier."),
+            ParamSpec("gen.drone.intensity", default: 0.35, help: "Pad loudness. Traffic modulates it by default, so the bed swells with network activity."),
             ParamSpec("gen.drone.legato", kind: .continuous, range: 0.25...1.5, default: 1.02,
-                      help: "Chord length relative to the chord period (>1 overlaps)."),
+                      help: "Chord length relative to its slot. Just over 1 = chords overlap smoothly; below 1 leaves gaps (a breathing, pulsing pad)."),
             ParamSpec("gen.drone.spread", kind: .integer, range: 0...2, default: 1,
-                      help: "Open voicing: lift every other chord tone this many octaves."),
+                      help: "Open voicing: lifts every other chord note up an octave for a wider, airier pad. 0 = close, compact chords."),
             ParamSpec("gen.drone.ccNumber", kind: .integer, range: 0...127, default: 74,
-                      help: "CC sent once per beat on the pad role (0 = off). 74 is usually cutoff."),
-            ParamSpec("gen.drone.ccValue", default: 0.4, help: "Value of that CC, 0...1 (good mod target)."),
+                      help: "MIDI CC the pad sends once a beat (74 = filter cutoff on most synths). 0 = off. For hosted synths it's usually better to route traffic straight to a synth parameter in Modulation."),
+            ParamSpec("gen.drone.ccValue", default: 0.4, help: "Value of that CC (0–1). Modulated by traffic by default: busier network = brighter pad."),
         ]
     }
 
@@ -106,20 +106,20 @@ public final class MotifGenerator: Generator {
 
     public var params: [ParamSpec] {
         [
-            ParamSpec("gen.motif.enabled", kind: .toggle, default: 1, help: "Play per-app motifs."),
-            ParamSpec("gen.motif.length", kind: .integer, range: 1...12, default: 4, help: "Notes per motif."),
+            ParamSpec("gen.motif.enabled", kind: .toggle, default: 1, help: "Per-app motifs: each app has its own little tune, played on the lead when it wakes up. This is how you hear who is talking."),
+            ParamSpec("gen.motif.length", kind: .integer, range: 1...12, default: 4, help: "Notes per motif. Short (2–3) = blips and chirps; long (6–12) = little melodies."),
             ParamSpec("gen.motif.stepBeats", kind: .continuous, range: 0.125...4, default: 0.5, unit: "beats",
-                      help: "Gap between motif notes."),
+                      help: "Gap between motif notes in beats. 0.25 = quick flourish, 1 = slow and spacious."),
             ParamSpec("gen.motif.noteBeats", kind: .continuous, range: 0.05...8, default: 0.75, unit: "beats",
-                      help: "Length of each motif note."),
-            ParamSpec("gen.motif.octave", kind: .integer, range: 2...7, default: 5, help: "Register centre."),
+                      help: "Length of each motif note. Short = plucked; long = notes ring into each other."),
+            ParamSpec("gen.motif.octave", kind: .integer, range: 2...7, default: 5, help: "Register of the motifs. 5 sits above the pad; 6 is bell-like and sparkly."),
             ParamSpec("gen.motif.range", kind: .integer, range: 1...24, default: 7, unit: "semitones",
-                      help: "How far a motif may wander from its starting pitch."),
-            ParamSpec("gen.motif.intensity", default: 0.7, help: "Loudness scale for motifs."),
+                      help: "How far a motif can wander from its first note, in semitones. Small = tight, repetitive figures; large = leaping melodies."),
+            ParamSpec("gen.motif.intensity", default: 0.7, help: "Overall loudness of motifs."),
             ParamSpec("gen.motif.dynamics", default: 0.6,
-                      help: "How much the app's byte rate affects loudness (0 = fixed, 1 = fully data-driven)."),
+                      help: "How much an app's traffic changes its motif's loudness. 0 = all motifs equal; 1 = big downloads are loud, small pings are soft."),
             ParamSpec("gen.motif.maxPerTick", kind: .integer, range: 1...8, default: 2,
-                      help: "At most this many apps start a motif at the same moment."),
+                      help: "How many apps can start motifs at the same instant. Keeps simultaneous wake-ups from piling up."),
         ]
     }
 
@@ -174,18 +174,18 @@ public final class PulseGenerator: Generator {
 
     public var params: [ParamSpec] {
         [
-            ParamSpec("gen.pulse.enabled", kind: .toggle, default: 1, help: "Play the pulse layer."),
+            ParamSpec("gen.pulse.enabled", kind: .toggle, default: 1, help: "A sparse rhythmic sparkle: random notes on the grid whose density follows total traffic."),
             ParamSpec("gen.pulse.step", kind: .choice, default: 1, options: Quantiser.gridOptions.map(\.label),
-                      help: "Grid the pulse considers firing on."),
-            ParamSpec("gen.pulse.density", default: 0.05, help: "Chance of a note per step (good mod target)."),
-            ParamSpec("gen.pulse.octave", kind: .integer, range: 1...7, default: 4, help: "Lowest octave of the pulse."),
+                      help: "Grid the pulse fires on. 1/8 = gentle; 1/16 = busier, more glitchy."),
+            ParamSpec("gen.pulse.density", default: 0.05, help: "Chance of a note on each step. Traffic adds to this by default, so a busy network sparkles more."),
+            ParamSpec("gen.pulse.octave", kind: .integer, range: 1...7, default: 4, help: "Lowest register of the pulse."),
             ParamSpec("gen.pulse.span", kind: .integer, range: 0...36, default: 14, unit: "semitones",
-                      help: "Pitch rise from silence to very heavy traffic."),
+                      help: "How far pitch rises with traffic, in semitones. Higher = busy network sounds higher and more excited."),
             ParamSpec("gen.pulse.jitter", kind: .continuous, range: 0...12, default: 3, unit: "semitones",
-                      help: "Random pitch spread on each pulse."),
-            ParamSpec("gen.pulse.intensity", default: 0.45, help: "Pulse loudness."),
+                      help: "Random pitch spread on each pulse. 0 = repetitive; higher = more varied."),
+            ParamSpec("gen.pulse.intensity", default: 0.45, help: "Loudness of the pulse."),
             ParamSpec("gen.pulse.noteBeats", kind: .continuous, range: 0.05...4, default: 0.25, unit: "beats",
-                      help: "Length of each pulse."),
+                      help: "Length of pulse notes. Short = ticks and plinks; long = shimmering overlaps."),
         ]
     }
 

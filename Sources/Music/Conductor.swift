@@ -19,33 +19,33 @@ public final class Conductor: @unchecked Sendable {
 
     public static let params: [ParamSpec] = [
         ParamSpec("clock.bpm", kind: .continuous, range: 20...200, default: 66, unit: "bpm",
-                  help: "Tempo of the musical grid."),
+                  help: "Speed of the musical grid everything snaps to. Lower feels more ambient and spacious; it also slows chord changes, since those are counted in bars."),
         ParamSpec("harmony.root", kind: .choice, default: 2, options: ScaleCatalogue.rootNames,
-                  help: "Key centre."),
+                  help: "The key's home note. Changes the pitch of everything at once; the mood and shape of the music stay the same."),
         ParamSpec("harmony.scale", kind: .choice, default: 2, options: ScaleCatalogue.names,
-                  help: "Scale / mode used by the pitch quantiser and chords."),
+                  help: "Which notes are 'allowed'. Sets the colour: Major bright, Minor sad, Dorian wistful (default), Lydian dreamy, Phrygian dark, the pentatonics can't clash, Whole tone floats, Chromatic means anything goes."),
         ParamSpec("harmony.chordSize", kind: .integer, range: 1...6, default: 3,
-                  help: "Notes per chord (stacked thirds): 3 = triad, 4 = seventh..."),
+                  help: "Notes in each chord. 3 = plain triads, 4 = sevenths (jazzier, lusher), 5–6 = big ambiguous clusters. Affects the pad and which tones the bass and quantiser use."),
         ParamSpec("harmony.barsPerChord", kind: .integer, range: 1...16, default: 2,
-                  help: "How long each chord lasts."),
+                  help: "How long each chord lasts. 1 = restless, 2 = default, 4–8 = slow ambient drift."),
         ParamSpec("harmony.hysteresis", kind: .continuous, range: 0...300, default: 10, unit: "s",
-                  help: "A new mood must persist this long before the progression changes."),
+                  help: "How long the network must stay in a new mood before the music follows. Short = the harmony reacts quickly to bursts; long = it only changes for sustained shifts."),
         ParamSpec("harmony.changeOnPhrase", kind: .toggle, default: 1,
-                  help: "Wait for the current progression to finish before switching to a new one."),
+                  help: "On: a new mood waits until the current chord progression finishes (smooth, musical). Off: switches at the next chord (more responsive, can feel abrupt)."),
         ParamSpec("conductor.smoothing", kind: .continuous, range: 0...120, default: 8, unit: "s",
-                  help: "Time constant for smoothing traffic before classifying the mood (bursty data flips less)."),
+                  help: "How much traffic is averaged before choosing a mood, in seconds. Higher ignores brief spikes (calmer harmony); lower reacts to every burst."),
         ParamSpec("conductor.quietBelow", kind: .continuous, range: 0...1_000_000, default: 8_000, unit: "B/s",
-                  help: "Total rate under which the mood is 'quiet'."),
+                  help: "Mood threshold. When smoothed total traffic is below this, the mood is QUIET and the slow two-chord quiet progression plays. Raise it to stay in quiet more often."),
         ParamSpec("conductor.busyAbove", kind: .continuous, range: 1_000...100_000_000, default: 1_500_000, unit: "B/s",
-                  help: "Total rate over which the mood is 'busy' (or 'focused')."),
+                  help: "Mood threshold. When smoothed traffic is above this, the mood is BUSY (more chords, more motion) or FOCUSED if one app dominates. Between this and 'quiet below' the mood is CALM."),
         ParamSpec("conductor.focusRatio", kind: .continuous, range: 0.3...1, default: 0.7,
-                  help: "Share of traffic one app needs for the mood to be 'focused'."),
+                  help: "When the network is busy and one app has at least this share of the traffic (streaming, a big download), the mood is FOCUSED: a pedal-like progression that sits still. Lower it to get focused more readily."),
         ParamSpec("conductor.flurryApps", kind: .integer, range: 2...20, default: 3,
-                  help: "This many app activations within the flurry window trigger the flurry gesture."),
+                  help: "When this many apps wake up within the flurry window, the music plays a cadence (v → i), a little 'arrival' gesture. Lower = more frequent gestures."),
         ParamSpec("conductor.flurryWindow", kind: .continuous, range: 0.5...60, default: 4, unit: "s",
-                  help: "Window for counting activations towards a flurry."),
+                  help: "Time window for counting apps waking up towards a flurry."),
         ParamSpec("conductor.flurryCooldown", kind: .continuous, range: 0...600, default: 60, unit: "s",
-                  help: "Minimum time between flurry gestures."),
+                  help: "Minimum time between two flurry cadences, so gestures stay special."),
     ]
 
     public var progressions: [Mood: [Int]]
@@ -146,10 +146,12 @@ public final class Conductor: @unchecked Sendable {
     }
 
     public static let defaultProgressions: [Mood: [Int]] = [
-        .quiet: [0, 3],             // i  iv   — slow breathing
-        .calm: [0, 5, 3, 4],        // i  VI iv v
-        .busy: [0, 4, 5, 3, 0, 6],  // more motion
-        .focused: [0, 0, 6, 6],     // pedal-like, one thing dominates
+        // Degrees are scale steps (0 = tonic); chords are stacked thirds, so the quality depends
+        // on the scale. Names below are for the default D Dorian. Avoids degree 5 (B° in Dorian).
+        .quiet: [0, 3],             // Dm G        i IV      — slow breathing
+        .calm: [0, 6, 3, 4],        // Dm C G Am   i VII IV v
+        .busy: [0, 4, 2, 3, 0, 6],  // Dm Am F G Dm C — more motion
+        .focused: [0, 0, 6, 6],     // Dm Dm C C   — pedal-like, one thing dominates
     ]
 
     public static let defaultGestures: [String: [Int]] = [

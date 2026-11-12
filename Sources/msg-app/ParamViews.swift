@@ -1,3 +1,4 @@
+import Engine
 import Params
 import SwiftUI
 
@@ -16,7 +17,29 @@ struct ParamRow: View {
     /// Byte-rate thresholds span decades, so their sliders work on a log scale.
     private var isLog: Bool { spec.unit == "B/s" }
 
+    /// Hosted synths' own controls all share one generic explanation; keep it to the tooltip.
+    private var showsInlineHelp: Bool {
+        guard model.showExplanations, !spec.help.isEmpty else { return false }
+        let parts = spec.id.split(separator: ".")
+        return !(parts.first == "au" && !["preset", "volume", "pan"].contains(parts.last ?? ""))
+    }
+
     var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            row
+            if showsInlineHelp {
+                Text(spec.help)
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 252)
+                    .padding(.trailing, 122)
+            }
+        }
+        .padding(.vertical, 2)
+        .help(spec.help)
+    }
+
+    private var row: some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 1) {
                 Text(label ?? (spec.label == spec.id ? Self.shortLabel(spec.id) : spec.label))
@@ -37,8 +60,6 @@ struct ParamRow: View {
             }
             .frame(width: 110, alignment: .trailing)
         }
-        .padding(.vertical, 2)
-        .help(spec.help)
     }
 
     @ViewBuilder private var control: some View {
@@ -147,13 +168,89 @@ struct ParamSection: View {
                 NotRunningHint()
             }
             ForEach(order, id: \.self) { group in
-                Section(group.capitalized) {
+                Section {
+                    if let first = groups[group]?.first,
+                       let doc = ParamDocs.description(for: groupPrefix(first.id)) {
+                        Text(doc).font(.callout).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.vertical, 4)
+                    }
+                    if group == "conductor" { MoodTable().padding(.bottom, 6) }
                     ForEach(groups[group] ?? [], id: \.id) { ParamRow(spec: $0) }
+                } header: {
+                    Text(Self.title(group)).font(.headline)
                 }
             }
         }
         .searchable(text: $filter, placement: .toolbar, prompt: "Filter \(title.lowercased())")
         .navigationTitle(title)
+    }
+}
+
+extension ParamSection {
+    /// "gen.drone.octave" with groupComponent 1 -> "gen.drone".
+    func groupPrefix(_ id: String) -> String {
+        id.split(separator: ".").prefix(groupComponent + 1).joined(separator: ".")
+    }
+
+    static func title(_ group: String) -> String {
+        ["gen": "Generators", "quant": "Quantise", "macro": "Macros", "sub": "Sub drone", "drone": "Pad (drone)",
+         "motif": "Lead (motifs)", "pulse": "Pulse", "bass": "Bass", "activity": "App activity"][group] ?? group.capitalized
+    }
+}
+
+/// What each mood plays, and when the network counts as that mood, at the current settings.
+struct MoodTable: View {
+    @Environment(AppModel.self) private var model
+
+    private func condition(_ mood: String) -> String {
+        let quiet = Format.rate(model.effective("conductor.quietBelow"))
+        let busy = Format.rate(model.effective("conductor.busyAbove"))
+        let focus = Int((model.effective("conductor.focusRatio") * 100).rounded())
+        switch mood {
+        case "quiet": return "traffic below \(quiet)"
+        case "calm": return "\(quiet) – \(busy)"
+        case "busy": return "above \(busy), spread across apps"
+        case "focused": return "above \(busy), one app ≥ \(focus)%"
+        default: return ""
+        }
+    }
+
+    var body: some View {
+        let status = model.status
+        Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 6) {
+            GridRow {
+                Text("Mood").font(.caption).foregroundStyle(.secondary)
+                Text("When (smoothed traffic)").font(.caption).foregroundStyle(.secondary)
+                Text("Chord progression").font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach(status?.progressions ?? [], id: \.mood) { p in
+                let now = status?.mood == p.mood
+                GridRow {
+                    Text(p.mood.capitalized).fontWeight(now ? .bold : .regular)
+                        .foregroundStyle(now ? Color.accentColor : .primary)
+                    Text(condition(p.mood)).foregroundStyle(.secondary)
+                    HStack(spacing: 10) {
+                        ForEach(Array(zip(p.chords, p.numerals).enumerated()), id: \.offset) { i, chord in
+                            let playing = now && i == status?.progressionIndex
+                            VStack(spacing: 0) {
+                                Text(chord.0).fontWeight(playing ? .bold : .regular)
+                                Text(chord.1).font(.caption2).foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(playing ? Color.accentColor.opacity(0.25) : .clear, in: RoundedRectangle(cornerRadius: 4))
+                        }
+                    }
+                }
+            }
+        }
+        .padding(10)
+        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(alignment: .topTrailing) {
+            if let s = status {
+                Text("now: \(s.mood) at \(Format.rate(s.smoothedRate))").font(.caption).foregroundStyle(.secondary).padding(8)
+            }
+        }
     }
 }
 

@@ -49,6 +49,8 @@ public struct Scene: Codable, Sendable {
             VoiceConfig(role: "pad", destination: "virtual", channel: 1, low: 36, high: 72, maxPolyphony: 8),
             VoiceConfig(role: "lead", destination: "virtual", channel: 2, low: 60, high: 96, maxPolyphony: 4),
             VoiceConfig(role: "pulse", destination: "virtual", channel: 3, low: 48, high: 84, maxPolyphony: 3),
+            VoiceConfig(role: "bass", destination: "virtual", channel: 4, low: 28, high: 55, maxPolyphony: 2),
+            VoiceConfig(role: "sub", destination: "virtual", channel: 5, low: 21, high: 45, maxPolyphony: 2),
         ],
         progressions: Dictionary(uniqueKeysWithValues: Conductor.defaultProgressions.map { ($0.key.rawValue, $0.value) }),
         gestures: Conductor.defaultGestures,

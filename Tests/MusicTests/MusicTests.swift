@@ -141,3 +141,18 @@ private let dDorian = HarmonyContext(root: 2, scale: .dorian)
         #expect(t.update(rates: ["x": 5_000], now: 13, params: p, ignore: []).count == 1)
     }
 }
+
+@Suite struct ChordNameTests {
+    @Test func namesDorianTriads() {
+        let names = (0..<7).map { dDorian.chordName(degree: $0) }
+        #expect(names == ["Dm", "Em", "F", "G", "Am", "B°", "C"])
+        #expect((0..<7).map { dDorian.romanNumeral(degree: $0) } == ["i", "ii", "III", "IV", "v", "vi°", "VII"])
+    }
+
+    @Test func namesSevenths() {
+        let c = HarmonyContext(root: 0, scale: .major, chordSize: 4)
+        #expect(c.chordName(degree: 0) == "Cmaj7")
+        #expect(c.chordName(degree: 4) == "G7")
+        #expect(c.chordName(degree: 1) == "Dm7")
+    }
+}
