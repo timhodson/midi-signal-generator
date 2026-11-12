@@ -37,6 +37,12 @@ yellow = scale note, red = out of key).
 - Each generator group starts with a **"What makes the … play"** card built from the current settings
   and traffic (e.g. how often a pulse fires right now and why).
 
+**Follow-ups:**
+- Motif notes carry a tag (app, step, design) through to `PlayedNote.motif`. The app lights the sounding step
+  in the step grid, the strips, the list thumbnails and the **All motifs** gallery (designs and every app heard).
+- Piano rolls **pause while the pointer is over them**, with a "paused" badge, holding a snapshot of the notes
+  so the inspected note can't scroll away. They ease back to live over 0.5 s when the pointer leaves.
+
 ## Consequences
 
 - Discord can be fixed per app without losing the "who's talking" mapping.

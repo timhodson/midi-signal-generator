@@ -23,6 +23,8 @@ public struct EngineStatus: Sendable {
         public var rawPitch: Double?
         /// Generator intensity (0...1) before the velocity curve.
         public var intensity: Double = 0
+        /// For motif notes: the app, step and design (nil = generated motif).
+        public var motif: NoteIntent.MotifTag?
     }
 
     /// An app the engine has seen, for the motif editor.

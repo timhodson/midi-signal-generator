@@ -211,7 +211,8 @@ public final class Engine: @unchecked Sendable {
                 if case .raw(let p) = intent.pitch { rawPitch = p }
                 recentNotes.append(.init(id: noteCounter, time: routed.start, role: routed.role, note: routed.note,
                                          velocity: routed.velocity, why: routed.why, duration: routed.duration,
-                                         rawTime: intent.time, rawPitch: rawPitch, intensity: intent.intensity))
+                                         rawTime: intent.time, rawPitch: rawPitch, intensity: intent.intensity,
+                                         motif: intent.motif))
                 if recentNotes.count > 400 { recentNotes.removeFirst(recentNotes.count - 400) }
                 if logNotes {
                     log("\(String(format: "%8.2f", routed.start))s \(routed.role.padding(5)) ch\(String(routed.channel + 1).padding(2)) "

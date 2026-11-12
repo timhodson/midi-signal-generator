@@ -180,6 +180,14 @@ final class AppModel {
             if let v = s.values[id], abs(cell.effective - v) > 1e-9 { cell.effective = v }
             if now >= cell.localEditUntil, let b = s.bases[id], abs(cell.base - b) > 1e-9 { cell.base = b }
         }
+        var motifSteps: [String: Set<Int>] = [:]
+        for n in s.recentNotes.suffix(80) {
+            // Lit while sounding (and a beat of grace so short notes are still seen at 10 Hz).
+            guard let tag = n.motif, n.time <= s.time + 0.05, s.time < n.time + max(n.duration, 0.25) + 0.15 else { continue }
+            motifSteps["app:" + tag.app, default: []].insert(tag.step)
+            if let d = tag.designID { motifSteps["design:" + d, default: []].insert(tag.step) }
+        }
+        if motifSteps != soundingMotifSteps { soundingMotifSteps = motifSteps }
         pointCounter += 1
         // One chart point per second is plenty; skip the silence before the first data arrives.
         if s.totalRate > 0 || !history.isEmpty, history.last.map({ s.time - $0.time >= 1 }) ?? true {
@@ -206,6 +214,9 @@ final class AppModel {
     func auditionChord(_ degree: Int) { session?.auditionChord(degree) }
 
     // MARK: - Motifs
+
+    /// Motif steps sounding right now, keyed "app:<name>" and "design:<id>" (for live highlighting).
+    private(set) var soundingMotifSteps: [String: Set<Int>] = [:]
 
     /// The motif designs being edited; pushed to the engine on every change.
     var motifDesigns: [MotifDesign] = []

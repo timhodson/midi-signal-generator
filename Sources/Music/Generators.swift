@@ -162,7 +162,8 @@ public final class MotifGenerator: Generator {
                 out.notes.append(NoteIntent(
                     role: "lead", pitch: .raw(centre + Double(offset)), intensity: intensity,
                     time: ctx.now + Double(i) * step, beats: p.value("gen.motif.noteBeats"),
-                    why: "\(activation.key) woke (\(formatRate(activation.bytesPerSecond))) · generated motif"
+                    why: "\(activation.key) woke (\(formatRate(activation.bytesPerSecond))) · generated motif",
+                    motif: .init(app: activation.key, step: i, designID: nil)
                 ))
             }
         }
@@ -183,7 +184,8 @@ public final class MotifGenerator: Generator {
             return NoteIntent(role: "lead", pitch: .exact(ctx.harmony.note(degree: anchor + s, octave: octave)),
                               intensity: intensity, time: ctx.now + Double(i) * step,
                               beats: p.value("gen.motif.noteBeats"),
-                              why: "\(activation.key) woke (\(formatRate(activation.bytesPerSecond))) · \(label)")
+                              why: "\(activation.key) woke (\(formatRate(activation.bytesPerSecond))) · \(label)",
+                              motif: .init(app: activation.key, step: i, designID: design.id))
         }
     }
 }

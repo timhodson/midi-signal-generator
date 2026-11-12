@@ -40,10 +40,15 @@ struct MotifsView: View {
         return List(selection: $selection) {
             Section {
                 ForEach(model.motifDesigns) { d in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(d.match == "*" ? "All other apps (*)" : "“\(d.match)”").fontWeight(.medium)
-                        Text("\(d.steps.count) steps · follows \(d.anchor == .chord ? "the chord" : "the key")")
-                            .font(.caption).foregroundStyle(.secondary)
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(d.match == "*" ? "All other apps (*)" : "“\(d.match)”").fontWeight(.medium).lineLimit(1)
+                            Text("\(d.steps.count) steps · follows \(d.anchor == .chord ? "the chord" : "the key")")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        MotifThumb(notes: model.resolve(d), active: model.soundingMotifSteps["design:" + d.id] ?? [])
+                            .frame(width: 84, height: 26)
                     }
                     .tag(Selection.design(d.id))
                 }
@@ -61,6 +66,8 @@ struct MotifsView: View {
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
+                        MotifThumb(notes: model.motif(for: a.name), active: model.soundingMotifSteps["app:" + a.name] ?? [])
+                            .frame(width: 84, height: 26)
                         if a.ignored {
                             Text("ignored").font(.caption2).padding(.horizontal, 5).padding(.vertical, 1)
                                 .background(.gray.opacity(0.3), in: Capsule())
@@ -99,6 +106,7 @@ struct MotifsView: View {
                     Button { newDesign(match: "*") } label: { Label("Design a default motif for all apps", systemImage: "plus") }
                 }
             }
+            MotifGallery { selection = $0 }
         }
     }
 
@@ -141,12 +149,12 @@ struct AppMotifPanel: View {
             if let design {
                 VisualCard(title: "Plays: \(design.match == "*" ? "the default design" : "design “\(design.match)”")",
                            caption: "Select the design in the list to edit it.") {
-                    MotifStrip(notes: model.resolve(design)).frame(height: 120)
+                    MotifStrip(notes: model.resolve(design), active: model.soundingMotifSteps["app:" + app] ?? []).frame(height: 120)
                 }
             } else {
                 VisualCard(title: "Plays: its generated motif",
                            caption: "Hollow: the pitch generated from the app's name. Filled: what the pitch quantiser makes of it now (with the current strength, it can vary). Notes outside the highlighted chord rows are the ones that can sound discordant.") {
-                    MotifStrip(notes: model.generatedMotif(for: app)).frame(height: 120)
+                    MotifStrip(notes: model.generatedMotif(for: app), active: model.soundingMotifSteps["app:" + app] ?? []).frame(height: 120)
                 }
             }
         }
@@ -182,6 +190,7 @@ struct DesignEditor: View {
         let chordSteps = Set(rows.filter { r in
             h.map { chordPCs.contains((($0.note(degree: anchor + r, octave: octave) % 12) + 12) % 12) } ?? false
         })
+        let live = model.soundingMotifSteps["design:" + design.id] ?? []
         VStack(alignment: .leading, spacing: 14) {
             VisualCard(title: "Design", caption: "Which apps it's for, and what the steps are measured from.") {
                 Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
@@ -232,8 +241,12 @@ struct DesignEditor: View {
                                 .frame(width: 74, alignment: .leading)
                             ForEach(Array(design.steps.enumerated()), id: \.offset) { i, step in
                                 let on = step == row
+                                let playing = live.contains(i)
                                 Rectangle()
-                                    .fill(on ? Color.orange : (chordSteps.contains(row) ? Color.accentColor.opacity(0.18) : Color.primary.opacity(0.06)))
+                                    .fill(on ? (playing ? Color.white : Color.orange)
+                                             : (chordSteps.contains(row) ? Color.accentColor.opacity(playing ? 0.35 : 0.18)
+                                                                         : Color.primary.opacity(playing ? 0.16 : 0.06)))
+                                    .shadow(color: on && playing ? .orange : .clear, radius: 6)
                                     .frame(width: 30, height: 16)
                                     .overlay(RoundedRectangle(cornerRadius: 2).stroke(step == nil && row == 0 ? Color.secondary : .clear, style: StrokeStyle(dash: [2])))
                                     .contentShape(Rectangle())
@@ -244,7 +257,8 @@ struct DesignEditor: View {
                     GridRow {
                         Text("").frame(width: 74)
                         ForEach(Array(design.steps.enumerated()), id: \.offset) { i, step in
-                            Text(step == nil ? "rest" : "\(i + 1)").font(.caption2).foregroundStyle(.secondary).frame(width: 30)
+                            Text(step == nil ? "rest" : "\(i + 1)").font(.caption2.weight(live.contains(i) ? .bold : .regular))
+                                .foregroundStyle(live.contains(i) ? Color.orange : .secondary).frame(width: 30)
                         }
                     }
                 }
@@ -262,7 +276,7 @@ struct DesignEditor: View {
             }
 
             VisualCard(title: "How it sounds over the current chord") {
-                MotifStrip(notes: model.resolve(design)).frame(height: 110)
+                MotifStrip(notes: model.resolve(design), active: live).frame(height: 110)
             }
         }
     }
@@ -281,6 +295,8 @@ struct DesignEditor: View {
 struct MotifStrip: View {
     @Environment(AppModel.self) private var model
     let notes: [(raw: Double?, played: Int?)]
+    /// Steps sounding right now (lit up).
+    var active: Set<Int> = []
 
     var body: some View {
         Canvas { gc, size in
@@ -297,9 +313,13 @@ struct MotifStrip: View {
                 else if scale.contains(pc) { gc.fill(Path(r), with: .color(.primary.opacity(0.05))) }
             }
             let slot = size.width / CGFloat(notes.count)
+            for i in active where i < notes.count {
+                gc.fill(Path(roundedRect: CGRect(x: slot * CGFloat(i) + 2, y: 0, width: slot - 4, height: size.height), cornerRadius: 4),
+                        with: .color(.white.opacity(0.12)))
+            }
             for (i, n) in notes.enumerated() {
                 let x = slot * (CGFloat(i) + 0.5)
-                let d = min(rowH * 1.2, 12)
+                let d = min(rowH * 1.2, 12) * (active.contains(i) ? 1.5 : 1)
                 if let raw = n.raw, let played = n.played {
                     var line = Path(); line.move(to: CGPoint(x: x, y: y(raw))); line.addLine(to: CGPoint(x: x, y: y(Double(played))))
                     gc.stroke(line, with: .color(.orange.opacity(0.6)), lineWidth: 1.5)
@@ -342,5 +362,83 @@ extension AppModel {
                 : strength > 0 ? HarmonyContext.nearest(raw, in: h.scalePitchClasses) : Int(raw.rounded())
             return (raw, played)
         }
+    }
+}
+
+/// A tiny picture of a motif: one dot per step on a mini pitch range. Lit steps are sounding now.
+struct MotifThumb: View {
+    @Environment(AppModel.self) private var model
+    let notes: [(raw: Double?, played: Int?)]
+    var active: Set<Int> = []
+
+    var body: some View {
+        let chord = Set(model.status?.chordPitchClasses ?? [])
+        Canvas { gc, size in
+            let played = notes.compactMap(\.played)
+            guard let lo = played.min(), let hi = played.max() else { return }
+            let span = Double(max(hi - lo, 6))
+            let slot = size.width / CGFloat(max(notes.count, 1))
+            for (i, n) in notes.enumerated() {
+                guard let p = n.played else { continue }
+                let x = slot * (CGFloat(i) + 0.5)
+                let y = size.height - 4 - CGFloat(Double(p - lo) / span) * (size.height - 8)
+                let lit = active.contains(i)
+                let d: CGFloat = lit ? 8 : 5
+                let inChord = chord.contains(((p % 12) + 12) % 12)
+                gc.fill(Path(ellipseIn: CGRect(x: x - d / 2, y: y - d / 2, width: d, height: d)),
+                        with: .color(lit ? .white : (inChord ? .orange : .yellow)))
+            }
+        }
+        .background(active.isEmpty ? Color.primary.opacity(0.06) : Color.orange.opacity(0.3), in: RoundedRectangle(cornerRadius: 4))
+    }
+}
+
+/// Every motif at a glance: your designs and every app heard. Click one to open it.
+struct MotifGallery: View {
+    @Environment(AppModel.self) private var model
+    let select: (MotifsView.Selection) -> Void
+
+    var body: some View {
+        let apps = model.status?.apps ?? []
+        VisualCard(title: "All motifs", caption: "Designs and every app heard. Lit cards are playing now; orange dots are chord notes, yellow are other scale notes.") {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 10)], spacing: 10) {
+                ForEach(model.motifDesigns) { d in
+                    card(d.match == "*" ? "All other apps (*)" : "“\(d.match)”", "design", model.resolve(d),
+                         model.soundingMotifSteps["design:" + d.id] ?? []) { select(.design(d.id)) }
+                }
+                ForEach(apps, id: \.name) { a in
+                    let design = MotifDesign.best(for: a.name, in: model.motifDesigns)
+                    card(a.name, a.ignored ? "ignored" : design == nil ? "generated" : "uses design",
+                         model.motif(for: a.name), model.soundingMotifSteps["app:" + a.name] ?? []) { select(.app(a.name)) }
+                }
+            }
+        }
+    }
+
+    private func card(_ title: String, _ kind: String, _ notes: [(raw: Double?, played: Int?)], _ active: Set<Int>,
+                      action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(title).fontWeight(.medium).lineLimit(1)
+                    Spacer()
+                    Text(kind).font(.caption2).foregroundStyle(.secondary)
+                }
+                MotifThumb(notes: notes, active: active).frame(height: 44)
+            }
+            .padding(8)
+            .background(Color.primary.opacity(active.isEmpty ? 0.05 : 0.12), in: RoundedRectangle(cornerRadius: 8))
+            .overlay(RoundedRectangle(cornerRadius: 8).stroke(active.isEmpty ? Color.clear : .orange, lineWidth: 1.5))
+            .contentShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+extension AppModel {
+    /// What an app plays: its design if one matches, otherwise its generated motif.
+    func motif(for app: String) -> [(raw: Double?, played: Int?)] {
+        if let d = MotifDesign.best(for: app, in: motifDesigns) { return resolve(d) }
+        return generatedMotif(for: app)
     }
 }

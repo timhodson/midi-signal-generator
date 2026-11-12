@@ -65,20 +65,58 @@ struct PianoRoll: View {
     /// Frames per second. Big "hero" rolls scroll smoothly at 24; small lanes are fine at 12.
     var fps: Double = 24
     @State private var hover: CGPoint?
+    /// While the pointer is over the roll, time stands still so the note being inspected stays put.
+    @State private var frozenAt: Double?
+    /// The data as it was when frozen, so notes being inspected can't scroll out of the history.
+    @State private var frozenStatus: EngineStatus?
+    /// After inspecting, ease from where we stopped back to live.
+    @State private var catchUp: (from: Double, started: Date)?
+    private static let catchUpSeconds = 0.5
 
-    var body: some View {
-        TimelineView(.animation(minimumInterval: 1 / fps, paused: !model.visualsActive)) { tl in
-            Canvas { gc, size in draw(&gc, size, now: model.engineNow(at: tl.date)) }
-        }
-        .onContinuousHover { phase in
-            if case .active(let p) = phase { hover = p } else { hover = nil }
-        }
-        .help("Hover a note to see why it played")
+    private func displayTime(at date: Date) -> Double {
+        if let frozenAt { return frozenAt }
+        let live = model.engineNow(at: date)
+        guard let c = catchUp else { return live }
+        let t = date.timeIntervalSince(c.started) / Self.catchUpSeconds
+        guard t < 1 else { return live }
+        let ease = 1 - pow(1 - t, 3)
+        return c.from + (live - c.from) * ease
     }
 
-    private func draw(_ gc: inout GraphicsContext, _ size: CGSize, now: Double) {
+    var body: some View {
+        TimelineView(.animation(minimumInterval: 1 / (frozenAt == nil ? fps : 12), paused: !model.visualsActive)) { tl in
+            Canvas { gc, size in
+                draw(&gc, size, now: displayTime(at: tl.date), status: frozenStatus ?? model.status)
+                if frozenAt != nil {
+                    let badge = gc.resolve(Text("⏸ paused while inspecting").font(.system(size: 10, weight: .semibold)))
+                    let bs = badge.measure(in: size)
+                    let box = CGRect(x: size.width - bs.width - 14, y: 2, width: bs.width + 10, height: bs.height + 4)
+                    gc.fill(Path(roundedRect: box, cornerRadius: 4), with: .color(.orange.opacity(0.85)))
+                    gc.draw(badge, in: box.insetBy(dx: 5, dy: 2))
+                }
+            }
+        }
+        .onContinuousHover { phase in
+            switch phase {
+            case .active(let p):
+                hover = p
+                if frozenAt == nil {
+                    frozenAt = displayTime(at: Date())
+                    frozenStatus = model.status
+                }
+            case .ended:
+                hover = nil
+                if let f = frozenAt { catchUp = (f, Date()) }
+                frozenAt = nil
+                frozenStatus = nil
+            }
+        }
+        .help("Hover to pause and see why a note played")
+    }
+
+    private func draw(_ gc: inout GraphicsContext, _ size: CGSize, now: Double, status: EngineStatus?) {
         Perf.canvasFrames += 1
-        guard let s = model.status else { return }
+        guard let s = status else { return }
         let start = now - window, end = now + ahead
         let notes = s.recentNotes.filter { (roles?.contains($0.role) ?? true) && $0.time + $0.duration >= start && $0.time <= end }
         let band: CGFloat = showChords ? 18 : 0

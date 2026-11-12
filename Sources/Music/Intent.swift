@@ -26,9 +26,23 @@ public struct NoteIntent: Sendable, Equatable {
     public var essential: Bool
     /// Human-readable reason, shown in dry-run logs.
     public var why: String
+    /// For motif notes: which app, which step, and which design (nil = generated).
+    public var motif: MotifTag?
+
+    public struct MotifTag: Sendable, Equatable, Hashable {
+        public var app: String
+        public var step: Int
+        public var designID: String?
+        public init(app: String, step: Int, designID: String?) {
+            self.app = app
+            self.step = step
+            self.designID = designID
+        }
+    }
 
     public init(role: String, pitch: Pitch, intensity: Double, time: Double, beats: Double,
-                essential: Bool = false, why: String = "") {
+                essential: Bool = false, why: String = "", motif: MotifTag? = nil) {
+        self.motif = motif
         self.role = role
         self.pitch = pitch
         self.intensity = intensity
