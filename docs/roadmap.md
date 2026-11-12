@@ -65,7 +65,15 @@
    - bundle an open-licensed font (e.g. an OFL dot-matrix or technical mono) for labels and the LCD
    - apply it first to the new tiles, mixer and tabletop (items 3–4) rather than restyling the long
      pages that those replace
-   - check licences before reusing anything from AudioKit's open-source apps; default to our own art
+   - our own art, generated on Tim's local ComfyUI (Z-Image Turbo and FLUX.2 klein 4B are installed,
+     the same setup as the video skill): Claude writes the texture specs and prompts.
+     - textures, not finished controls: panel surfaces (charcoal grain, light wear), knob-cap
+       materials (radially symmetric, so they can rotate), LCD glass, section bevel strips, an app icon
+     - lighting, shadows, pointers and value arcs stay in code, so a knob can turn without its
+       highlight turning with it
+     - panel textures must tile: generate, then make seamless (offset and blend), and check at 1× and 2×
+     - keep source prompts and settings in the repo (e.g. `art/`) so the look can be regenerated
+   - no reuse of AudioKit's artwork
 6. **App, next round:** adding
    and removing hosted instruments, scene A/B comparison, MIDI-learn for params, an app bundle.
 7. **MIDI clock** out (and in, to follow a DAW). CoreMIDI timestamped sends.
