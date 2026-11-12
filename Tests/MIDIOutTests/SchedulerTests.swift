@@ -63,3 +63,15 @@ private func note(_ n: Int, at start: Double, for duration: Double, poly: Int = 
         #expect(s.soundingCount == 0)
     }
 }
+
+@Suite struct CompositeSinkTests {
+    @Test func routesByDestinationWithFallback() {
+        let au = Recorder(), midi = Recorder()
+        let sink = CompositeSink(routes: [.init(claims: { $0.hasPrefix("au:") }, sink: au)], fallback: midi)
+        sink.noteOn(destination: "au:j6", channel: 0, note: 60, velocity: 1)
+        sink.noteOn(destination: "network", channel: 0, note: 62, velocity: 1)
+        sink.allNotesOff()
+        #expect(au.log == ["on 60", "panic"])
+        #expect(midi.log == ["on 62", "panic"])
+    }
+}

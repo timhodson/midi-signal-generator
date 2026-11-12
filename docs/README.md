@@ -1,7 +1,7 @@
 # Documentation
 
 - [Architecture](architecture.md): pipeline, modules, signals, threading
-- [MIDI setup](midi-setup.md): sending to an iPad over network MIDI, a DAW or Bluetooth
+- [MIDI setup](midi-setup.md): hosted AU synths on the Mac, an iPad over network MIDI, a DAW or Bluetooth
 - [Development](development.md): building and testing (including the Command Line Tools workaround)
 - [Roadmap](roadmap.md): what comes after the spike
 
@@ -21,3 +21,4 @@ is made or reversed; don't rewrite history. Mark superseded ones in their status
 | [0007](decisions/0007-midi-output.md) | Roles, voice routing, app-side scheduler, destinations |
 | [0008](decisions/0008-sources-behind-a-protocol-osc-later.md) | Sources behind a protocol; OSC and out-of-process later |
 | [0009](decisions/0009-seeded-randomness-and-leitmotifs.md) | Seeded randomness and per-app leitmotifs |
+| [0010](decisions/0010-hosted-audio-unit-instruments.md) | Host Audio Unit instruments (Synth One J6, King of FM) in-app, one per voice |

@@ -7,7 +7,8 @@
 - [x] Conductor (moods, progressions, hysteresis, flurry gesture), Drone / Motif / Pulse generators
 - [x] Continuous quantisers, mod matrix, faithfulness macro, JSON scenes
 - [x] CoreMIDI out: virtual port, network session, named destinations; scheduler with note ledger
-- [ ] **Listen to it on the iPad** and tune the default scene by ear
+- [x] Hosted Audio Unit instruments, one per voice, with plugin params as mod targets (ADR 0010). Heard on the Mac
+- [ ] **Listen to it on the iPad** and tune the default and hosted scenes by ear
 
 ## Next
 
@@ -29,4 +30,4 @@
 - MQTT bridge (Home Assistant / Zigbee2MQTT) for temperature, humidity and motion. Mostly the
   state layer: mode, key and tempo drift.
 - Scene morphing, including choice params switching on boundaries.
-- Built-in preview synth (AudioKit) for listening without external gear.
+- Effects on the hosted mix (reverb/delay sends), and the plugins' own editor windows in the app.

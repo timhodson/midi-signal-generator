@@ -136,3 +136,45 @@ public struct VoiceRouter: Sendable {
                              time: control.time + p.value("voice.\(v.role).latencyMs") / 1000)
     }
 }
+
+/// An Audio Unit instrument hosted inside the app. Voices reach it with destination
+/// "au:<id>" (docs/decisions/0010-hosted-audio-unit-instruments.md).
+public struct InstrumentConfig: Codable, Sendable, Equatable {
+    /// Short id used in destinations and param ids: "j6" -> "au:j6", "au.j6.volume".
+    public var id: String
+    /// Component name as listed by `--list-instruments`, e.g. "Synth One J6" or
+    /// "AudioKit Pro: Synth One J6".
+    public var component: String
+    /// Factory preset name to load (nil = the plugin's default sound).
+    public var preset: String?
+    public var volume: Double
+    public var pan: Double
+    /// Run the plugin in a separate process (the default). A crashing plugin can't take the
+    /// app down, and some plugins (King of FM 2) only load this way from a command-line host.
+    public var outOfProcess: Bool
+
+    public init(id: String, component: String, preset: String? = nil, volume: Double = 0.8,
+                pan: Double = 0, outOfProcess: Bool = true) {
+        self.id = id
+        self.component = component
+        self.preset = preset
+        self.volume = volume
+        self.pan = pan
+        self.outOfProcess = outOfProcess
+    }
+
+    public static let destinationPrefix = "au:"
+    public var destination: String { Self.destinationPrefix + id }
+
+    private enum CodingKeys: String, CodingKey { case id, component, preset, volume, pan, outOfProcess }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        component = try c.decode(String.self, forKey: .component)
+        preset = try c.decodeIfPresent(String.self, forKey: .preset)
+        volume = try c.decodeIfPresent(Double.self, forKey: .volume) ?? 0.8
+        pan = try c.decodeIfPresent(Double.self, forKey: .pan) ?? 0
+        outOfProcess = try c.decodeIfPresent(Bool.self, forKey: .outOfProcess) ?? true
+    }
+}

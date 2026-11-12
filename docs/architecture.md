@@ -37,10 +37,13 @@ something pleasant: only interpretation changes.
  │ NoteScheduler  time-ordered on/off/CC queue, note ledger, polyphony, panic      │
  └─────────────────┬──────────────────────────────────────────────────────────────┘
                    │
- ┌─────────────────▼──────────────────┐
- │ CoreMIDISink (swift-midi-io)       │  "virtual" port · "network" session (iPad)
- │ PrintSink (--dry-run, tests)       │  · any named destination (IAC, hardware)
- └────────────────────────────────────┘
+ ┌─────────────────▼──────────────────────────────┐
+ │ CompositeSink                                  │
+ │  ├ "au:<id>" → AUHostSink (AVAudioEngine)      │  Synth One J6, King of FM 2… in-app,
+ │  │                                             │  plugin params = mod-matrix targets
+ │  └ else → CoreMIDISink (swift-midi-io)         │  "virtual" port · "network" session (iPad)
+ │            PrintSink (--dry-run, tests)        │  · any named destination (IAC, hardware)
+ └────────────────────────────────────────────────┘
 ```
 
 ## Modules
@@ -51,7 +54,8 @@ something pleasant: only interpretation changes.
 | `SignalBus` | – | `SignalSample`, `SignalSource` protocol, `SignalBus` |
 | `Music` | Params, SignalBus, Tonic | `HarmonyContext`, `ScaleCatalogue`, `MusicalClock`, `Quantiser`, `Conductor`, `ActivityTracker`, generators, `SeededRandom` |
 | `Router` | Params, Music | `VoiceConfig`, `VoiceRouter`, range folding |
-| `MIDIOut` | Router, SwiftMIDIIO | `NoteScheduler`, `MIDISink`, `CoreMIDISink`, `PrintSink` |
+| `MIDIOut` | Router, Params, SwiftMIDIIO | `NoteScheduler`, `MIDISink`, `ParameterisedSink`, `CompositeSink`, `CoreMIDISink`, `PrintSink` |
+| `AUHost` | MIDIOut, Router, Params, AVFoundation | `AUHostSink`: hosted Audio Unit instruments, their params, output meter |
 | `Sources` | SignalBus | `NettopParser`, `NettopSource`, `SyntheticSource` |
 | `Engine` | all | `Engine` (tick loop), `Scene` (JSON) |
 | `msg-spike` | Engine | CLI |

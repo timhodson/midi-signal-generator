@@ -9,12 +9,13 @@ Sources/
   SignalBus/   SignalSample, SignalSource, SignalBus
   Music/       Harmony, Clock, Quantiser, Conductor, ActivityTracker, Generators
   Router/      VoiceConfig, VoiceRouter
-  MIDIOut/     NoteScheduler, CoreMIDISink, PrintSink
+  MIDIOut/     NoteScheduler, CompositeSink, CoreMIDISink, PrintSink
+  AUHost/      AUHostSink: hosted Audio Unit instruments
   Sources/     NettopSource (+ parser), SyntheticSource
   Engine/      Engine (tick loop), Scene
   msg-spike/   CLI
 Tests/         Swift Testing suites per module
-scenes/        default.json, ipad-network.json
+scenes/        default.json, ipad-network.json, audiokit-hosted.json
 docs/          this folder; decisions/ holds the ADRs
 ```
 
@@ -32,16 +33,15 @@ swift build
 ## Tests
 
 ```sh
-./test.sh          # = swift test plus the Swift Testing paths the Command Line Tools need
+swift test
 ```
 
 ## Toolchain gotchas (Command Line Tools only, no Xcode)
 
-> **With Xcode installed** (in progress as of 2026-11-12), select it and use plain SwiftPM:
-> `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`, then `swift build` and
-> `swift test` should work with no workaround — use plain `swift test` rather than `./test.sh`, whose
-> paths point at the Command Line Tools. The rest of this section only
-> applies to Command Line Tools–only installs.
+> **This Mac now uses Xcode** (`xcode-select -p` → `/Applications/Xcode.app/…`), and plain
+> `swift build` / `swift test` work. If `swift` says *"You have not agreed to the Xcode license
+> agreements"*, run `sudo xcodebuild -license accept`. The rest of this section only applies to
+> Command Line Tools–only installs.
 
 **`swift build` fails on every package** with
 `reference to member 'v15' cannot be resolved` or `Undefined symbols … PackageDescription.Package.__allocating_init`.
@@ -64,7 +64,9 @@ The CLT install has leftover Swift 5.10 `*.private.swiftinterface` files in
   ```
 
 **`no such module 'Testing'` / `Library not loaded: @rpath/lib_TestingInterop.dylib`**:
-SwiftPM doesn't add the CLT's Swift Testing paths. `./test.sh` adds them. With Xcode installed, plain `swift test` works.
+SwiftPM doesn't add the CLT's Swift Testing paths. Pass them yourself:
+`swift test -Xswiftc -F -Xswiftc $CLT/Frameworks -Xlinker -F -Xlinker $CLT/Frameworks -Xlinker -rpath -Xlinker $CLT/Frameworks -Xlinker -rpath -Xlinker $CLT/usr/lib`
+with `CLT=/Library/Developer/CommandLineTools/Library/Developer`. With Xcode, plain `swift test` works.
 
 ## Conventions
 

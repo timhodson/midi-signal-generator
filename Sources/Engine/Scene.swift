@@ -13,6 +13,8 @@ public struct Scene: Codable, Sendable {
     public var routes: [ModRoute]
     public var macros: [Macro]
     public var voices: [VoiceConfig]
+    /// Audio Unit instruments hosted in-app; voices reach them with destination "au:<id>".
+    public var instruments: [InstrumentConfig] = []
     public var progressions: [String: [Int]]
     public var gestures: [String: [Int]]
     /// Apps that never trigger motifs (always-on daemons) while `activity.ignore` is on.
@@ -52,6 +54,39 @@ public struct Scene: Codable, Sendable {
         gestures: Conductor.defaultGestures,
         ignoreApps: ["mDNSResponder", "apsd", "netbiosd", "syslogd", "symptomsd", "rapportd", "identityservice"]
     )
+
+    private enum CodingKeys: String, CodingKey {
+        case name, seed, params, routes, macros, voices, instruments, progressions, gestures, ignoreApps
+    }
+
+    public init(name: String, seed: UInt64, params: [String: Double], routes: [ModRoute], macros: [Macro],
+                voices: [VoiceConfig], instruments: [InstrumentConfig] = [], progressions: [String: [Int]],
+                gestures: [String: [Int]], ignoreApps: [String]) {
+        self.name = name
+        self.seed = seed
+        self.params = params
+        self.routes = routes
+        self.macros = macros
+        self.voices = voices
+        self.instruments = instruments
+        self.progressions = progressions
+        self.gestures = gestures
+        self.ignoreApps = ignoreApps
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = try c.decode(String.self, forKey: .name)
+        seed = try c.decode(UInt64.self, forKey: .seed)
+        params = try c.decode([String: Double].self, forKey: .params)
+        routes = try c.decode([ModRoute].self, forKey: .routes)
+        macros = try c.decode([Macro].self, forKey: .macros)
+        voices = try c.decode([VoiceConfig].self, forKey: .voices)
+        instruments = try c.decodeIfPresent([InstrumentConfig].self, forKey: .instruments) ?? []
+        progressions = try c.decode([String: [Int]].self, forKey: .progressions)
+        gestures = try c.decode([String: [Int]].self, forKey: .gestures)
+        ignoreApps = try c.decode([String].self, forKey: .ignoreApps)
+    }
 
     public static func load(_ url: URL) throws -> Scene {
         try JSONDecoder().decode(Scene.self, from: Data(contentsOf: url))

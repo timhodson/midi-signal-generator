@@ -1,6 +1,23 @@
 # MIDI setup
 
-Run `msg-spike --list-destinations` to see what this Mac can send to.
+Run `msg-spike --list-destinations` to see what this Mac can send to, and
+`msg-spike --list-instruments` for Audio Unit synths it can host itself.
+
+## Hosted Audio Unit synths on the Mac (Synth One J6, King of FM 2…)
+
+No other app is needed: the synths run inside `msg-spike` and play through the Mac's audio output.
+
+```sh
+msg-spike --scene scenes/audiokit-hosted.json --verbose
+# or pick per role on the command line (role=synth[@preset]):
+msg-spike --au pad="Synth One J6@Intersteller Pad" --au lead="King of FM 2@DX Tub Bells"
+msg-spike --au pad="Synth One J6" --list-options au.pad.preset   # browse presets
+msg-spike --au pad="Synth One J6" --list-params | grep '^au\.pad'  # all synth controls
+```
+
+Every synth control is a param, so it can be a mod-matrix target. The hosted scene routes
+total traffic to `au.j6.cutoffLayer1`. `--verbose` also prints the output peak level every 5 s.
+See [ADR 0010](decisions/0010-hosted-audio-unit-instruments.md).
 
 ## iPad synths over network MIDI (Wi-Fi)
 

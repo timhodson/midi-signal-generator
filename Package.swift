@@ -26,19 +26,22 @@ let package = Package(
         .target(name: "Router", dependencies: ["Params", "Music"]),
         // Note scheduling + CoreMIDI output (virtual port, network session).
         .target(name: "MIDIOut", dependencies: [
-            "Router",
+            "Router", "Params",
             .product(name: "SwiftMIDIIO", package: "swift-midi-io"),
         ]),
+        // Hosts Audio Unit instruments (e.g. Synth One J6, King of FM) as MIDI destinations.
+        .target(name: "AUHost", dependencies: ["MIDIOut", "Router", "Params"]),
         // Data sources (nettop process traffic, synthetic).
         .target(name: "Sources", dependencies: ["SignalBus"]),
         // Wires everything together and owns the clock.
         .target(name: "Engine", dependencies: ["Params", "SignalBus", "Music", "Router", "MIDIOut", "Sources"]),
-        .executableTarget(name: "msg-spike", dependencies: ["Engine"]),
+        .executableTarget(name: "msg-spike", dependencies: ["Engine", "AUHost"]),
 
         .testTarget(name: "ParamsTests", dependencies: ["Params"]),
         .testTarget(name: "MusicTests", dependencies: ["Music", "Params", "SignalBus"]),
         .testTarget(name: "RouterTests", dependencies: ["Router", "Music", "Params"]),
         .testTarget(name: "SourcesTests", dependencies: ["Sources", "SignalBus"]),
-        .testTarget(name: "MIDIOutTests", dependencies: ["MIDIOut", "Router"]),
+        .testTarget(name: "MIDIOutTests", dependencies: ["MIDIOut", "Router", "Params"]),
+        .testTarget(name: "AUHostTests", dependencies: ["AUHost"]),
     ]
 )

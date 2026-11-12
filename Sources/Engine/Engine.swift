@@ -25,6 +25,7 @@ public final class Engine: @unchecked Sendable {
     private let generators: [Generator]
     private let router: VoiceRouter
     private let scheduler: NoteScheduler
+    private let parameterisedSink: ParameterisedSink?
     private var quantiser = Quantiser()
     private var activity = ActivityTracker()
     private var clock = MusicalClock()
@@ -54,18 +55,22 @@ public final class Engine: @unchecked Sendable {
         generators = [DroneGenerator(), MotifGenerator(), PulseGenerator()]
         router = VoiceRouter(voices: scene.voices)
         scheduler = NoteScheduler(sink: sink)
+        parameterisedSink = sink as? ParameterisedSink
 
         params.register(Conductor.params)
         params.register(Quantiser.params)
         params.register(ActivityTracker.params)
         for g in generators { params.register(g.params) }
         router.registerParams(in: params)
+        parameterisedSink?.registerParams(in: params)
         modMatrix.registerParams(in: params)
         for m in scene.macros {
             params.register(ParamSpec(m.id, default: 0.5, modulatable: false, help: m.help))
         }
 
         for (id, value) in scene.params.sorted(by: { $0.key < $1.key }) where !id.hasPrefix("macro.") {
+            // Hosted-instrument params only exist when the instruments are loaded (not in --dry-run).
+            if id.hasPrefix("au."), params.specs[id] == nil { continue }
             try params.set(id, value)
         }
         // Macros only apply if the scene sets them explicitly, so a scene's own values win.
@@ -120,6 +125,7 @@ public final class Engine: @unchecked Sendable {
         lastTick = t
 
         modMatrix.apply(to: params, dt: dt) { [bus] in bus.value($0) }
+        parameterisedSink?.applyParams(params)
 
         // Look ahead: generators work on the musical time slightly in the future so the
         // scheduler holds notes before they're due.

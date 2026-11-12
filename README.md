@@ -12,11 +12,13 @@ is a tunable parameter**, from raw sonification to tidy ambient music.
 ## Quick start
 
 ```sh
-swift build    # see docs/development.md if this fails with a PackageDescription error
+swift build
 .build/debug/msg-spike --source synthetic --dry-run   # hear nothing, see the notes
 .build/debug/msg-spike --verbose                      # real traffic → virtual MIDI port "MIDI Signal Generator"
+.build/debug/msg-spike --scene scenes/audiokit-hosted.json   # Synth One J6 + King of FM, hosted in-app
+.build/debug/msg-spike --au pad="Synth One J6@Intersteller Pad"  # any AU synth per role
 .build/debug/msg-spike --dest network                 # → iPad via network MIDI (docs/midi-setup.md)
-.build/debug/msg-spike --list-params                  # all ~80 parameters
+.build/debug/msg-spike --list-params                  # all ~80 parameters (hundreds more with hosted synths)
 .build/debug/msg-spike --set macro.faithfulness=0.9   # closer to raw data
 ```
 
@@ -26,5 +28,5 @@ Voices: `pad` = ch 1, `lead` = ch 2, `pulse` = ch 3 (all tunable).
 
 - [Architecture](docs/architecture.md)
 - [Decisions (ADRs)](docs/README.md#decisions-adrs)
-- [MIDI setup (iPad, DAW, Bluetooth)](docs/midi-setup.md)
+- [MIDI setup (hosted AU synths, iPad, DAW, Bluetooth)](docs/midi-setup.md)
 - [Development](docs/development.md) · [Roadmap](docs/roadmap.md)
