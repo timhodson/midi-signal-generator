@@ -69,6 +69,19 @@ Visuals scroll smoothly by extrapolating engine time between the 10 Hz status up
   note); all notes of a hovered motif's wake-up are outlined (`MotifTag.instance`). There's no system tooltip.
 - The Motifs page lists apps in first-heard order, so it doesn't reshuffle as traffic changes.
 
+## Knobs and LED buttons (fourth round)
+
+- Continuous settings default to **AudioKit-style arc knobs** (`ParamKnob`), built on AudioKit Controls'
+  `Control` primitive with a vertical drag. The ring fills from the left, or from the centre for bipolar
+  params (pan, route depth); an orange dot shows the live modulated value; the value in the middle uses
+  our formatting. AudioKit's own `ArcKnob` shows `Int(value)` while dragging, which can't show 0–1 values.
+- Toggles are **LED buttons** (lit in the group's colour); pickers stay rows. Knobs and LEDs take the
+  voice colour in generator and voice groups.
+- With explanations on, a knob grid shows the hovered knob's explanation above it.
+- A toolbar switch flips between **Knobs** and **Sliders** (sliders keep inline explanations).
+- Instruments: volume and pan knobs; the synth's own parameters as a knob grid.
+- `Circle().trim` doesn't wrap past 1, so arcs are drawn from 0 and rotated to their start angle.
+
 ## Consequences
 
 - New params appear in the UI with no UI work.

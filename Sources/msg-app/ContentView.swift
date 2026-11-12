@@ -42,6 +42,12 @@ struct ContentView: View {
         .toolbar {
             ToolbarItemGroup {
                 @Bindable var model = model
+                Picker("Controls", selection: $model.useKnobs) {
+                    Label("Knobs", systemImage: "dial.medium").tag(true)
+                    Label("Sliders", systemImage: "slider.horizontal.3").tag(false)
+                }
+                .pickerStyle(.segmented)
+                .help("Show continuous settings as knobs or as sliders with inline explanations")
                 Toggle(isOn: $model.showExplanations) { Label("Explanations", systemImage: "text.bubble") }
                     .help("Show what each setting does under its control")
                 Button { Task { await model.openScene() } } label: { Label("Open Scene", systemImage: "folder") }

@@ -205,7 +205,25 @@ struct ParamSection: View {
                     let all = groups[group] ?? []
                     // Params a visual above can set live in an Advanced drawer (unless you're searching).
                     let advanced = filter.isEmpty ? all.filter { VisualControls.covers($0.id) } : []
-                    ForEach(all.filter { !advanced.contains($0) }, id: \.id) { ParamRow(spec: $0) }
+                    let shown = all.filter { !advanced.contains($0) }
+                    if model.useKnobs, filter.isEmpty {
+                        // Switches as LED buttons, pickers as rows, everything continuous as a knob grid.
+                        let toggles = shown.filter { $0.kind == .toggle }
+                        if !toggles.isEmpty {
+                            HStack(spacing: 10) {
+                                ForEach(toggles, id: \.id) { LEDButton(spec: $0, color: Pages.color(forGroup: group)) }
+                                Spacer()
+                            }
+                            .listRowSeparator(.hidden)
+                        }
+                        ForEach(shown.filter { $0.kind == .choice }, id: \.id) { ParamRow(spec: $0) }
+                        let knobs = shown.filter(\.isKnob)
+                        if !knobs.isEmpty {
+                            KnobGrid(specs: knobs, color: Pages.color(forGroup: group)).listRowSeparator(.hidden)
+                        }
+                    } else {
+                        ForEach(shown, id: \.id) { ParamRow(spec: $0) }
+                    }
                     if !advanced.isEmpty {
                         AdvancedDrawer(specs: advanced)
                     }

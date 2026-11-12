@@ -61,6 +61,8 @@ final class AppModel {
     var recording = false
     /// Show each parameter's explanation under its control (not just as a tooltip).
     var showExplanations = true
+    /// Knobs (AudioKit style) or sliders for continuous settings.
+    var useKnobs = true
 
     // Running state
     private(set) var session: Session?

@@ -17,7 +17,7 @@ Bluetooth. A Rust core (`midir`, `pcap`) with a Tauri UI was considered for poss
 - **[swift-midi-io](https://github.com/orchetect/swift-midi-io)** for CoreMIDI. This is the
   MIDIKit I/O layer, which became a separate package in its 1.x releases ("SwiftMIDI"). It gives
   virtual ports, connections by name or unique ID, and the network session policy.
-- Planned for the UI: AudioKit **Controls** (knobs, XY pads) and **Keyboard** (range display),
+- **AudioKit Controls** is used for knob interaction (ADR 0012). Planned: **Keyboard** (range display),
   plus Swift Charts for data scopes. AudioKitUI's scopes expect audio buffers, so they are only
   useful if we add a built-in preview synth.
 

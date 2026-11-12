@@ -66,6 +66,13 @@ enum Pages {
 
     static let generatorRoles = ["drone": "pad", "motif": "lead", "pulse": "pulse", "bass": "bass", "sub": "sub"]
 
+    /// Knob colour: a voice's colour for its generator / voice group, accent otherwise.
+    static func color(forGroup group: String) -> Color {
+        if let role = generatorRoles[group] { return RoleStyle.color(role) }
+        if RoleStyle.order.contains(group) { return RoleStyle.color(group) }
+        return .accentColor
+    }
+
     @MainActor static func generatorAccessory(_ group: String) -> AnyView? {
         guard let role = generatorRoles[group] else { return nil }
         return AnyView(VStack(spacing: 10) {

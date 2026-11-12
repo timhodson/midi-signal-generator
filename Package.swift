@@ -12,6 +12,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/AudioKit/Tonic.git", from: "2.1.2"),
         .package(url: "https://github.com/orchetect/swift-midi-io.git", from: "1.1.0"),
+        .package(url: "https://github.com/AudioKit/Controls.git", from: "1.1.4"),
     ],
     targets: [
         // Pure, dependency-free core: every tunable value lives here.
@@ -40,7 +41,10 @@ let package = Package(
         .target(name: "Runtime", dependencies: ["Engine", "AUHost", "MIDIOut", "Music", "Router", "SignalBus", "Sources"]),
         .executableTarget(name: "msg-spike", dependencies: ["Runtime", "Engine", "AUHost"]),
         // The Mac app: SwiftUI panels generated from ParamSpecs, scopes, synth editors.
-        .executableTarget(name: "msg-app", dependencies: ["Runtime", "Engine", "AUHost", "Music", "Params", "Router", "Sources"]),
+        .executableTarget(name: "msg-app", dependencies: [
+            "Runtime", "Engine", "AUHost", "Music", "Params", "Router", "Sources",
+            .product(name: "Controls", package: "Controls"),
+        ]),
 
         .testTarget(name: "ParamsTests", dependencies: ["Params"]),
         .testTarget(name: "MusicTests", dependencies: ["Music", "Params", "SignalBus"]),
