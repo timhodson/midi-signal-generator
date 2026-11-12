@@ -37,6 +37,16 @@ host them, but it plays live MIDI into the selected track only, so one synth per
   activation policy (no Dock icon) and runs `NSApplication.shared.run()` instead of `dispatchMain()`.
 - `AVAudioUnit.instantiate` delivers its result on the main queue, so the CLI waits for it by
   running the main run loop rather than blocking it.
+- **Presets only apply to a running plugin.** Synth One J6 accepts `currentPreset` before the
+  engine starts and even reports it back as current, but keeps its default sound ("2025: Space
+  Trip"). Its parameter values then update **asynchronously**. The host therefore selects presets
+  after `engine.start()` and waits until the values have changed and held still for 200 ms (2 s
+  timeout) before reading them as param defaults. It warns if nothing changed. A preset changed at
+  runtime is re-read after 0.6 s.
+- Factory preset names can have trailing spaces and curly apostrophes ("Heaven’s Gate Pad "), so
+  lookup is trimmed, case-insensitive and apostrophe-agnostic. A number selects by index.
+- Fixing a plugin param in a scene (as the hosted scene first did with the J6 cutoff) overrides
+  every preset's own value. Prefer mod routes, which offset the preset's value.
 - A peak meter on the main mix (`takePeak()`, printed with `--verbose`) confirms rendering
   headlessly. Three synths at default levels peaked around −4 dBFS, so the hosted scene uses lower volumes.
 

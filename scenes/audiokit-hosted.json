@@ -78,7 +78,6 @@
     "activity.cooldown": 6,
     "activity.ignore": 1,
     "activity.threshold": 4000,
-    "au.j6.cutoffLayer1": 0.35,
     "clock.bpm": 66,
     "conductor.busyAbove": 1500000,
     "conductor.flurryApps": 3,

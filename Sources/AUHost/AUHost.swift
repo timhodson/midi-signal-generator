@@ -23,6 +23,8 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
         var pushed: [String: Double] = [:]
         var presetIndex: Int?
         let presetNames: [String]
+        /// When to re-read the plugin's values after a preset change.
+        var resyncAt: Date?
 
         init(config: InstrumentConfig, unit: AVAudioUnit) {
             self.config = config
@@ -96,10 +98,10 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
             )
             let inst = Instrument(config: config, unit: unit)
             if let name = config.preset {
-                guard let i = inst.presetNames.firstIndex(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) else {
+                guard let i = Self.presetIndex(of: name, in: inst.presetNames) else {
                     throw AUHostError.presetNotFound(name, config.component)
                 }
-                host.select(preset: i, on: inst)
+                inst.presetIndex = i // applied once the engine runs; see below
             }
             host.engine.attach(unit)
             host.engine.attach(inst.mixer)
@@ -115,8 +117,56 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
             try host.engine.start()
             // The MIDI block is only valid once render resources are allocated.
             for inst in host.instruments.values { inst.midi = inst.unit.auAudioUnit.scheduleMIDIEventBlock }
+            // Presets only take effect on a running plugin: Synth One J6 accepts a preset set
+            // before the engine starts and reports it as current, but keeps its default sound.
+            // Its parameter values also update asynchronously, so wait for them to settle
+            // before they become our parameters' defaults.
+            for inst in host.instruments.values.sorted(by: { $0.config.id < $1.config.id }) {
+                guard let index = inst.presetIndex else { continue }
+                let before = snapshot(inst)
+                host.select(preset: index, on: inst)
+                let after = await settle(inst, from: before)
+                if after == before, index != 0, !before.isEmpty {
+                    host.log("⚠︎ \(inst.config.id): preset \"\(inst.presetNames[index])\" did not change any parameter — it may not have loaded")
+                }
+            }
         }
         return host
+    }
+
+    /// Find a preset by name or by number. Plugin preset names can carry trailing spaces and
+    /// curly apostrophes (J6: "Heaven’s Gate Pad "), so compare trimmed, case-insensitive, with
+    /// apostrophes normalised. A bare number ("95") selects by index.
+    static func presetIndex(of query: String, in names: [String]) -> Int? {
+        func norm(_ s: String) -> String {
+            s.trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "’", with: "'").replacingOccurrences(of: "‘", with: "'")
+                .lowercased()
+        }
+        let q = norm(query)
+        if let n = Int(q), names.indices.contains(n) { return n }
+        return names.firstIndex { norm($0) == q }
+    }
+
+    static func snapshot(_ inst: Instrument) -> [AUValue] {
+        (inst.unit.auAudioUnit.parameterTree?.allParameters ?? []).map(\.value)
+    }
+
+    /// Wait until parameter values have moved away from `before` and then held still for
+    /// 200 ms (or give up after `timeout`). Returns the final values.
+    static func settle(_ inst: Instrument, from before: [AUValue], timeout: Double = 2) async -> [AUValue] {
+        let start = Date()
+        var last = before
+        var stableFor = 0
+        var moved = false
+        while Date().timeIntervalSince(start) < timeout {
+            try? await Task.sleep(for: .milliseconds(50))
+            let now = snapshot(inst)
+            if now != before { moved = true }
+            if now == last { stableFor += 1 } else { stableFor = 0; last = now }
+            if moved, stableFor >= 4 { break }
+        }
+        return last
     }
 
     private func select(preset index: Int, on inst: Instrument) {
@@ -211,8 +261,13 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
             let p = inst.prefix
             if let v = changed("\(p).preset", inst, store) {
                 select(preset: Int(v), on: inst)
-                resync(inst, store)
+                // The plugin updates its values asynchronously; adopt them a moment later.
+                inst.resyncAt = Date().addingTimeInterval(0.6)
                 log("♪ \(inst.config.id) preset → \(inst.presetNames[safe: Int(v)] ?? "?")")
+            }
+            if let due = inst.resyncAt, Date() >= due {
+                inst.resyncAt = nil
+                resync(inst, store)
             }
             if let v = changed("\(p).volume", inst, store) { inst.mixer.outputVolume = Float(v) }
             if let v = changed("\(p).pan", inst, store) { inst.mixer.pan = Float(v) }
