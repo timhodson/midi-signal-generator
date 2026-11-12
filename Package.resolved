@@ -1,0 +1,33 @@
+{
+  "originHash" : "0f244714e1009ea5f65766959d178e07d995c736daa23cec5808eab16f4b7586",
+  "pins" : [
+    {
+      "identity" : "swift-midi-core",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/orchetect/swift-midi-core",
+      "state" : {
+        "revision" : "9b2c7ba5d651e9225c40759e8ba93186412593a6",
+        "version" : "1.0.1"
+      }
+    },
+    {
+      "identity" : "swift-midi-io",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/orchetect/swift-midi-io",
+      "state" : {
+        "revision" : "54ac94028e3825bd8e622d373b0698d196927212",
+        "version" : "1.1.0"
+      }
+    },
+    {
+      "identity" : "tonic",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/AudioKit/Tonic.git",
+      "state" : {
+        "revision" : "601eeb26b06ff6edfa391b2fd2d8815ec8231a9b",
+        "version" : "2.1.2"
+      }
+    }
+  ],
+  "version" : 3
+}

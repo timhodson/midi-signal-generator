@@ -1,0 +1,183 @@
+import Dispatch
+import Engine
+import Foundation
+import MIDIOut
+import Params
+import Sources
+
+let usage = """
+msg-spike — turn this Mac's network traffic into MIDI.
+
+USAGE: msg-spike [options]
+
+  --source nettop|synthetic   Data source (default: nettop = real per-app traffic).
+  --scene <file.json>         Load a scene (default: built-in; see scenes/default.json).
+  --set <id=value>            Override a parameter or macro. Repeatable.
+                              e.g. --set macro.faithfulness=0.2 --set harmony.scale=4
+  --dest <name>               Send every voice to this MIDI destination instead of the
+                              scene's. "virtual" = this app's own port, "network" =
+                              Apple's network MIDI session (iPad), or any name from
+                              --list-destinations (e.g. "IAC Driver Bus 1").
+  --network-session           Let devices (iPad) join this Mac's network MIDI session.
+  --dry-run                   Print notes; send no MIDI.
+  --verbose                   Print every note while sending MIDI.
+  --duration <seconds>        Stop after this long (default: run until Ctrl-C).
+  --list-params               Print every tunable parameter and exit.
+  --list-destinations         Print MIDI destinations on this Mac and exit.
+  --dump-scene                Print the effective scene as JSON and exit.
+  -h, --help                  Show this help.
+"""
+
+struct Options {
+    var source = "nettop"
+    var scenePath: String?
+    var sets: [(String, Double)] = []
+    var dest: String?
+    var networkSession = false
+    var dryRun = false
+    var verbose = false
+    var duration: Double?
+    var listParams = false
+    var listDestinations = false
+    var dumpScene = false
+}
+
+func fail(_ message: String) -> Never {
+    FileHandle.standardError.write(Data("error: \(message)\n".utf8))
+    exit(1)
+}
+
+func parse(_ args: [String]) -> Options {
+    var o = Options()
+    var it = args.makeIterator()
+    func value(_ flag: String) -> String {
+        guard let v = it.next() else { fail("\(flag) needs a value") }
+        return v
+    }
+    while let a = it.next() {
+        switch a {
+        case "--source": o.source = value(a)
+        case "--scene": o.scenePath = value(a)
+        case "--set":
+            let kv = value(a).split(separator: "=", maxSplits: 1).map(String.init)
+            guard kv.count == 2, let v = Double(kv[1]) else { fail(ParamError.malformed(kv.joined(separator: "=")).description) }
+            o.sets.append((kv[0], v))
+        case "--dest": o.dest = value(a)
+        case "--network-session": o.networkSession = true
+        case "--dry-run": o.dryRun = true
+        case "--verbose": o.verbose = true
+        case "--duration":
+            guard let d = Double(value(a)) else { fail("--duration needs a number of seconds") }
+            o.duration = d
+        case "--list-params": o.listParams = true
+        case "--list-destinations": o.listDestinations = true
+        case "--dump-scene": o.dumpScene = true
+        case "-h", "--help": print(usage); exit(0)
+        default: fail("unknown option \(a)\n\n\(usage)")
+        }
+    }
+    return o
+}
+
+let options = parse(Array(CommandLine.arguments.dropFirst()))
+
+var scene = Scene.default
+if let path = options.scenePath {
+    do { scene = try Scene.load(URL(fileURLWithPath: path)) } catch { fail("could not load scene \(path): \(error)") }
+}
+if let dest = options.dest {
+    scene.voices = scene.voices.map { var v = $0; v.destination = dest; return v }
+}
+for (id, value) in options.sets { scene.params[id] = value }
+
+if options.listDestinations {
+    let sink = CoreMIDISink()
+    do { try sink.start(destinations: [], enableNetworkSession: options.networkSession) } catch { fail("\(error)") }
+    print("MIDI destinations on this Mac (use with --dest or a voice's \"destination\"):")
+    print("  virtual  (this app's own virtual source, \"MIDI Signal Generator\")")
+    print(CoreMIDISink.networkSessionDestinationID() == nil
+        ? "  network  (Apple network MIDI session — currently DISABLED; enable it in Audio MIDI Setup → Network)"
+        : "  network  (Apple network MIDI session — enabled)")
+    for name in sink.availableDestinations() { print("  \(name)") }
+    exit(0)
+}
+
+let sink: MIDISink
+let coreMIDI: CoreMIDISink?
+if options.dryRun || options.listParams || options.dumpScene {
+    sink = PrintSink { _ in } // notes are logged by the engine instead
+    coreMIDI = nil
+} else {
+    let c = CoreMIDISink()
+    do {
+        try c.start(destinations: Set(scene.voices.map(\.destination)), enableNetworkSession: options.networkSession)
+    } catch { fail("MIDI start failed: \(error)") }
+    sink = c
+    coreMIDI = c
+}
+
+let engine: Engine
+do { engine = try Engine(scene: scene, sink: sink) } catch { fail("\(error)") }
+
+if options.listParams {
+    for id in engine.params.order {
+        let s = engine.params.specs[id]!
+        let range = s.kind == .choice
+            ? s.options.enumerated().map { "\($0.offset)=\($0.element)" }.joined(separator: " ")
+            : "\(s.range.lowerBound)…\(s.range.upperBound)\(s.unit.isEmpty ? "" : " \(s.unit)")"
+        let mod = s.modulatable ? " [mod]" : ""
+        print("\(id) = \(engine.params.baseValue(id))  (\(range))\(mod)\n    \(s.help)")
+    }
+    exit(0)
+}
+
+if options.dumpScene {
+    var effective = scene
+    // Macros are left out (their effect is already in the target values) so the dump
+    // round-trips; route depths go back into the routes themselves.
+    effective.params = engine.params.baseValues.filter { !$0.key.hasPrefix("mod.") && !$0.key.hasPrefix("macro.") }
+    for i in effective.routes.indices { effective.routes[i].amount = engine.params.baseValue("mod.\(i).amount") }
+    print(String(decoding: try! effective.encoded(), as: UTF8.self))
+    exit(0)
+}
+
+if let c = coreMIDI {
+    for (name, ok) in c.connectedDestinations().sorted(by: { $0.key < $1.key }) {
+        if ok {
+            print("→ MIDI: \(name)")
+        } else if name == CoreMIDISink.networkDestination {
+            print("⚠︎ Network MIDI session is disabled. Enable it in Audio MIDI Setup → Window → Show MIDI Studio → Network, then restart.")
+        } else {
+            print("⚠︎ MIDI destination \"\(name)\" not found yet — will connect when it appears. Try --list-destinations.")
+        }
+    }
+}
+
+engine.logNotes = options.dryRun || options.verbose
+switch options.source {
+case "nettop": engine.add(NettopSource())
+case "synthetic": engine.add(SyntheticSource(seed: scene.seed))
+default: fail("unknown source \(options.source)")
+}
+
+do { try engine.start() } catch { fail("could not start: \(error)") }
+print("Running \"\(scene.name)\". Ctrl-C to stop.")
+
+func shutdown() -> Never {
+    engine.stop()
+    print("\nstopped, all notes off.")
+    exit(0)
+}
+
+signal(SIGINT, SIG_IGN)
+signal(SIGTERM, SIG_IGN)
+let sigint = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
+sigint.setEventHandler { shutdown() }
+sigint.resume()
+let sigterm = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+sigterm.setEventHandler { shutdown() }
+sigterm.resume()
+if let d = options.duration {
+    DispatchQueue.main.asyncAfter(deadline: .now() + d) { shutdown() }
+}
+dispatchMain()

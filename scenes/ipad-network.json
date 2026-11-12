@@ -1,0 +1,219 @@
+{
+  "gestures": {
+    "flurry": [
+      4,
+      0
+    ]
+  },
+  "ignoreApps": [
+    "mDNSResponder",
+    "apsd",
+    "netbiosd",
+    "syslogd",
+    "symptomsd",
+    "rapportd",
+    "identityservice"
+  ],
+  "macros": [
+    {
+      "help": "0 = tidy and musical, 1 = raw sonification. Moves the quantise strengths and density.",
+      "id": "macro.faithfulness",
+      "targets": [
+        {
+          "at0": 1,
+          "at1": 0,
+          "param": "quant.pitch.strength"
+        },
+        {
+          "at0": 1,
+          "at1": 0,
+          "param": "quant.time.strength"
+        },
+        {
+          "at0": 0.7,
+          "at1": 1,
+          "param": "quant.density.probability"
+        },
+        {
+          "at0": 4,
+          "at1": 40,
+          "param": "quant.density.maxPerSecond"
+        },
+        {
+          "at0": 30,
+          "at1": 0,
+          "param": "harmony.hysteresis"
+        }
+      ]
+    }
+  ],
+  "name": "iPad over network MIDI",
+  "params": {
+    "activity.cooldown": 6,
+    "activity.ignore": 1,
+    "activity.threshold": 4000,
+    "clock.bpm": 66,
+    "conductor.busyAbove": 1500000,
+    "conductor.flurryApps": 3,
+    "conductor.flurryCooldown": 60,
+    "conductor.flurryWindow": 4,
+    "conductor.focusRatio": 0.7,
+    "conductor.quietBelow": 8000,
+    "conductor.smoothing": 8,
+    "gen.drone.ccNumber": 74,
+    "gen.drone.ccValue": 0.4,
+    "gen.drone.enabled": 1,
+    "gen.drone.intensity": 0.35,
+    "gen.drone.legato": 1.02,
+    "gen.drone.octave": 3,
+    "gen.drone.spread": 1,
+    "gen.motif.dynamics": 0.6,
+    "gen.motif.enabled": 1,
+    "gen.motif.intensity": 0.7,
+    "gen.motif.length": 4,
+    "gen.motif.maxPerTick": 2,
+    "gen.motif.noteBeats": 0.75,
+    "gen.motif.octave": 5,
+    "gen.motif.range": 7,
+    "gen.motif.stepBeats": 0.5,
+    "gen.pulse.density": 0.05,
+    "gen.pulse.enabled": 1,
+    "gen.pulse.intensity": 0.45,
+    "gen.pulse.jitter": 3,
+    "gen.pulse.noteBeats": 0.25,
+    "gen.pulse.octave": 4,
+    "gen.pulse.span": 14,
+    "gen.pulse.step": 1,
+    "harmony.barsPerChord": 2,
+    "harmony.changeOnPhrase": 1,
+    "harmony.chordSize": 3,
+    "harmony.hysteresis": 10,
+    "harmony.root": 2,
+    "harmony.scale": 2,
+    "quant.density.maxPerSecond": 6,
+    "quant.density.probability": 1,
+    "quant.pitch.strength": 0.75,
+    "quant.time.grid": 3,
+    "quant.time.humanise": 6,
+    "quant.time.strength": 0.9,
+    "quant.time.swing": 0,
+    "quant.velocity.ceiling": 108,
+    "quant.velocity.curve": 1,
+    "quant.velocity.floor": 28,
+    "voice.lead.channel": 2,
+    "voice.lead.enabled": 1,
+    "voice.lead.high": 96,
+    "voice.lead.latencyMs": 0,
+    "voice.lead.low": 60,
+    "voice.lead.maxPolyphony": 4,
+    "voice.lead.transpose": 0,
+    "voice.lead.velocityScale": 1,
+    "voice.pad.channel": 1,
+    "voice.pad.enabled": 1,
+    "voice.pad.high": 72,
+    "voice.pad.latencyMs": 0,
+    "voice.pad.low": 36,
+    "voice.pad.maxPolyphony": 8,
+    "voice.pad.transpose": 0,
+    "voice.pad.velocityScale": 1,
+    "voice.pulse.channel": 3,
+    "voice.pulse.enabled": 1,
+    "voice.pulse.high": 84,
+    "voice.pulse.latencyMs": 0,
+    "voice.pulse.low": 48,
+    "voice.pulse.maxPolyphony": 3,
+    "voice.pulse.transpose": 0,
+    "voice.pulse.velocityScale": 1
+  },
+  "progressions": {
+    "busy": [
+      0,
+      4,
+      5,
+      3,
+      0,
+      6
+    ],
+    "calm": [
+      0,
+      5,
+      3,
+      4
+    ],
+    "focused": [
+      0,
+      0,
+      6,
+      6
+    ],
+    "quiet": [
+      0,
+      3
+    ]
+  },
+  "routes": [
+    {
+      "amount": 0.45,
+      "curve": 1.5,
+      "inputMax": 5000000,
+      "inputMin": 5000,
+      "scale": "log",
+      "smoothing": 2,
+      "source": "net.total.bytesPerSec",
+      "target": "gen.pulse.density"
+    },
+    {
+      "amount": 0.5,
+      "curve": 1,
+      "inputMax": 10000000,
+      "inputMin": 1000,
+      "scale": "log",
+      "smoothing": 4,
+      "source": "net.total.bytesPerSec",
+      "target": "gen.drone.ccValue"
+    },
+    {
+      "amount": 0.25,
+      "curve": 1,
+      "inputMax": 10000000,
+      "inputMin": 1000,
+      "scale": "log",
+      "smoothing": 6,
+      "source": "net.total.bytesPerSec",
+      "target": "gen.drone.intensity"
+    }
+  ],
+  "seed": 2026,
+  "voices": [
+    {
+      "channel": 1,
+      "destination": "network",
+      "high": 72,
+      "latencyMs": 0,
+      "low": 36,
+      "maxPolyphony": 8,
+      "role": "pad",
+      "transpose": 0
+    },
+    {
+      "channel": 2,
+      "destination": "network",
+      "high": 96,
+      "latencyMs": 0,
+      "low": 60,
+      "maxPolyphony": 4,
+      "role": "lead",
+      "transpose": 0
+    },
+    {
+      "channel": 3,
+      "destination": "network",
+      "high": 84,
+      "latencyMs": 0,
+      "low": 48,
+      "maxPolyphony": 3,
+      "role": "pulse",
+      "transpose": 0
+    }
+  ]
+}
