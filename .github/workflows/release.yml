@@ -1,0 +1,77 @@
+name: Release
+
+# Push a version tag (git tag v0.1.0 && git push origin v0.1.0) to build, test and publish a
+# GitHub release with a zip of the Mac app and command-line tools. Run it by hand (Actions →
+# Release → Run workflow) to build the zip as a downloadable artifact without publishing.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Test
+        run: swift test
+
+      - name: Build (release, Apple silicon)
+        run: swift build -c release --arch arm64
+
+      - name: Package
+        id: package
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          [[ "$GITHUB_REF_TYPE" == "tag" ]] || VERSION="dev-${GITHUB_SHA::7}"
+          NAME="midi-signal-generator-${VERSION}-macos-arm64"
+          BIN="$(swift build -c release --arch arm64 --show-bin-path)"
+          mkdir -p "dist/$NAME"
+          # The executables, and the resource bundles they load from beside themselves.
+          cp "$BIN/msg-app" "$BIN/msg-spike" "$BIN/msg-pcap" "dist/$NAME/"
+          cp -R "$BIN"/*.bundle "dist/$NAME/"
+          cp -R scenes "dist/$NAME/scenes"
+          cp README.md "dist/$NAME/"
+          cat > "dist/$NAME/INSTALL.txt" <<'EOF'
+          MIDI Signal Generator: Apple silicon build, unsigned.
+
+          macOS quarantines unsigned downloads. After unzipping, clear that once:
+              xattr -dr com.apple.quarantine midi-signal-generator-*
+
+          Then, from this folder:
+              ./msg-app --scene scenes/default.json        the Mac app
+              ./msg-spike --source synthetic --dry-run     command line, no MIDI out
+              sudo ./msg-pcap --print                      packet capture helper (optional)
+
+          Keep the .bundle folders next to the executables: the app loads its skin from them.
+          See README.md and https://github.com/timhodson/midi-signal-generator for more.
+          EOF
+          (cd dist && ditto -c -k --keepParent "$NAME" "$NAME.zip")
+          shasum -a 256 "dist/$NAME.zip" | tee "dist/$NAME.zip.sha256"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.name }}
+          path: |
+            dist/*.zip
+            dist/*.sha256
+
+      - name: Publish release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.sha256 \
+            --title "$GITHUB_REF_NAME" --generate-notes

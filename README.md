@@ -1,5 +1,7 @@
 # MIDI Signal Generator
 
+[![CI](https://github.com/timhodson/midi-signal-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/timhodson/midi-signal-generator/actions/workflows/ci.yml)
+
 Turns data signals into ambient MIDI streams: 90s modem handshake sounds, re-imagined for
 today's networks. It starts with **this Mac's network traffic**. The whole LAN and
 sensors (temperature, humidity, motion) come later.
@@ -8,6 +10,14 @@ Each app on the Mac gets its own motif when it wakes up. Overall traffic drives 
 and pad brightness. The network's "mood" (quiet / calm / busy / focused) picks the chord
 progression, and a flurry of apps waking at once triggers a cadence. **Every musical decision
 is a tunable parameter**, from raw sonification to tidy ambient music.
+
+## Download
+
+Builds for Apple silicon Macs (macOS 15 or later) are on the
+[Releases](https://github.com/timhodson/midi-signal-generator/releases) page. They're unsigned: after
+unzipping, run `xattr -dr com.apple.quarantine midi-signal-generator-*`, then `./msg-app` from the folder
+(INSTALL.txt in the zip has the details). To cut a release, push a version tag: `git tag v0.1.0 && git push
+origin v0.1.0`. The Release workflow tests, builds and publishes it.
 
 ## Quick start
 
