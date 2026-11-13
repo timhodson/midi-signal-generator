@@ -25,7 +25,10 @@ struct OverviewView: View {
                         }
                     }
                     HStack(alignment: .top, spacing: 16) {
-                        SkinBox(title: "Traffic") { TrafficChart().frame(height: 220) }
+                        SkinBox(title: "Traffic") {
+                            TrafficChart().frame(height: 220)
+                            TrafficLegend()
+                        }
                         SkinBox(title: "Busiest apps") { TopApps().frame(height: 220) }
                             .frame(width: 320)
                     }
@@ -170,6 +173,36 @@ struct TrafficChart: View {
             }
         }
         .chartXAxisLabel("seconds ago")
+    }
+}
+
+/// What the traffic chart's lines mean.
+struct TrafficLegend: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        HStack(spacing: 18) {
+            item(Path { p in p.move(to: .init(x: 0, y: 7)); p.addLine(to: .init(x: 6, y: 7)); p.addLine(to: .init(x: 6, y: 2))
+                        p.addLine(to: .init(x: 13, y: 2)); p.addLine(to: .init(x: 13, y: 5)); p.addLine(to: .init(x: 20, y: 5)) },
+                 .gray.opacity(0.8), "total traffic, each second")
+            item(Path { p in p.move(to: .init(x: 0, y: 6)); p.addCurve(to: .init(x: 20, y: 2), control1: .init(x: 8, y: 6), control2: .init(x: 12, y: 2)) },
+                 .blue, "smoothed: this decides the mood", width: 2)
+            item(line, .green, "quiet below \(Format.rate(model.base("conductor.quietBelow")))", dash: [3, 3])
+            item(line, .red, "busy above \(Format.rate(model.base("conductor.busyAbove")))", dash: [3, 3])
+            Spacer(minLength: 0)
+            Text("Log scale. Move the thresholds on Harmony → Mood.").foregroundStyle(.tertiary)
+        }
+        .font(.caption)
+    }
+
+    private var line: Path { Path { p in p.move(to: .init(x: 0, y: 4)); p.addLine(to: .init(x: 20, y: 4)) } }
+
+    private func item(_ path: Path, _ color: Color, _ text: String, width: CGFloat = 1.5, dash: [CGFloat] = []) -> some View {
+        HStack(spacing: 6) {
+            path.stroke(color, style: StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round, dash: dash))
+                .frame(width: 20, height: 8)
+            Text(text).foregroundStyle(.secondary)
+        }
     }
 }
 
