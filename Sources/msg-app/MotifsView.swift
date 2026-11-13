@@ -378,7 +378,8 @@ extension AppModel {
     /// (nearest scale note at strength ≤ 0.5, nearest chord note above).
     func generatedMotif(for app: String) -> [(raw: Double?, played: Int?)] {
         guard let h = harmony else { return [] }
-        let shape = MotifGenerator.shape(for: app, length: Int(base("gen.motif.length")), range: Int(base("gen.motif.range")))
+        let shape = MotifGenerator.shape(for: app, length: Int(base("gen.motif.length")), range: Int(base("gen.motif.range")),
+                                         seed: Int(base("gen.motif.seed")))
         let centre = Double(12 * (Int(base("gen.motif.octave")) + 1) + h.root + shape.start)
         let strength = base("quant.pitch.strength")
         return shape.offsets.map { o in

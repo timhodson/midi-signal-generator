@@ -75,7 +75,8 @@ struct LCDScreen: View {
         let shape = RoundedRectangle(cornerRadius: 4)
         VStack(alignment: .leading, spacing: 3) {
             ForEach(Array(lines.enumerated()), id: \.offset) { i, line in
-                Text(line.uppercased())
+                // Only the title in capitals: chord names need their case (Gm isn't GM).
+                Text(i == 0 ? line.uppercased() : line)
                     .font(.system(size: i == 0 ? 15 : 11, weight: i == 0 ? .bold : .medium, design: .monospaced))
                     .tracking(1)
                     .foregroundStyle(Studio.lcdText.opacity(i == 0 ? 1 : 0.8))
@@ -177,7 +178,7 @@ struct LCDLines: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                Text(line.uppercased()).font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                Text(line).font(.system(size: 9.5, weight: .medium, design: .monospaced))
                     .foregroundStyle(Studio.lcdText.opacity(0.9))
                     .shadow(color: Studio.lcdText.opacity(0.45), radius: 2)
                     .lineLimit(1).truncationMode(.tail)

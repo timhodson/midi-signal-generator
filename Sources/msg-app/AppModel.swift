@@ -260,6 +260,10 @@ final class AppModel {
         setMotifDesigns(all)
     }
 
+    func randomise() { session?.randomise() }
+    func returnHome() { session?.returnHome() }
+    func makeHome() { session?.makeHome() }
+
     /// Set to jump to a page (e.g. from the signal-flow inspector); ContentView follows it.
     var navigate: SidebarItem?
 
@@ -442,7 +446,7 @@ final class AppModel {
             let panel = NSSavePanel()
             panel.allowedContentTypes = [.json]
             panel.directoryURL = Self.scenesDirectory
-            panel.nameFieldStringValue = sceneURL?.lastPathComponent ?? "scene.json"
+            panel.nameFieldStringValue = Self.suggestedName(for: sceneURL)
             guard panel.runModal() == .OK, let chosen = panel.url else { return }
             url = chosen
         }
@@ -452,6 +456,43 @@ final class AppModel {
             sceneURL = url
             scene = current
         } catch { self.error = "Could not save: \(error)" }
+    }
+
+    /// Save (⌘S). A scene loaded from a file isn't overwritten silently: the default is a new file,
+    /// replacing is a choice (which can be made the default with "Always replace without asking").
+    func saveSceneAsking() {
+        guard let url = sceneURL else { saveScene(); return }
+        if UserDefaults.standard.bool(forKey: Self.replaceWithoutAskingKey) { saveScene(askForLocation: false); return }
+        let alert = NSAlert()
+        alert.messageText = "Save over “\(url.lastPathComponent)”?"
+        let varied = !(status?.variation?.log.isEmpty ?? true)
+        alert.informativeText = "Saving as a new file keeps “\(url.lastPathComponent)” as it was"
+            + (varied ? ", including the home that variations start from." : ".")
+            + " Replacing writes everything as it plays now into that file."
+        alert.addButton(withTitle: "Save as New…")
+        alert.addButton(withTitle: "Replace")
+        alert.addButton(withTitle: "Cancel")
+        alert.showsSuppressionButton = true
+        alert.suppressionButton?.title = "Always replace without asking"
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            saveScene()
+        case .alertSecondButtonReturn:
+            if alert.suppressionButton?.state == .on { UserDefaults.standard.set(true, forKey: Self.replaceWithoutAskingKey) }
+            saveScene(askForLocation: false)
+        default:
+            break
+        }
+    }
+
+    static let replaceWithoutAskingKey = "save.replaceWithoutAsking"
+
+    /// "evening.json" → "evening 2026-11-13 1042.json", so Save as New never offers the original's name.
+    static func suggestedName(for url: URL?) -> String {
+        let stem = url?.deletingPathExtension().lastPathComponent ?? "scene"
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HHmm"
+        return "\(stem) \(f.string(from: Date())).json"
     }
 
     func chooseReplayFile() {

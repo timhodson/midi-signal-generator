@@ -10,6 +10,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
     case generators = "Generators"
     case motifs = "Motifs"
     case quantise = "Quantise"
+    case variation = "Variation"
     case voices = "Voices"
     case instruments = "Instruments"
     case mixer = "Mixer"
@@ -19,7 +20,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
     static let sections: [(title: String, items: [SidebarItem])] = [
         ("At a glance", [.overview, .flow, .tabletop]),
         ("Signals", [.modulation, .harmony]),
-        ("Music", [.generators, .motifs, .quantise]),
+        ("Music", [.generators, .motifs, .quantise, .variation]),
         ("Sound", [.voices, .instruments, .mixer]),
     ]
 
@@ -27,6 +28,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .overview: "waveform.path.ecg"
         case .flow: "point.3.filled.connected.trianglepath.dotted"
+        case .variation: "dice"
         case .harmony: "music.note.list"
         case .quantise: "square.grid.3x3"
         case .generators: "sparkles"
@@ -62,6 +64,9 @@ struct ContentView: View {
         .toolbar {
             ToolbarItemGroup {
                 @Bindable var model = model
+                Button { model.randomise() } label: { Label("Randomise", systemImage: "dice") }
+                    .help("Vary the piece now (key, scale, progressions, motifs…) by the deviation set on the Variation page")
+                    .disabled(!model.isRunning)
                 Picker("Skin", selection: $model.skin) {
                     ForEach(SkinStyle.allCases) { Text($0.rawValue).tag($0) }
                 }
@@ -77,7 +82,7 @@ struct ContentView: View {
                     .help("Show what each setting does under its control")
                 Button { Task { await model.openScene() } } label: { Label("Open Scene", systemImage: "folder") }
                     .help("Open a scene (JSON)")
-                Button { model.saveScene() } label: { Label("Save Scene", systemImage: "square.and.arrow.down") }
+                Button { model.saveSceneAsking() } label: { Label("Save Scene", systemImage: "square.and.arrow.down") }
                     .help("Save the current scene, including every tweak")
             }
         }
@@ -94,6 +99,7 @@ struct ContentView: View {
         switch item {
         case .overview: OverviewView()
         case .flow: FlowView()
+        case .variation: VariationView()
         case .harmony:
             ParamSection(title: "Harmony", prefixes: ["clock.", "harmony.", "conductor."],
                          hero: Pages.harmonyHero, accessory: Pages.harmonyAccessory)

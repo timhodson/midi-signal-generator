@@ -80,8 +80,8 @@ public struct MotifDesign: Codable, Sendable, Equatable, Identifiable {
 
     /// Turn a generated (chromatic) motif into the nearest scale steps above the key tonic, so it
     /// can be edited. Useful for keeping an app's character but fixing a clashing note.
-    public static func fromGenerated(app: String, length: Int, range: Int, octave: Int, harmony: HarmonyContext) -> MotifDesign {
-        let shape = MotifGenerator.shape(for: app, length: length, range: range)
+    public static func fromGenerated(app: String, length: Int, range: Int, octave: Int, harmony: HarmonyContext, seed: Int = 0) -> MotifDesign {
+        let shape = MotifGenerator.shape(for: app, length: length, range: range, seed: seed)
         let centre = 12 * (octave + 1) + harmony.root + shape.start
         let steps: [Int?] = shape.offsets.map { offset in
             let target = centre + offset

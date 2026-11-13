@@ -127,6 +127,13 @@ public final class Conductor: @unchecked Sendable {
         return notes
     }
 
+    /// Start the current mood's progression again from its first chord (after a variation).
+    public func restartPhrase() {
+        gestureQueue.removeAll()
+        progressionIndex = -1
+        chordDegree = progressions[mood]?.first ?? 0
+    }
+
     /// Jump to a chord now (audition). The progression carries on from where it was at the
     /// next chord boundary.
     public func force(chord degree: Int) { chordDegree = degree }

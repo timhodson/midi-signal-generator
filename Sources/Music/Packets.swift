@@ -61,6 +61,8 @@ public final class PacketGenerator: Generator {
                       help: "Most figures started per second. A page load fires dozens of lookups and connections; this keeps them from becoming a wall of notes. Events over the limit are skipped."),
             ParamSpec("gen.packets.cooldown", kind: .continuous, range: 0...120, default: 10, unit: "s",
                       help: "The same site can't play the same kind of figure again for this long. Lower = chattier; higher = you hear each site once in a while."),
+            ParamSpec("gen.packets.seed", kind: .integer, range: 0...9999, default: 0, modulatable: false,
+                      help: "Which note each site gets. Sites keep their note within a set; a new number deals out new ones. 0 = the original set."),
             ParamSpec("gen.packets.noteBeats", kind: .continuous, range: 0.05...4, default: 0.35, unit: "beats",
                       help: "Length of figure notes. Short = blips like a modem; long = notes ring into each other."),
         ]
@@ -139,7 +141,8 @@ public final class PacketGenerator: Generator {
         let level = p.value("gen.packets.intensity")
         let length = p.value("gen.packets.noteBeats")
         let spb = ctx.clock.secondsPerBeat
-        let d = Self.degree(for: site, steps: ctx.harmony.scaleSteps.count)
+        let seed = p.int("gen.packets.seed")
+        let d = Self.degree(for: seed == 0 ? site : "\(site)#\(seed)", steps: ctx.harmony.scaleSteps.count)
         func note(_ degree: Int, octave o: Int, at t: Double, _ intensity: Double, beats: Double? = nil, _ why: String) -> NoteIntent {
             NoteIntent(role: role, pitch: .exact(ctx.harmony.note(degree: degree, octave: o)), intensity: intensity,
                        time: t, beats: beats ?? length, why: why)

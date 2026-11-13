@@ -49,6 +49,9 @@ public final class Engine: @unchecked Sendable {
     private let motif = MotifGenerator()
     private let packets = PacketGenerator()
     private let drums = DrumGenerator()
+    private let variation = Variation()
+    private var pendingHome = false
+    private var nextVariationIn: Double?
     private var seenFlurries = 0
     private var netEvents: [EngineStatus.NetEvent] = []
     private var netEventCounter = 0
@@ -85,6 +88,7 @@ public final class Engine: @unchecked Sendable {
         params.register(Conductor.params)
         params.register(Quantiser.params)
         params.register(ActivityTracker.params)
+        params.register(Variation.params)
         for g in generators { params.register(g.params) }
         router.registerParams(in: params)
         parameterisedSink?.registerParams(in: params)
@@ -102,6 +106,7 @@ public final class Engine: @unchecked Sendable {
         for (id, value) in scene.params where id.hasPrefix("macro.") {
             try setParam(id, value)
         }
+        variation.makeHome(params, conductor)
     }
 
     /// Set a parameter (or macro) by id. Call on `queue` once running.
@@ -184,8 +189,20 @@ public final class Engine: @unchecked Sendable {
         pendingPreviews.removeAll()
 
         var chordChanged = false
+        nextVariationIn = variation.schedule(now: t, params)
         for barBeat in MusicalClock.crossings(of: Double(clock.beatsPerBar), in: beats) {
             let bar = Int((barBeat / Double(clock.beatsPerBar)).rounded())
+            // Variations (and going back home) land on chord boundaries, scheduled ones at the end of a phrase.
+            let boundary = bar % max(params.int("harmony.barsPerChord"), 1) == 0
+            let phraseStarts = boundary && !conductor.gesturePending && conductor.progressionIndex >= conductor.progressionLength - 1
+            if boundary, pendingHome || variation.shouldApply(atChordBoundary: boundary, phraseStarts: phraseStarts, params) {
+                let changes = pendingHome ? variation.returnHome(params, conductor, now: t)
+                                          : variation.apply(params, conductor, rng: &rng, now: t)
+                log("♪ \(pendingHome ? "back home" : "variation"): \(changes.isEmpty ? "no change" : changes.joined(separator: "; "))")
+                pendingHome = false
+                conductor.restartPhrase()
+                chordChanged = true // re-strike pad, bass and sub in the new key
+            }
             let before = conductor.mood
             if conductor.onBar(bar, now: t, params: params) { chordChanged = true }
             if conductor.mood != before { log("♪ mood \(before.rawValue) → \(conductor.mood.rawValue)") }
@@ -300,6 +317,15 @@ extension Engine {
         log("→ \(role) now plays on \(destination)")
     }
 
+    /// Vary the piece at the next chord change. Call on `queue`.
+    public func randomiseNow() { variation.request("randomised by hand", manual: true) }
+
+    /// Go back to the home settings at the next chord change. Call on `queue`.
+    public func returnHome() { pendingHome = true }
+
+    /// Make what's playing now the home that variations start from. Call on `queue`.
+    public func makeHome() { variation.makeHome(params, conductor) }
+
     /// Replace the edited drum grooves (live). Call on `queue`.
     public func setGrooves(_ grooves: [DrumGroove]) { drums.custom = grooves }
 
@@ -371,7 +397,8 @@ extension Engine {
             chordPitchClasses: harmony.chordPitchClasses.sorted(),
             root: harmony.root, scaleSteps: harmony.scaleSteps, chordSize: harmony.chordSize,
             apps: appInfos(), motifs: motif.designs, netEvents: netEvents, capture: capture,
-            drums: drums.status(params: params)
+            drums: drums.status(params: params),
+            variation: .init(log: variation.log, nextIn: nextVariationIn, pending: variation.pendingReason ?? (pendingHome ? "back home" : nil))
         )
     }
 }

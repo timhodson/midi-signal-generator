@@ -143,12 +143,14 @@ public final class MotifGenerator: Generator {
                       help: "How much an app's traffic changes its motif's loudness. 0 = all motifs equal; 1 = big downloads are loud, small pings are soft."),
             ParamSpec("gen.motif.maxPerTick", kind: .integer, range: 1...8, default: 2,
                       help: "How many apps can start motifs at the same instant. Keeps simultaneous wake-ups from piling up."),
+            ParamSpec("gen.motif.seed", kind: .integer, range: 0...9999, default: 0, modulatable: false,
+                      help: "Which set of generated motifs plays. Every app keeps its own tune within a set; a new number gives every app a new tune. 0 = the original set. Variation changes this when it reshuffles motifs."),
         ]
     }
 
-    /// Chromatic offsets for an app's motif. Deterministic per name. Exposed for tests.
-    public static func shape(for key: String, length: Int, range: Int) -> (start: Int, offsets: [Int]) {
-        var rng = SeededRandom(seed: stableHash(key))
+    /// Chromatic offsets for an app's motif. Deterministic per name (and seed; 0 = the original set).
+    public static func shape(for key: String, length: Int, range: Int, seed: Int = 0) -> (start: Int, offsets: [Int]) {
+        var rng = SeededRandom(seed: stableHash(seed == 0 ? key : "\(key)#\(seed)"))
         let start = Int(rng.next() % 12)
         var offsets: [Int] = [0]
         var current = 0
@@ -173,7 +175,7 @@ public final class MotifGenerator: Generator {
                 continue
             }
             let shape = Self.shape(for: activation.key, length: p.int("gen.motif.length"),
-                                   range: p.int("gen.motif.range"))
+                                   range: p.int("gen.motif.range"), seed: p.int("gen.motif.seed"))
             let centre = Double(12 * (p.int("gen.motif.octave") + 1) + ctx.harmony.root + shape.start)
             // Loudness: log of the rate between 1 kB/s and 10 MB/s, blended by `dynamics`.
             let level = min(max((log10(max(activation.bytesPerSecond, 1)) - 3) / 4, 0), 1)

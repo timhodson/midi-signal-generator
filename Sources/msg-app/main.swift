@@ -62,7 +62,7 @@ struct MSGApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("Open Scene…") { Task { await model.openScene() } }.keyboardShortcut("o")
-                Button("Save Scene") { model.saveScene(askForLocation: model.sceneURL == nil) }.keyboardShortcut("s")
+                Button("Save Scene") { model.saveSceneAsking() }.keyboardShortcut("s")
                 Button("Save Scene As…") { model.saveScene() }.keyboardShortcut("s", modifiers: [.command, .shift])
             }
         }
@@ -107,6 +107,10 @@ enum Snapshot {
         Task { @MainActor in
             await model.start()
             if let error = model.error { print("start error: \(error)") }
+            if args.contains("--randomise") {
+                try? await Task.sleep(for: .seconds(1))
+                model.randomise()
+            }
             try? await Task.sleep(for: .seconds(seconds))
             try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             for item in SidebarItem.allCases {

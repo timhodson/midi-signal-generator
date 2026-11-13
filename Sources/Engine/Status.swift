@@ -100,6 +100,16 @@ public struct EngineStatus: Sendable {
     public var capture: Capture?
     /// The drummer: groove, complexity, fills and recent hits.
     public var drums: DrumStatus?
+    /// Variations made so far, and when the next scheduled one is due.
+    public var variation: VariationInfo?
+
+    public struct VariationInfo: Sendable {
+        public var log: [Variation.Applied]
+        /// Seconds until the next scheduled variation (nil = no schedule).
+        public var nextIn: Double?
+        /// A variation waiting for its chord change / phrase end, and why.
+        public var pending: String?
+    }
 
     public struct NetEvent: Sendable, Hashable, Identifiable {
         public var id: Int

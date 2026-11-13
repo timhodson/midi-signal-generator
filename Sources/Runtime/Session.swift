@@ -226,6 +226,15 @@ public final class Session: @unchecked Sendable {
         engine.queue.sync { coreMIDI?.connectedDestinations() ?? [:] }
     }
 
+    /// Vary the piece at the next chord change, from any thread.
+    public func randomise() { engine.queue.async { [engine] in engine.randomiseNow() } }
+
+    /// Back to the home settings at the next chord change, from any thread.
+    public func returnHome() { engine.queue.async { [engine] in engine.returnHome() } }
+
+    /// Make what's playing the new home, from any thread.
+    public func makeHome() { engine.queue.async { [engine] in engine.makeHome() } }
+
     /// Replace the edited drum grooves (live), from any thread.
     public func setGrooves(_ grooves: [DrumGroove]) {
         engine.queue.async { [engine] in engine.setGrooves(grooves) }
