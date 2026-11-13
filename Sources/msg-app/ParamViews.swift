@@ -28,8 +28,23 @@ struct ParamRow: View {
 
     var body: some View {
         let _ = Perf.paramRowBodies += 1
+        // Three columns where there's room; stacked in narrow places (inspectors, tabletop cards,
+        // panel windows), so the control never gets squeezed to nothing.
+        ViewThatFits(in: .horizontal) {
+            wide.frame(minWidth: 620)
+            stacked
+        }
+        .padding(.vertical, 2)
+        .help(spec.help)
+    }
+
+    private var wide: some View {
         VStack(alignment: .leading, spacing: 3) {
-            row
+            HStack(alignment: .center, spacing: 12) {
+                labelBlock.frame(width: 240, alignment: .leading)
+                control.frame(maxWidth: .infinity)
+                valueBlock.frame(width: 110, alignment: .trailing)
+            }
             if showsInlineHelp {
                 Text(spec.help)
                     .font(.callout).foregroundStyle(.secondary)
@@ -38,37 +53,47 @@ struct ParamRow: View {
                     .padding(.trailing, 122)
             }
         }
-        .padding(.vertical, 2)
-        .help(spec.help)
     }
 
-    private var row: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(label ?? (spec.label == spec.id ? Self.shortLabel(spec.id) : spec.label))
-                    .lineLimit(1)
-                Text(spec.id).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1)
+    private var stacked: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+                labelBlock
+                Spacer(minLength: 8)
+                valueBlock
             }
-            .frame(width: 240, alignment: .leading)
-
-            control.frame(maxWidth: .infinity)
-
-            VStack(alignment: .trailing, spacing: 1) {
-                if typing, spec.kind == .continuous || spec.kind == .normalised || spec.kind == .integer {
-                    TextField("", value: Binding(get: { base }, set: { model.set(spec.id, $0) }),
-                              format: .number.precision(.significantDigits(1...6)))
-                        .textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing).frame(width: 100)
-                        .help("Type an exact value and press Return")
-                } else {
-                    Text(Self.format(base, spec)).monospacedDigit()
-                }
-                if modulated {
-                    Text("~ \(Self.format(effective, spec))")
-                        .font(.caption).monospacedDigit().foregroundStyle(.orange)
-                        .help("Current value including modulation")
-                }
+            control.frame(maxWidth: .infinity, alignment: .leading)
+            if showsInlineHelp {
+                Text(spec.help)
+                    .font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(width: 110, alignment: .trailing)
+        }
+    }
+
+    private var labelBlock: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(label ?? (spec.label == spec.id ? Self.shortLabel(spec.id) : spec.label))
+                .lineLimit(1)
+            Text(spec.id).font(.caption.monospaced()).foregroundStyle(.secondary).lineLimit(1)
+        }
+    }
+
+    private var valueBlock: some View {
+        VStack(alignment: .trailing, spacing: 1) {
+            if typing, spec.kind == .continuous || spec.kind == .normalised || spec.kind == .integer {
+                TextField("", value: Binding(get: { base }, set: { model.set(spec.id, $0) }),
+                          format: .number.precision(.significantDigits(1...6)))
+                    .textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing).frame(width: 100)
+                    .help("Type an exact value and press Return")
+            } else {
+                Text(Self.format(base, spec)).monospacedDigit()
+            }
+            if modulated {
+                Text("~ \(Self.format(effective, spec))")
+                    .font(.caption).monospacedDigit().foregroundStyle(.orange)
+                    .help("Current value including modulation")
+            }
         }
     }
 
