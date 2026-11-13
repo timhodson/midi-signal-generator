@@ -127,6 +127,13 @@ group's settings underneath. The same `GroupPanel` view is used in its own windo
 for `PanelID`) and on the **Tabletop**, which lays pinned panels out in columns that fit the window
 (drag a card's handle onto another to reorder). Pins are saved per user in UserDefaults.
 
+The **Signal flow** page (`FlowView.swift`) lays the patch out as four columns, Signals →
+Generators → Voices → Outputs, joined by cables built from the live wiring: app activity → lead,
+packets → network events (and drums when accents are on), harmony → pad, bass, sub and drums,
+each generator → its voice (by role), each voice → its hosted synth or MIDI destination. Cables
+glow while notes, events or chord changes travel them; hovering or selecting a box lights its
+upstream and downstream path; the selected box's settings open in the inspector.
+
 The **Mixer** page is a desk for the hosted synths (`AUHost/Mixer.swift`): each synth runs
 EQ (low shelf, mid bell, high shelf) → channel mixer (fader, pan, mute/solo), which fans out to the
 master and to post-fader sends into a reverb bus and a tempo-synced delay bus. Every control is a

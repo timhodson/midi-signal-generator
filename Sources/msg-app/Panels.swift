@@ -203,6 +203,7 @@ struct GroupPanel: View {
 /// Title row with pin, pop-out and (optionally) close.
 struct PanelHeader: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.skin) private var skin
     @Environment(\.openWindow) private var openWindow
     let panel: PanelID
     var onClose: (() -> Void)?
@@ -211,7 +212,11 @@ struct PanelHeader: View {
     var body: some View {
         HStack(spacing: 10) {
             RoundedRectangle(cornerRadius: 2).fill(Panels.color(panel, model: model)).frame(width: 12, height: 12)
-            Text(Panels.title(panel)).font(.title3.weight(.semibold))
+            if skin == .studio {
+                Text(Panels.title(panel).uppercased()).font(Studio.legend(15, weight: .bold)).tracking(1.5)
+            } else {
+                Text(Panels.title(panel)).font(.title3.weight(.semibold))
+            }
             Spacer()
             PinButton(panel: panel)
             if showPopOut {
@@ -297,6 +302,8 @@ struct TilePage: View {
                 }
             }
         }
+        .environment(\.skin, model.skin)
+        .background { if model.skin == .studio { PanelBackground(cornerRadius: 0, shade: 0.45).ignoresSafeArea() } }
         .searchable(text: $filter, placement: .toolbar, prompt: "Filter \(page.title.lowercased())")
         .navigationTitle(page.title)
     }
@@ -304,9 +311,12 @@ struct TilePage: View {
 
 struct PanelTile: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.skin) private var skin
     @Environment(\.openWindow) private var openWindow
     let panel: PanelID
     let selected: Bool
+    /// Smaller, for the signal-flow page: one summary line, a thinner strip.
+    var compact = false
     let action: () -> Void
 
     var body: some View {
@@ -319,31 +329,54 @@ struct PanelTile: View {
                 Button {
                     Panels.setOn(panel, !on, model: model)
                 } label: {
-                    Circle().fill(on ? color : Color.secondary.opacity(0.4)).frame(width: 10, height: 10)
-                        .shadow(color: on ? color : .clear, radius: 3)
+                    if skin == .studio {
+                        RoundedRectangle(cornerRadius: 2).fill(on ? color : Color(white: 0.12))
+                            .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(Color.black.opacity(0.7), lineWidth: 1))
+                            .shadow(color: on ? color.opacity(0.9) : .clear, radius: 4)
+                            .frame(width: 14, height: 10)
+                    } else {
+                        Circle().fill(on ? color : Color.secondary.opacity(0.4)).frame(width: 10, height: 10)
+                            .shadow(color: on ? color : .clear, radius: 3)
+                    }
                 }
                 .buttonStyle(.plain).disabled(state == nil)
                 .help(state == nil ? "" : panel.page == .instruments ? (on ? "Mute in the mixer" : "Unmute") : on ? "Switch off" : "Switch on")
-                Text(Panels.title(panel)).font(.headline).lineLimit(1)
+                if skin == .studio {
+                    Text(Panels.title(panel).uppercased()).font(Studio.legend(compact ? 11 : 12, weight: .bold)).tracking(1).lineLimit(1)
+                } else {
+                    Text(Panels.title(panel)).font(compact ? .subheadline.weight(.semibold) : .headline).lineLimit(1)
+                }
                 Spacer(minLength: 4)
                 PinButton(panel: panel)
                 Button { openWindow(value: panel) } label: { Image(systemName: "macwindow.on.rectangle") }
                     .buttonStyle(.borderless).foregroundStyle(.secondary).help("Open in its own window")
             }
             if let role {
-                NoteStrip(role: role).frame(height: 30)
+                NoteStrip(role: role).frame(height: compact ? 18 : 30)
                     .opacity(on ? 1 : 0.4)
             } else {
-                Color.clear.frame(height: 30) // keep tiles lined up
+                Color.clear.frame(height: compact ? 18 : 30) // keep tiles lined up
             }
-            ForEach(Array(Panels.summary(panel, model: model).enumerated()), id: \.offset) { _, line in
-                Text(line).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
+            let lines = Panels.summary(panel, model: model)
+            if skin == .studio {
+                LCDLines(lines: compact ? Array(lines.prefix(1)) : lines)
+            } else {
+                ForEach(Array((compact ? Array(lines.prefix(1)) : lines).enumerated()), id: \.offset) { _, line in
+                    Text(line).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
+                }
             }
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, minHeight: 104, alignment: .topLeading)
-        .background((selected ? color.opacity(0.16) : Color.primary.opacity(0.05)), in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(selected ? color : .clear, lineWidth: 1.5))
+        .padding(compact ? 8 : 10)
+        .frame(maxWidth: .infinity, minHeight: compact ? 0 : 104, alignment: .topLeading)
+        .background {
+            if skin == .studio {
+                PanelBackground(cornerRadius: 8, shade: selected ? 0 : 0.12)
+            } else {
+                RoundedRectangle(cornerRadius: 10).fill(selected ? color.opacity(0.16) : Color.primary.opacity(0.05))
+            }
+        }
+        .overlay(RoundedRectangle(cornerRadius: skin == .studio ? 8 : 10).stroke(selected ? color : .clear, lineWidth: 1.5)
+            .shadow(color: selected && skin == .studio ? color.opacity(0.8) : .clear, radius: 4))
         .contentShape(RoundedRectangle(cornerRadius: 10))
         .onTapGesture(perform: action)
     }
@@ -399,6 +432,8 @@ struct PanelWindow: View {
             }
         }
         .frame(minWidth: 520, minHeight: 360)
+        .environment(\.skin, model.skin)
+        .background { if model.skin == .studio { PanelBackground(cornerRadius: 0, shade: 0.35).ignoresSafeArea() } }
         .navigationTitle(Panels.title(panel))
     }
 }
@@ -433,12 +468,15 @@ struct TabletopView: View {
                 }
             }
         }
+        .environment(\.skin, model.skin)
+        .background { if model.skin == .studio { PanelBackground(cornerRadius: 0, shade: 0.45).ignoresSafeArea() } }
         .navigationTitle("Tabletop")
     }
 }
 
 struct TabletopCard: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.skin) private var skin
     let panel: PanelID
     @State private var targeted = false
 
@@ -453,7 +491,9 @@ struct TabletopCard: View {
             GroupPanel(panel: panel, showDoc: false)
         }
         .padding(14)
-        .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
+        .background {
+            if skin == .studio { PanelBackground(cornerRadius: 10) } else { RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.05)) }
+        }
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(targeted ? Panels.color(panel, model: model) : .clear, lineWidth: 2))
         .dropDestination(for: String.self) { items, _ in
             guard let id = items.first else { return false }

@@ -38,19 +38,30 @@ struct RoleLegend: View {
 
 /// A card that frames a visual with a title and a one-line explanation.
 struct VisualCard<Content: View>: View {
+    @Environment(\.skin) private var skin
     let title: String
     var caption: String?
     @ViewBuilder var content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title).font(.headline)
+            if skin == .studio {
+                Text(title.uppercased()).font(Studio.legend(11, weight: .bold)).tracking(1).foregroundStyle(Studio.label)
+            } else {
+                Text(title).font(.headline)
+            }
             if let caption { Text(caption).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
             content
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10))
+        .background {
+            if skin == .studio {
+                PanelBackground(cornerRadius: 8, shade: 0.2)
+            } else {
+                RoundedRectangle(cornerRadius: 10).fill(.quaternary.opacity(0.35))
+            }
+        }
     }
 }
 

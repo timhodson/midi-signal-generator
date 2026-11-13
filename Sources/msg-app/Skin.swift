@@ -169,3 +169,26 @@ struct StudioLEDButton: View {
         .buttonStyle(.plain)
     }
 }
+
+/// A slim LCD strip for a tile's summary lines.
+struct LCDLines: View {
+    let lines: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                Text(line.uppercased()).font(.system(size: 9.5, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Studio.lcdText.opacity(0.9))
+                    .shadow(color: Studio.lcdText.opacity(0.45), radius: 2)
+                    .lineLimit(1).truncationMode(.tail)
+            }
+        }
+        .padding(.horizontal, 7).padding(.vertical, 5)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            if let img = Studio.lcd { Image(nsImage: img).resizable() } else { Color(red: 0.12, green: 0.15, blue: 0.12) }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 3))
+        .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(Color.black.opacity(0.75), lineWidth: 1.5))
+    }
+}

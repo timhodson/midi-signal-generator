@@ -2,6 +2,7 @@ import SwiftUI
 
 enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
     case overview = "Overview"
+    case flow = "Signal flow"
     case harmony = "Harmony"
     case quantise = "Quantise"
     case generators = "Generators"
@@ -17,6 +18,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
     var icon: String {
         switch self {
         case .overview: "waveform.path.ecg"
+        case .flow: "point.3.filled.connected.trianglepath.dotted"
         case .harmony: "music.note.list"
         case .quantise: "square.grid.3x3"
         case .generators: "sparkles"
@@ -74,6 +76,7 @@ struct ContentView: View {
     @ViewBuilder func detail(_ item: SidebarItem) -> some View {
         switch item {
         case .overview: OverviewView()
+        case .flow: FlowView()
         case .harmony:
             ParamSection(title: "Harmony", prefixes: ["clock.", "harmony.", "conductor."],
                          hero: Pages.harmonyHero, accessory: Pages.harmonyAccessory)

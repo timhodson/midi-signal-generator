@@ -140,12 +140,23 @@ extension ParamSpec {
 /// A hardware-style on/off button with an LED, for toggle params.
 struct LEDButton: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.skin) private var skin
     let spec: ParamSpec
     var label: String?
     var color: Color = .green
 
     var body: some View {
         let on = model.base(spec.id) >= 0.5
+        if skin == .studio {
+            StudioLEDButton(label: (label ?? (spec.label == spec.id ? ParamRow.shortLabel(spec.id) : spec.label)).uppercased(),
+                            on: on, color: color) { model.set(spec.id, on ? 0 : 1) }
+                .help(spec.help)
+        } else {
+            plain(on)
+        }
+    }
+
+    private func plain(_ on: Bool) -> some View {
         Button { model.set(spec.id, on ? 0 : 1) } label: {
             HStack(spacing: 8) {
                 Circle()
