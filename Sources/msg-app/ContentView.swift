@@ -7,6 +7,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
     case generators = "Generators"
     case motifs = "Motifs"
     case voices = "Voices"
+    case tabletop = "Tabletop"
     case instruments = "Instruments"
     case modulation = "Modulation"
 
@@ -20,6 +21,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
         case .generators: "sparkles"
         case .motifs: "music.quarternote.3"
         case .voices: "arrow.triangle.branch"
+        case .tabletop: "rectangle.3.group"
         case .instruments: "pianokeys"
         case .modulation: "point.3.connected.trianglepath.dotted"
         }
@@ -70,12 +72,10 @@ struct ContentView: View {
                          hero: Pages.harmonyHero, accessory: Pages.harmonyAccessory)
         case .quantise:
             ParamSection(title: "Quantise", prefixes: ["macro.", "quant."], groupComponent: 0, hero: Pages.quantiseHero)
-        case .generators:
-            ParamSection(title: "Generators", prefixes: ["gen.", "activity."], groupComponent: 1,
-                         hero: Pages.generatorsHero, accessory: Pages.generatorAccessory)
+        case .generators: TilePage(page: .generators)
         case .motifs: MotifsView()
-        case .voices:
-            ParamSection(title: "Voices", prefixes: ["voice."], groupComponent: 1, accessory: Pages.voiceAccessory)
+        case .voices: TilePage(page: .voices)
+        case .tabletop: TabletopView()
         case .instruments: InstrumentsView()
         case .modulation: ModulationView()
         }

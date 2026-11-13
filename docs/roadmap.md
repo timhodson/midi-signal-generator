@@ -16,15 +16,13 @@
 - [x] Packet capture helper `msg-pcap`: DNS lookups, handshakes with round trips, closes and LAN chatter as figures; features over OSC (ADR 0015)
 - [x] Drummer: a groove per mood with presence and complexity, fills at phrase ends and flurries, idle rests, Euclidean grooves, network accents; built-in GM kit; editable step grid (ADR 0016)
 - [x] Destination picker per voice in the app: virtual, network, hosted, Bluetooth / USB / network / IAC / app destinations (incl. offline), live switching, Bluetooth MIDI pairing panel
-- [ ] **Listen to it on the iPad** and tune the default and hosted scenes by ear
+- [x] Tile pages for Generators and Voices (live tile per group, click to expand one), pop-out windows, a Tabletop of pinned panels
+- [ ] **Listen to it on the iPad** and tune the default and hosted scenes by ear (drums heard on an iPhone over Bluetooth MIDI: fine)
 
 ## Next
 
-1. **OSC in, the rest**: signals already arrive over OSC (ADR 0015); still to do: param control
-   (`/param/quant.pitch.strength 0.4`) and accepting from the LAN.
-2. **Packets, next:** per-process attribution via PKTAP (link events to app motifs), a packet
-   source for whole-LAN capture on a Pi.
-3. **App, layout (feedback 2026-11-12):** Voices and Generators take a lot of scrolling to find
+1. **App, layout (feedback 2026-11-12), first pass done 2026-11-13; still to come: free-form
+   placement and sizing on the tabletop, tiles for the other pages.** Voices and Generators take a lot of scrolling to find
    anything. Instead:
    - an overview of small **tiles**, one per voice / generator, each showing at a glance what it's
      doing now (live mini-visual, key numbers, on/off)
@@ -32,7 +30,7 @@
    - **open several in their own windows**, or **pin them to a "tabletop"**: a free-form, tiled
      workspace where the chosen panels sit side by side for tweaking together
    (saved per scene or per user).
-4. **Mixer page (feedback 2026-11-12):** styled like a hardware mixer: a channel strip per voice
+2. **Mixer page (feedback 2026-11-12):** styled like a hardware mixer: a channel strip per voice
    with a fader, pan, mute/solo, a meter and EQ knobs (low / mid with frequency / high), plus
    **buses** for grouping and shared FX (e.g. a reverb bus and a delay bus with per-channel send
    knobs, a drums bus), and a master strip. Notes:
@@ -46,7 +44,7 @@
      fader, so the fader is built on its `Control` base to match.
    - Every fader, knob and send is a param, so traffic can ride them in Modulation.
    (Replaces "effects on the hosted mix" under Later.)
-5. **A hardware-style skin (feedback 2026-11-12)**, in the spirit of AudioKit's apps (King of FM 2
+3. **A hardware-style skin (feedback 2026-11-12)**, in the spirit of AudioKit's apps (King of FM 2
    as the reference): an original look, not their artwork. What makes that style:
    - dark charcoal panels with a fine grain, divided into labelled sections by inset/bevel lines
    - big 3D knobs (soft radial shading, drop shadow, a single light pointer line), labels in small
@@ -63,7 +61,7 @@
      sharp at any size and need no image assets; build on AudioKit Controls' `Control` base, as the
      current knobs do
    - bundle an open-licensed font (e.g. an OFL dot-matrix or technical mono) for labels and the LCD
-   - apply it first to the new tiles, mixer and tabletop (items 3–4) rather than restyling the long
+   - apply it first to the new tiles, mixer and tabletop (items 1–2) rather than restyling the long
      pages that those replace
    - our own art, generated on Tim's local ComfyUI (Z-Image Turbo and FLUX.2 klein 4B are installed,
      the same setup as the video skill): Claude writes the texture specs and prompts.
@@ -74,13 +72,16 @@
      - panel textures must tile: generate, then make seamless (offset and blend), and check at 1× and 2×
      - keep source prompts and settings in the repo (e.g. `art/`) so the look can be regenerated
    - no reuse of AudioKit's artwork
-6. **App, next round:** adding
+4. **App, next round:** adding
    and removing hosted instruments, scene A/B comparison, MIDI-learn for params, an app bundle.
-7. **MIDI clock** out (and in, to follow a DAW). CoreMIDI timestamped sends.
-8. More generators: arpeggiator over the chord, flow-voice (one voice per live connection with voice stealing).
-9. Drums, next: more grooves and odd meters, per-lane timing feel (laid-back snare), groove morphing between moods.
+5. **MIDI clock** out (and in, to follow a DAW). CoreMIDI timestamped sends.
+6. More generators: arpeggiator over the chord, flow-voice (one voice per live connection with voice stealing).
+7. Drums, next: more grooves and odd meters, per-lane timing feel (laid-back snare), groove morphing between moods.
 
 ## Later
+
+- OSC param control (`/param/quant.pitch.strength 0.4`) and OSC from the LAN (parked 2026-11-13).
+- Packets: per-process attribution via PKTAP (link events to app motifs), a whole-LAN capture source on a Pi (parked 2026-11-13).
 
 - Whole-LAN capture: mirror port / router NetFlow / Pi-hole DNS log. Per-**device** leitmotifs (ADR 0009).
 - MQTT bridge (Home Assistant / Zigbee2MQTT) for temperature, humidity and motion. Mostly the

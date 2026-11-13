@@ -70,13 +70,14 @@ struct PresenceBar: View {
                     RoundedRectangle(cornerRadius: 4).fill(.quaternary)
                     RoundedRectangle(cornerRadius: 4).fill(RoleStyle.color("drums").opacity(0.55))
                         .frame(width: max(w * value, 2))
-                    ForEach(Self.marks, id: \.0) { at, label in
-                        let on = value >= at
+                    ForEach(Array(Self.marks.enumerated()), id: \.offset) { i, mark in
+                        let on = value >= mark.0
+                        // Alternate label heights so neighbouring marks don't collide on narrow cards.
                         VStack(spacing: 1) {
-                            Rectangle().fill(on ? Color.primary : .secondary).frame(width: 1, height: 14)
-                            Text(label).font(.caption2).foregroundStyle(on ? .primary : .secondary).fixedSize()
+                            Rectangle().fill(on ? Color.primary : .secondary).frame(width: 1, height: i % 2 == 0 ? 14 : 28)
+                            Text(mark.1).font(.caption2).foregroundStyle(on ? .primary : .secondary).fixedSize()
                         }
-                        .offset(x: w * at)
+                        .offset(x: w * mark.0)
                     }
                 }
                 .contentShape(Rectangle())
@@ -84,7 +85,7 @@ struct PresenceBar: View {
                     model.set("gen.drums.presence", min(max(g.location.x / max(w, 1), 0), 1))
                 })
             }
-            .frame(height: 30)
+            .frame(height: 44)
         }
     }
 
@@ -172,6 +173,10 @@ struct DrumGrooveEditor: View {
             if let groove, let d {
                 grid(groove, d, live: name == playing)
                     .frame(height: Self.rowHeight * CGFloat(DrumLane.allCases.count) + 18)
+                if name == playing, let bar = d.fillBar {
+                    Text("Orange steps: a fill\(bar > Int(((model.status?.beat ?? 0) / 4).rounded(.down)) ? " next bar" : " this bar") (\(d.fillReason)).")
+                        .font(.caption).foregroundStyle(.orange)
+                }
                 Text(hoverText(groove, d) ?? (name == DrumGroove.euclidean
                     ? "Euclidean is built from the Euclid settings below (hits and rotation per lane), so it isn't edited here. Route a signal to a hits setting and the rhythm grows with it."
                     : "Hover a step for what it is and its chance of playing now."))
@@ -277,11 +282,6 @@ struct DrumGrooveEditor: View {
                     gc.stroke(Path(roundedRect: r.insetBy(dx: -1, dy: -1), cornerRadius: 4), with: .color(.white), lineWidth: 2)
                 }
             }
-        }
-        if showFill {
-            let x = Self.labelWidth + CGFloat(d.fillStart) * cellW
-            gc.draw(Text("fill: \(d.fillReason)").font(.caption2).foregroundStyle(.orange),
-                    at: CGPoint(x: x + 4, y: 8), anchor: .leading)
         }
     }
 }

@@ -120,3 +120,9 @@ types are `@unchecked Sendable` because the queue is their isolation. There are 
 `msg-app` sits on `Runtime.Session`. It reads `EngineStatus` about 10× a second and sets params
 through the session. Its parameter panels are generated from `ParamSpec`. See
 [ADR 0012](decisions/0012-mac-app-generated-from-params.md).
+
+Generators and Voices are **tile pages** (`Panels.swift`): one live tile per group (a note strip of
+its voice, two summary lines, an on/off light, pin and pop-out), and clicking a tile opens that
+group's settings underneath. The same `GroupPanel` view is used in its own window (`WindowGroup`
+for `PanelID`) and on the **Tabletop**, which lays pinned panels out in columns that fit the window
+(drag a card's handle onto another to reorder). Pins are saved per user in UserDefaults.

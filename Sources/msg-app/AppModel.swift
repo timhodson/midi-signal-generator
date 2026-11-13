@@ -260,6 +260,35 @@ final class AppModel {
         setMotifDesigns(all)
     }
 
+    // MARK: Tabletop
+
+    /// Panels pinned to the Tabletop, in order. Saved per user (not per scene).
+    var pinned: [PanelID] = AppModel.loadPinned() {
+        didSet { if persistsLayout { Self.savePinned(pinned) } }
+    }
+    /// Off for headless snapshots, so they don't change the user's layout.
+    @ObservationIgnored var persistsLayout = true
+
+    func togglePin(_ panel: PanelID) {
+        if let i = pinned.firstIndex(of: panel) { pinned.remove(at: i) } else { pinned.append(panel) }
+    }
+
+    /// Move the pinned panel with `id` to just before `target`.
+    func movePin(_ id: String, before target: PanelID) {
+        guard let from = pinned.firstIndex(where: { $0.id == id }), pinned[from] != target else { return }
+        let panel = pinned.remove(at: from)
+        pinned.insert(panel, at: pinned.firstIndex(of: target) ?? pinned.endIndex)
+    }
+
+    private static let pinnedKey = "tabletop.pinned"
+    private static func loadPinned() -> [PanelID] {
+        guard let data = UserDefaults.standard.data(forKey: pinnedKey) else { return [] }
+        return (try? JSONDecoder().decode([PanelID].self, from: data)) ?? []
+    }
+    private static func savePinned(_ panels: [PanelID]) {
+        UserDefaults.standard.set(try? JSONEncoder().encode(panels), forKey: pinnedKey)
+    }
+
     // MARK: MIDI destinations
 
     /// Every MIDI destination on this Mac (online or remembered), refreshed while the Voices page is open.

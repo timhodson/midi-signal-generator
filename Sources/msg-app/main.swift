@@ -66,6 +66,11 @@ struct MSGApp: App {
                 Button("Save Scene As…") { model.saveScene() }.keyboardShortcut("s", modifiers: [.command, .shift])
             }
         }
+        // A generator's or voice's settings in a window of their own (Open in its own window).
+        WindowGroup("Panel", for: PanelID.self) { $panel in
+            if let panel { PanelWindow(panel: panel).environment(model) }
+        }
+        .defaultSize(width: 640, height: 720)
     }
 }
 
@@ -91,6 +96,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 enum Snapshot {
     static func run(model: AppModel, directory: URL, seconds: Double, height: Double = 860) {
         model.forceVisualsActive = true
+        model.persistsLayout = false
+        model.pinned = [PanelID(page: .generators, group: "drums"), PanelID(page: .voices, group: "lead"),
+                        PanelID(page: .generators, group: "pulse")]
         setvbuf(stdout, nil, _IOLBF, 0)
         NSApplication.shared.setActivationPolicy(.prohibited)
         Task { @MainActor in
