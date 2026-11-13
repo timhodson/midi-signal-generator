@@ -5,3 +5,6 @@ xcuserdata/
 DerivedData/
 .DS_Store
 recordings/
+
+# Raw texture generations (keep only the chosen, processed ones in art/textures/)
+art/textures/raw/
