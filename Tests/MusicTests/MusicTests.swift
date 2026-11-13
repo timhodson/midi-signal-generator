@@ -424,3 +424,17 @@ private let dDorian = HarmonyContext(root: 2, scale: .dorian)
         }
     }
 }
+
+@Suite struct SpellingTests {
+    @Test func flatKeysUseFlats() {
+        let dMinor = HarmonyContext(root: 2, scale: ScaleCatalogue.scales[1])
+        #expect(dMinor.spellsWithFlats)
+        #expect((0..<7).map { dMinor.chordName(degree: $0) } == ["Dm", "E°", "F", "Gm", "Am", "B♭", "C"])
+        #expect(HarmonyContext(root: 5, scale: ScaleCatalogue.scales[0]).chordName(degree: 3) == "B♭")       // F major: IV
+        #expect(HarmonyContext(root: 0, scale: ScaleCatalogue.scales[5]).chordName(degree: 6) == "B♭")       // C Mixolydian ♭VII
+        #expect(!HarmonyContext(root: 11, scale: ScaleCatalogue.scales[0]).spellsWithFlats)                  // B major: sharps
+        #expect(HarmonyContext(root: 11, scale: ScaleCatalogue.scales[0]).chordName(degree: 3) == "E")
+        #expect(HarmonyContext(root: 2, scale: ScaleCatalogue.scales[2]).chordName(degree: 6) == "C")        // D Dorian = C major
+        #expect(!HarmonyContext(root: 2, scale: ScaleCatalogue.scales[2]).spellsWithFlats)
+    }
+}

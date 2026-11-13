@@ -12,6 +12,7 @@ public enum ScaleCatalogue {
     public static var names: [String] { scales.map(\.description) }
 
     public static let sharpNames = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"]
+    public static let flatNames = ["C", "D♭", "D", "E♭", "E", "F", "G♭", "G", "A♭", "A", "B♭", "B"]
 
     /// Index = semitones above C.
     public static let rootNames = ["C", "C♯/D♭", "D", "D♯/E♭", "E", "F", "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B"]
@@ -75,11 +76,32 @@ public struct HarmonyContext: Sendable, Equatable {
     }
 
     /// Chord built on a scale degree, as a name like "Dm", "G", "B°" or "Cmaj7".
+    /// Whether the key is written with flats: its relative major is F, B♭, E♭, A♭, D♭ or G♭
+    /// (so D minor has B♭, not A♯).
+    public var spellsWithFlats: Bool {
+        let major = [0, 2, 4, 5, 7, 9, 11]
+        var ionian = root
+        if scaleSteps.count == 7, let k = scaleSteps.indices.first(where: { k in
+            major.map { (($0 + scaleSteps[k]) % 12) }.sorted() == scaleSteps.sorted() || Set(scaleSteps.map { ($0 - scaleSteps[k] + 12) % 12 }) == Set(major)
+        }) {
+            ionian = (root + scaleSteps[k]) % 12
+        } else if scaleSteps.contains(3) {
+            ionian = (root + 3) % 12 // minor-ish (harmonic / melodic minor, minor pentatonic): its relative major
+        }
+        return [5, 10, 3, 8, 1, 6].contains(ionian)
+    }
+
+    /// A pitch class named for this key: "B♭" in D minor, "A♯" in B major.
+    public func pitchName(_ pc: Int) -> String {
+        let i = ((pc % 12) + 12) % 12
+        return spellsWithFlats ? ScaleCatalogue.flatNames[i] : ScaleCatalogue.sharpNames[i]
+    }
+
     public func chordName(degree: Int) -> String {
         var c = self
         c.chordDegree = degree
         let tones = c.chordDegrees.map { c.note(degree: $0) }
-        let root = ScaleCatalogue.sharpNames[((tones[0] % 12) + 12) % 12]
+        let root = pitchName(tones[0])
         guard tones.count >= 3 else { return root }
         let third = tones[1] - tones[0], fifth = tones[2] - tones[0]
         let base: String

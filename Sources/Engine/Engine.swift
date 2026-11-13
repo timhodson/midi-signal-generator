@@ -462,7 +462,7 @@ extension Engine {
         return EngineStatus(
             time: t, beat: clock.beat, bpm: clock.bpm, mood: conductor.mood.rawValue,
             chordDegree: harmony.chordDegree,
-            chord: harmony.chordDegrees.map { String(noteName(harmony.note(degree: $0)).dropLast()) },
+            chord: harmony.chordDegrees.map { harmony.pitchName(harmony.note(degree: $0)) },
             key: "\(ScaleCatalogue.rootNames[harmony.root]) \(ScaleCatalogue.names[params.int("harmony.scale")])",
             totalRate: total, smoothedRate: conductor.smoothedRate, topApps: Array(apps),
             sounding: scheduler.soundingCount, values: values, bases: params.baseValues, signals: signals,
@@ -475,7 +475,7 @@ extension Engine {
                 c.chordDegree = d
                 let tones = c.chordDegrees.map { c.note(degree: $0) }
                 return .init(degree: d, name: harmony.chordName(degree: d), numeral: harmony.romanNumeral(degree: d),
-                             notes: tones.map { ScaleCatalogue.sharpNames[(($0 % 12) + 12) % 12] },
+                             notes: tones.map { harmony.pitchName($0) },
                              steps: c.chordDegrees.map { $0 % harmony.scaleSteps.count + 1 },
                              pitchClasses: tones.map { (($0 % 12) + 12) % 12 })
             },
