@@ -17,6 +17,7 @@
 - [x] Drummer: a groove per mood with presence and complexity, fills at phrase ends and flurries, idle rests, Euclidean grooves, network accents; built-in GM kit; editable step grid (ADR 0016)
 - [x] Destination picker per voice in the app: virtual, network, hosted, Bluetooth / USB / network / IAC / app destinations (incl. offline), live switching, Bluetooth MIDI pairing panel
 - [x] Tile pages for Generators and Voices (live tile per group, click to expand one), pop-out windows, a Tabletop of pinned panels
+- [x] Mixer page: channel strips (EQ, reverb/delay sends, pan, mute/solo, fader, meter) for hosted synths, FX returns, master; MIDI voices get a velocity-trim strip
 - [ ] **Listen to it on the iPad** and tune the default and hosted scenes by ear (drums heard on an iPhone over Bluetooth MIDI: fine)
 
 ## Next
@@ -30,7 +31,8 @@
    - **open several in their own windows**, or **pin them to a "tabletop"**: a free-form, tiled
      workspace where the chosen panels sit side by side for tweaking together
    (saved per scene or per user).
-2. **Mixer page (feedback 2026-11-12):** styled like a hardware mixer: a channel strip per voice
+2. **Mixer page (feedback 2026-11-12), first pass done 2026-11-13; still to come: group buses
+   (e.g. a drums sub-group), MIDI CC7/CC10 strips for external voices, a per-scene default mix.** styled like a hardware mixer: a channel strip per voice
    with a fader, pan, mute/solo, a meter and EQ knobs (low / mid with frequency / high), plus
    **buses** for grouping and shared FX (e.g. a reverb bus and a delay bus with per-channel send
    knobs, a drums bus), and a master strip. Notes:

@@ -95,7 +95,7 @@ public final class Engine: @unchecked Sendable {
 
         for (id, value) in scene.params.sorted(by: { $0.key < $1.key }) where !id.hasPrefix("macro.") {
             // Hosted-instrument params only exist when the instruments are loaded (not in --dry-run).
-            if id.hasPrefix("au."), params.specs[id] == nil { continue }
+            if id.hasPrefix("au.") || id.hasPrefix("mix."), params.specs[id] == nil { continue }
             try params.set(id, value)
         }
         // Macros only apply if the scene sets them explicitly, so a scene's own values win.
@@ -279,7 +279,7 @@ extension Engine {
         // round-trips; route depths go back into the routes themselves.
         s.params = params.baseValues.filter { !$0.key.hasPrefix("mod.") && !$0.key.hasPrefix("macro.") }
         // Keep the scene's own au.* values when instruments aren't loaded (e.g. --dry-run).
-        for (id, v) in scene.params where id.hasPrefix("au.") && params.specs[id] == nil { s.params[id] = v }
+        for (id, v) in scene.params where (id.hasPrefix("au.") || id.hasPrefix("mix.")) && params.specs[id] == nil { s.params[id] = v }
         for i in s.routes.indices { s.routes[i].amount = params.baseValue("mod.\(i).amount") }
         s.progressions = Dictionary(uniqueKeysWithValues: conductor.progressions.map { ($0.key.rawValue, $0.value) })
         s.gestures = conductor.gestures

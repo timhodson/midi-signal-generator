@@ -322,6 +322,9 @@ final class AppModel {
         }
     }
 
+    /// Latest peak level per hosted channel (by instrument id) and "master".
+    func mixLevels() -> [String: Float] { session?.auHost?.levels() ?? [:] }
+
     /// Hosted synths this session loaded (a voice can only move to one of these).
     var hostedInstruments: [InstrumentConfig] { session?.scene.instruments ?? [] }
 

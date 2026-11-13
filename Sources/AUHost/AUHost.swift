@@ -14,7 +14,14 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
     public final class Instrument {
         public let config: InstrumentConfig
         public let unit: AVAudioUnit
+        /// The channel strip: EQ, then the fader/pan mixer, which also feeds the FX sends.
+        let eq = AVAudioUnitEQ(numberOfBands: 3)
         let mixer = AVAudioMixerNode()
+        /// One per FX bus (Mixer.buses), post-fader.
+        var sends: [AVAudioMixerNode] = []
+        var volume: Double
+        var muted = false
+        var soloed = false
         var midi: AUScheduleMIDIEventBlock?
         /// Param id -> plugin parameter.
         var parameters: [String: AUParameter] = [:]
@@ -39,11 +46,13 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
         enum Target {
             case preset, volume, pan
             case parameter(AUParameter)
+            case eqGain(Int), eqFrequency(Int), send(Int), mute, solo
         }
 
         init(config: InstrumentConfig, unit: AVAudioUnit) {
             self.config = config
             self.unit = unit
+            volume = config.volume
             presetNames = unit.auAudioUnit.factoryPresets?.map(\.name) ?? []
         }
 
@@ -56,8 +65,13 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
     private var changeCursor = 0
     public private(set) var instruments: [String: Instrument] = [:]
     public var log: (String) -> Void = { print($0) }
-    private let meterLock = NSLock()
+    let meterLock = NSLock()
     private var peak: Float = 0
+    var levelsByKey: [String: Float] = [:]
+    var buses: [FXBus] = []
+    var globalMixIDs: Set<String> = []
+    var mixerDirty = false
+    var reverbRoom = -1
 
     private init() {}
 
@@ -78,7 +92,7 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
             for c in 0..<Int(buffer.format.channelCount) {
                 for i in 0..<Int(buffer.frameLength) { p = max(p, abs(channels[c][i])) }
             }
-            self.meterLock.withLock { self.peak = max(self.peak, p) }
+            self.meterLock.withLock { self.peak = max(self.peak, p); self.levelsByKey["master"] = p }
         }
     }
 
@@ -122,14 +136,10 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
                 inst.presetIndex = i // applied once the engine runs; see below
             }
             host.engine.attach(unit)
-            host.engine.attach(inst.mixer)
-            host.engine.connect(unit, to: inst.mixer, format: nil)
-            host.engine.connect(inst.mixer, to: host.engine.mainMixerNode, format: nil)
-            inst.mixer.outputVolume = Float(config.volume)
-            inst.mixer.pan = Float(config.pan)
             host.instruments[config.id] = inst
         }
         if !configs.isEmpty {
+            host.buildMixer()
             host.installMeter()
             host.engine.prepare()
             try host.engine.start()
@@ -271,6 +281,8 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
             for (id, param) in inst.parameters { inst.targets[id] = .parameter(param) }
             for id in inst.targets.keys { instrumentByParam[id] = inst.config.id }
         }
+        registerMixerParams(in: store)
+        for inst in instruments.values { for id in inst.targets.keys { instrumentByParam[id] = inst.config.id } }
         changeCursor = store.changeCursor
     }
 
@@ -343,6 +355,10 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
         }
         let (ids, cursor) = store.changes(since: changeCursor)
         changeCursor = cursor
+        if mixerDirty || ids.contains(where: globalMixIDs.contains) {
+            mixerDirty = false
+            applyGlobalMix(store)
+        }
         for id in Set(ids) {
             guard let owner = instrumentByParam[id], let inst = instruments[owner],
                   let target = inst.targets[id], let v = changed(id, inst, store) else { continue }
@@ -352,9 +368,9 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
                 // The plugin updates its values asynchronously; adopt them a moment later.
                 inst.resyncAt = Date().addingTimeInterval(0.6)
                 log("♪ \(inst.config.id) preset → \(inst.presetNames[safe: Int(v)] ?? "?")")
-            case .volume: inst.mixer.outputVolume = Float(v)
             case .pan: inst.mixer.pan = Float(v)
             case .parameter(let param): param.setValue(AUValue(v), originator: inst.observerToken)
+            default: _ = applyMixer(target, v, inst)
             }
         }
     }

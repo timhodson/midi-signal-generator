@@ -126,3 +126,9 @@ its voice, two summary lines, an on/off light, pin and pop-out), and clicking a 
 group's settings underneath. The same `GroupPanel` view is used in its own window (`WindowGroup`
 for `PanelID`) and on the **Tabletop**, which lays pinned panels out in columns that fit the window
 (drag a card's handle onto another to reorder). Pins are saved per user in UserDefaults.
+
+The **Mixer** page is a desk for the hosted synths (`AUHost/Mixer.swift`): each synth runs
+EQ (low shelf, mid bell, high shelf) → channel mixer (fader, pan, mute/solo), which fans out to the
+master and to post-fader sends into a reverb bus and a tempo-synced delay bus. Every control is a
+param (`au.<id>.eqLow`, `au.<id>.sendReverb`, `mix.delay.beats`, `mix.master`…). Voices sent out over
+MIDI get a strip with a velocity trim and mute, since their audio is mixed on the device.

@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import Foundation
 import Testing
 @testable import AUHost
@@ -77,5 +78,40 @@ extension AUHostSyncTests {
         }
         #expect(store.value("au.j6.preset") == 95)
         #expect(host.instruments["j6"]?.unit.auAudioUnit.currentPreset?.number == 95)
+    }
+}
+
+/// The mixer graph, on Apple's built-in synth (always installed). No notes are played.
+@Suite(.serialized) struct MixerTests {
+    @MainActor @Test func channelStripsAndBusesAreWiredAndFollowParams() async throws {
+        NSApplication.shared.setActivationPolicy(.prohibited)
+        let host = try await AUHostSink.load([InstrumentConfig(id: "a", component: "DLSMusicDevice", outOfProcess: false),
+                                              InstrumentConfig(id: "b", component: "DLSMusicDevice", outOfProcess: false)])
+        defer { host.stop(tail: 0) }
+        let store = ParamStore()
+        store.register([ParamSpec("clock.bpm", kind: .continuous, range: 20...200, default: 60)])
+        host.registerParams(in: store)
+        try store.set("mix.master", 0) // keep it silent
+        try store.set("au.a.eqLow", -6)
+        try store.set("au.a.sendReverb", 0.5)
+        try store.set("mix.delay.beats", 0.5)
+        try store.set("au.b.solo", 1)
+        host.applyParams(store)
+
+        let a = try #require(host.instruments["a"]), b = try #require(host.instruments["b"])
+        // Dry to master plus one post-fader send per bus.
+        #expect(host.engine.outputConnectionPoints(for: a.mixer, outputBus: 0).count == 1 + Mixer.buses.count)
+        #expect(a.eq.bands[0].gain == -6)
+        #expect(a.sends[0].outputVolume == 0.5)
+        #expect(a.mixer.outputVolume == 0)              // not soloed while b is
+        #expect(b.mixer.outputVolume == Float(b.config.volume))
+        #expect(abs(((host.buses[1].effect as? AVAudioUnitDelay)?.delayTime ?? 0) - 0.5) < 1e-6) // 0.5 beats at 60 bpm
+        try store.set("clock.bpm", 120)
+        host.applyParams(store)
+        #expect(abs(((host.buses[1].effect as? AVAudioUnitDelay)?.delayTime ?? 0) - 0.25) < 1e-6)
+        try store.set("au.b.solo", 0)
+        try store.set("au.a.mute", 1)
+        host.applyParams(store)
+        #expect(a.mixer.outputVolume == 0 && b.mixer.outputVolume > 0)
     }
 }

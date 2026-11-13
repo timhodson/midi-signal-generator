@@ -8,6 +8,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
     case motifs = "Motifs"
     case voices = "Voices"
     case tabletop = "Tabletop"
+    case mixer = "Mixer"
     case instruments = "Instruments"
     case modulation = "Modulation"
 
@@ -22,6 +23,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
         case .motifs: "music.quarternote.3"
         case .voices: "arrow.triangle.branch"
         case .tabletop: "rectangle.3.group"
+        case .mixer: "slider.vertical.3"
         case .instruments: "pianokeys"
         case .modulation: "point.3.connected.trianglepath.dotted"
         }
@@ -76,6 +78,7 @@ struct ContentView: View {
         case .motifs: MotifsView()
         case .voices: TilePage(page: .voices)
         case .tabletop: TabletopView()
+        case .mixer: MixerView()
         case .instruments: InstrumentsView()
         case .modulation: ModulationView()
         }
