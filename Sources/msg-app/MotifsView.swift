@@ -6,6 +6,7 @@ import SwiftUI
 /// motif each one plays, and lets you design your own in scale steps (so they stay in key).
 struct MotifsView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.skin) private var skin
 
     enum Selection: Hashable {
         case design(String)
@@ -24,6 +25,7 @@ struct MotifsView: View {
         } else {
             HStack(spacing: 0) {
                 sidebar.frame(width: 300)
+                    .background { if skin == .studio { PanelBackground(cornerRadius: 0, shade: 0.6) } }
                 Divider()
                 ScrollView {
                     detail.padding(20).frame(maxWidth: .infinity, alignment: .leading)
@@ -394,6 +396,7 @@ extension AppModel {
 /// A tiny picture of a motif: one dot per step on a mini pitch range. Lit steps are sounding now.
 struct MotifThumb: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.skin) private var skin
     let notes: [(raw: Double?, played: Int?)]
     var active: Set<Int> = []
 
@@ -415,13 +418,15 @@ struct MotifThumb: View {
                         with: .color(lit ? .white : (inChord ? .orange : .yellow)))
             }
         }
-        .background(active.isEmpty ? Color.primary.opacity(0.06) : Color.orange.opacity(0.3), in: RoundedRectangle(cornerRadius: 4))
+        .background(active.isEmpty ? (skin == .studio ? Color.black.opacity(0.45) : Color.primary.opacity(0.06)) : Color.orange.opacity(0.3),
+                    in: RoundedRectangle(cornerRadius: 4))
     }
 }
 
 /// Every motif at a glance: your designs and every app heard. Click one to open it.
 struct MotifGallery: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.skin) private var skin
     let select: (MotifsView.Selection) -> Void
 
     var body: some View {
@@ -453,7 +458,13 @@ struct MotifGallery: View {
                 MotifThumb(notes: notes, active: active).frame(height: 44)
             }
             .padding(8)
-            .background(Color.primary.opacity(active.isEmpty ? 0.05 : 0.12), in: RoundedRectangle(cornerRadius: 8))
+            .background {
+                if skin == .studio {
+                    PanelBackground(cornerRadius: 8, shade: active.isEmpty ? 0.1 : 0)
+                } else {
+                    RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(active.isEmpty ? 0.05 : 0.12))
+                }
+            }
             .overlay(RoundedRectangle(cornerRadius: 8).stroke(active.isEmpty ? Color.clear : .orange, lineWidth: 1.5))
             .contentShape(RoundedRectangle(cornerRadius: 8))
         }

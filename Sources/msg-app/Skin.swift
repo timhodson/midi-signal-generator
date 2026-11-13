@@ -3,7 +3,7 @@ import SwiftUI
 
 /// How the app looks. "System" is plain macOS; "Studio" is the hardware-style skin (roadmap: a
 /// hardware-style skin), drawn in code over textures generated on the local ComfyUI (art/textures.md).
-/// Batch 1 applies it to the Mixer page only, to judge the look.
+/// Every page follows it: shared pieces (VisualCard, SkinBox, knobs, LED buttons) switch on `\.skin`.
 enum SkinStyle: String, CaseIterable, Identifiable {
     case system = "System", studio = "Studio"
     var id: String { rawValue }
@@ -185,6 +185,70 @@ struct LCDLines: View {
             }
         }
         .padding(.horizontal, 7).padding(.vertical, 5)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            if let img = Studio.lcd { Image(nsImage: img).resizable() } else { Color(red: 0.12, green: 0.15, blue: 0.12) }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 3))
+        .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(Color.black.opacity(0.75), lineWidth: 1.5))
+    }
+}
+
+// MARK: - Page-level pieces
+
+extension View {
+    /// Passes the skin down to a whole page and, in the studio skin, paints the panel behind it
+    /// (lists and scroll views drop their own background so the panel shows through).
+    func skinnedPage(_ skin: SkinStyle, shade: Double = 0.45) -> some View {
+        environment(\.skin, skin)
+            .scrollContentBackground(skin == .studio ? .hidden : .automatic)
+            .background { if skin == .studio { PanelBackground(cornerRadius: 0, shade: shade).ignoresSafeArea() } }
+    }
+}
+
+/// A titled box of controls: a GroupBox in the system look, an engraved panel section in the studio skin.
+struct SkinBox<Content: View>: View {
+    @Environment(\.skin) private var skin
+    var title: String?
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        if skin == .studio {
+            VStack(alignment: .leading, spacing: 8) {
+                if let title {
+                    Text(title.uppercased()).font(Studio.legend(11, weight: .bold)).tracking(1).foregroundStyle(Studio.label)
+                }
+                content
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(PanelBackground(cornerRadius: 8, shade: 0.2))
+        } else if let title {
+            GroupBox(title) { content }
+        } else {
+            GroupBox { content }
+        }
+    }
+}
+
+/// A small backlit readout: one big value and an optional detail line, like a synth's parameter display.
+struct LCDReadout: View {
+    let value: String
+    var detail: String?
+    var warn = false
+
+    var body: some View {
+        let ink = warn ? Color(red: 1, green: 0.45, blue: 0.4) : Studio.lcdText
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value).font(.system(size: 19, weight: .bold, design: .monospaced))
+                .foregroundStyle(ink).shadow(color: ink.opacity(0.55), radius: 3)
+                .lineLimit(1).minimumScaleFactor(0.6)
+            if let detail {
+                Text(detail).font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(ink.opacity(0.75)).lineLimit(1).truncationMode(.tail)
+            }
+        }
+        .padding(.horizontal, 9).padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             if let img = Studio.lcd { Image(nsImage: img).resizable() } else { Color(red: 0.12, green: 0.15, blue: 0.12) }

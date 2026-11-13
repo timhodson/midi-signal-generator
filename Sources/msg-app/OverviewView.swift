@@ -19,17 +19,17 @@ struct OverviewView: View {
                 if model.isRunning {
                     StatusCards()
                     if model.specsByID["macro.faithfulness"] != nil {
-                        GroupBox {
+                        SkinBox {
                             ParamRow(spec: model.specsByID["macro.faithfulness"]!,
                                      label: "Faithfulness  ·  0 tidy and musical — 1 raw sonification")
                         }
                     }
                     HStack(alignment: .top, spacing: 16) {
-                        GroupBox("Traffic") { TrafficChart().frame(height: 220) }
-                        GroupBox("Busiest apps") { TopApps().frame(height: 220) }
+                        SkinBox(title: "Traffic") { TrafficChart().frame(height: 220) }
+                        SkinBox(title: "Busiest apps") { TopApps().frame(height: 220) }
                             .frame(width: 320)
                     }
-                    GroupBox("Recent notes") { RecentNotes() }
+                    SkinBox(title: "Recent notes") { RecentNotes() }
                 } else {
                     NotRunningHint().frame(maxWidth: .infinity, minHeight: 300)
                 }
@@ -105,12 +105,27 @@ struct StatusCards: View {
 }
 
 struct Card: View {
+    @Environment(\.skin) private var skin
     let title: String
     let value: String
     var detail: String?
     var warn = false
 
     var body: some View {
+        if skin == .studio {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title.uppercased()).font(Studio.legend(10, weight: .bold)).tracking(1).foregroundStyle(Studio.label)
+                LCDReadout(value: value, detail: detail, warn: warn)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(PanelBackground(cornerRadius: 8, shade: 0.2))
+        } else {
+            plain
+        }
+    }
+
+    private var plain: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title).font(.caption).foregroundStyle(.secondary)
             Text(value).font(.title2.weight(.semibold)).monospacedDigit().lineLimit(1)

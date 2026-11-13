@@ -99,6 +99,7 @@ enum Snapshot {
         model.persistsLayout = false
         if let skin = arg("--skin").flatMap({ name in SkinStyle.allCases.first { $0.rawValue.lowercased() == name.lowercased() } }) {
             model.skin = skin
+            Self.skin = skin
         }
         model.pinned = [PanelID(page: .generators, group: "drums"), PanelID(page: .voices, group: "lead"),
                         PanelID(page: .generators, group: "pulse")]
@@ -156,9 +157,12 @@ enum Snapshot {
         NSApplication.shared.run()
     }
 
+    /// The skin for pieces rendered on their own (outside ContentView, which applies it per page).
+    static var skin = SkinStyle.system
+
     static func render(_ view: some View, to url: URL, size: NSSize = NSSize(width: 1280, height: 860)) async {
         // Offscreen capture doesn't draw the window background, so paint it in.
-        let host = NSHostingView(rootView: view.background(Color(nsColor: .windowBackgroundColor)))
+        let host = NSHostingView(rootView: view.skinnedPage(skin).background(Color(nsColor: .windowBackgroundColor)))
         let window = NSWindow(contentRect: NSRect(origin: NSPoint(x: -30_000, y: -30_000), size: size),
                               styleMask: [.titled, .resizable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false

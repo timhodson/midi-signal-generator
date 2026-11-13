@@ -59,7 +59,7 @@ struct ContentView: View {
             }
             .navigationSplitViewColumnWidth(min: 170, ideal: 190)
         } detail: {
-            detail(selection)
+            detail(selection).skinnedPage(model.skin)
         }
         .toolbar {
             ToolbarItemGroup {
@@ -71,7 +71,7 @@ struct ContentView: View {
                     ForEach(SkinStyle.allCases) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
-                .help("The look. Studio is the hardware-style skin (on the Mixer page so far).")
+                .help("The look. Studio is the hardware-style skin.")
                 Picker("Controls", selection: $model.useKnobs) {
                     Label("Knobs", systemImage: "dial.medium").tag(true)
                     Label("Sliders", systemImage: "slider.horizontal.3").tag(false)

@@ -20,6 +20,7 @@
 - [x] Mixer page: channel strips (EQ, reverb/delay sends, pan, mute/solo, fader, meter) for hosted synths, FX returns, master; MIDI voices get a velocity-trim strip
 - [x] Instruments as tiles; Studio skin batch 1 (generated panel, knob cap and LCD textures) on the Mixer, switchable in the toolbar
 - [x] Signal flow page (patchbay of signals → generators → voices → outputs, live cables, path highlighting); Studio skin on tiles, Tabletop, panel windows and Signal flow
+- [x] Studio skin on every page: Overview (LCD readouts), Modulation (a depth knob per route), Harmony and Quantise (engraved panel sections), Motifs
 - [x] Variation: randomise key, scale, progressions, motifs, registers (and optionally tempo, drums) by a deviation, by hand or every 5 min … 4 h, from home or drifting (ADR 0017); Save asks before overwriting a loaded scene
 - [ ] **Listen to it on the iPad** and tune the default and hosted scenes by ear (drums heard on an iPhone over Bluetooth MIDI: fine)
 

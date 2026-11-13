@@ -5,9 +5,40 @@ import SwiftUI
 /// The mod matrix: signal → parameter routes with live input values.
 struct ModulationView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.skin) private var skin
     @State private var adding = false
 
     var body: some View {
+        Group {
+            if skin == .studio { studio } else { list }
+        }
+        .navigationTitle("Modulation")
+        .sheet(isPresented: $adding) { AddRouteSheet() }
+    }
+
+    /// Studio: one engraved panel per route, like patch points on a modular's matrix.
+    private var studio: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 12) {
+                if !model.isRunning { NotRunningHint() }
+                HStack {
+                    Text("ROUTES · \(model.routes.count)").font(Studio.legend(12, weight: .bold)).tracking(1.5)
+                        .foregroundStyle(Studio.label)
+                    Spacer()
+                    Button { adding = true } label: { Label("Add Route", systemImage: "plus") }
+                        .disabled(!model.isRunning)
+                }
+                ForEach(Array(model.routes.enumerated()), id: \.offset) { i, route in
+                    SkinBox { RouteRow(index: i, route: route) }
+                }
+                Text("Depth is a fraction of the target's range. Adding or removing a route restarts the session.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            .padding(16)
+        }
+    }
+
+    private var list: some View {
         List {
             if !model.isRunning { NotRunningHint() }
             Section {
@@ -26,13 +57,12 @@ struct ModulationView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
-        .navigationTitle("Modulation")
-        .sheet(isPresented: $adding) { AddRouteSheet() }
     }
 }
 
 struct RouteRow: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.skin) private var skin
     let index: Int
     let route: ModRoute
 
@@ -58,17 +88,35 @@ struct RouteRow: View {
                 Text("\(route.scale.rawValue) \(Format.rate(route.inputMin))…\(Format.rate(route.inputMax)), curve \(route.curve.formatted()), smooth \(route.smoothing.formatted()) s")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            HStack(spacing: 12) {
-                Sparkline(title: "input, as the route sees it (0–1)",
-                          points: (model.traces[route.source] ?? []).map { ($0.time, route.normalise($0.value)) },
-                          domain: 0...1, color: .teal)
-                Sparkline(title: "\(target?.label ?? route.target), base + modulation",
-                          points: (model.traces["param:" + route.target] ?? []).map { ($0.time, $0.value) },
-                          domain: target.map { $0.range } ?? 0...1, color: .orange,
-                          baseline: model.base(route.target))
+            let depth = model.specsByID["mod.\(index).amount"]
+            if skin == .studio {
+                // Studio: the depth is a bipolar knob beside the two traces it connects.
+                HStack(alignment: .center, spacing: 16) {
+                    HStack(spacing: 12) {
+                        Sparkline(title: "input, as the route sees it (0–1)",
+                                  points: (model.traces[route.source] ?? []).map { ($0.time, route.normalise($0.value)) },
+                                  domain: 0...1, color: .teal)
+                        Sparkline(title: "\(target?.label ?? route.target), base + modulation",
+                                  points: (model.traces["param:" + route.target] ?? []).map { ($0.time, $0.value) },
+                                  domain: target.map { $0.range } ?? 0...1, color: .orange,
+                                  baseline: model.base(route.target))
+                    }
+                    .frame(height: 70)
+                    if let depth { ParamKnob(spec: depth, label: "Depth", color: .orange, size: 58).frame(width: 90) }
+                }
+            } else {
+                HStack(spacing: 12) {
+                    Sparkline(title: "input, as the route sees it (0–1)",
+                              points: (model.traces[route.source] ?? []).map { ($0.time, route.normalise($0.value)) },
+                              domain: 0...1, color: .teal)
+                    Sparkline(title: "\(target?.label ?? route.target), base + modulation",
+                              points: (model.traces["param:" + route.target] ?? []).map { ($0.time, $0.value) },
+                              domain: target.map { $0.range } ?? 0...1, color: .orange,
+                              baseline: model.base(route.target))
+                }
+                .frame(height: 70)
+                if let depth { ParamRow(spec: depth, label: "Depth") }
             }
-            .frame(height: 70)
-            if let depth = model.specsByID["mod.\(index).amount"] { ParamRow(spec: depth, label: "Depth") }
         }
         .padding(.vertical, 4)
     }

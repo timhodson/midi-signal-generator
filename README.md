@@ -35,7 +35,7 @@ The drummer (ADR 0016) plays General MIDI drums; hosted scenes get Apple's built
 The Mac app (`msg-app`) shows every parameter as a control, and next to each group it shows what that group is doing right
 now. The sidebar follows the signal path: **At a glance** → **Signals** → **Music** → **Sound**. The toolbar switches
 between the plain **System** look and the hardware-style **Studio** skin, and has Save, Record and the
-Randomise dice. The screenshots below were taken with synthetic traffic and the master turned down.
+Randomise dice. The screenshots below use the Studio skin, with synthetic traffic and the master turned down.
 
 ### At a glance
 

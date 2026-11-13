@@ -203,6 +203,8 @@ struct ParamSection: View {
     var accessory: (String) -> AnyView? = { _ in nil }
     @State private var filter = ""
 
+    @Environment(\.skin) private var skin
+
     var body: some View {
         let specs = model.specs(withPrefix: prefixes).filter { s in
             filter.isEmpty || s.id.localizedCaseInsensitiveContains(filter) || s.label.localizedCaseInsensitiveContains(filter)
@@ -211,54 +213,82 @@ struct ParamSection: View {
         let groups = Dictionary(grouping: specs) { groupKey($0.id) }
         let order = specs.map { groupKey($0.id) }.reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
 
-        List {
-            if model.specs.isEmpty {
-                NotRunningHint()
-            } else if let hero, filter.isEmpty {
-                Section { hero.listRowSeparator(.hidden).padding(.vertical, 6) }
-            }
-            ForEach(order, id: \.self) { group in
-                Section {
-                    if let first = groups[group]?.first,
-                       let doc = ParamDocs.description(for: groupPrefix(first.id)),
-                       group == order.first(where: { g in groups[g]?.first.flatMap { ParamDocs.description(for: groupPrefix($0.id)) } == doc }) {
-                        Text(doc).font(.callout).foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.vertical, 4)
-                    }
-                    if filter.isEmpty, let extra = accessory(group) { extra.listRowSeparator(.hidden).padding(.bottom, 6) }
-                    let all = groups[group] ?? []
-                    // Params a visual above can set live in an Advanced drawer (unless you're searching).
-                    let advanced = filter.isEmpty ? all.filter { VisualControls.covers($0.id) } : []
-                    let shown = all.filter { !advanced.contains($0) }
-                    if model.useKnobs, filter.isEmpty {
-                        // Switches as LED buttons, pickers as rows, everything continuous as a knob grid.
-                        let toggles = shown.filter { $0.kind == .toggle }
-                        if !toggles.isEmpty {
-                            HStack(spacing: 10) {
-                                ForEach(toggles, id: \.id) { LEDButton(spec: $0, color: Pages.color(forGroup: group)) }
-                                Spacer()
+        Group {
+            if skin == .studio {
+                // Studio: each group is an engraved panel section on the page's panel.
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 14) {
+                        if model.specs.isEmpty {
+                            NotRunningHint()
+                        } else if let hero, filter.isEmpty {
+                            hero
+                        }
+                        ForEach(order, id: \.self) { group in
+                            SkinBox(title: Self.title(group)) {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    groupContent(group, groups: groups, order: order)
+                                }
                             }
-                            .listRowSeparator(.hidden)
                         }
-                        ForEach(shown.filter { $0.kind == .choice }, id: \.id) { ParamRow(spec: $0) }
-                        let knobs = shown.filter(\.isKnob)
-                        if !knobs.isEmpty {
-                            KnobGrid(specs: knobs, color: Pages.color(forGroup: group)).listRowSeparator(.hidden)
+                    }
+                    .padding(16)
+                }
+            } else {
+                List {
+                    if model.specs.isEmpty {
+                        NotRunningHint()
+                    } else if let hero, filter.isEmpty {
+                        Section { hero.listRowSeparator(.hidden).padding(.vertical, 6) }
+                    }
+                    ForEach(order, id: \.self) { group in
+                        Section {
+                            groupContent(group, groups: groups, order: order)
+                        } header: {
+                            Text(Self.title(group)).font(.headline)
                         }
-                    } else {
-                        ForEach(shown, id: \.id) { ParamRow(spec: $0) }
                     }
-                    if !advanced.isEmpty {
-                        AdvancedDrawer(specs: advanced)
-                    }
-                } header: {
-                    Text(Self.title(group)).font(.headline)
                 }
             }
         }
         .searchable(text: $filter, placement: .toolbar, prompt: "Filter \(title.lowercased())")
         .navigationTitle(title)
+    }
+
+    /// One group's description, extra visual and controls (rows in a list, or stacked in a panel).
+    @ViewBuilder private func groupContent(_ group: String, groups: [String: [ParamSpec]], order: [String]) -> some View {
+        if let first = groups[group]?.first,
+           let doc = ParamDocs.description(for: groupPrefix(first.id)),
+           group == order.first(where: { g in groups[g]?.first.flatMap { ParamDocs.description(for: groupPrefix($0.id)) } == doc }) {
+            Text(doc).font(.callout).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, 4)
+        }
+        if filter.isEmpty, let extra = accessory(group) { extra.listRowSeparator(.hidden).padding(.bottom, 6) }
+        let all = groups[group] ?? []
+        // Params a visual above can set live in an Advanced drawer (unless you're searching).
+        let advanced = filter.isEmpty ? all.filter { VisualControls.covers($0.id) } : []
+        let shown = all.filter { !advanced.contains($0) }
+        if model.useKnobs, filter.isEmpty {
+            // Switches as LED buttons, pickers as rows, everything continuous as a knob grid.
+            let toggles = shown.filter { $0.kind == .toggle }
+            if !toggles.isEmpty {
+                HStack(spacing: 10) {
+                    ForEach(toggles, id: \.id) { LEDButton(spec: $0, color: Pages.color(forGroup: group)) }
+                    Spacer()
+                }
+                .listRowSeparator(.hidden)
+            }
+            ForEach(shown.filter { $0.kind == .choice }, id: \.id) { ParamRow(spec: $0) }
+            let knobs = shown.filter(\.isKnob)
+            if !knobs.isEmpty {
+                KnobGrid(specs: knobs, color: Pages.color(forGroup: group)).listRowSeparator(.hidden)
+            }
+        } else {
+            ForEach(shown, id: \.id) { ParamRow(spec: $0) }
+        }
+        if !advanced.isEmpty {
+            AdvancedDrawer(specs: advanced)
+        }
     }
 }
 
