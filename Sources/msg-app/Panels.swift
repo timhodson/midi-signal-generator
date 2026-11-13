@@ -2,19 +2,30 @@ import AppKit
 import Engine
 import Music
 import Params
+import Router
 import SwiftUI
 
 // MARK: - Panels: one group of settings (a generator, a voice), shown as a tile, expanded, in its own window or on the tabletop
 
 enum PanelPage: String, Codable, CaseIterable, Hashable {
-    case generators, voices
+    case generators, voices, instruments
 
     var title: String { rawValue.capitalized }
-    var prefixes: [String] { self == .generators ? ["gen.", "activity."] : ["voice."] }
+    var prefixes: [String] {
+        switch self {
+        case .generators: ["gen.", "activity."]
+        case .voices: ["voice."]
+        case .instruments: ["au."]
+        }
+    }
     var groupComponent: Int { 1 }
 
     @MainActor func accessory(_ group: String) -> AnyView? {
-        self == .generators ? Pages.generatorAccessory(group) : Pages.voiceAccessory(group)
+        switch self {
+        case .generators: Pages.generatorAccessory(group)
+        case .voices: Pages.voiceAccessory(group)
+        case .instruments: nil
+        }
     }
 }
 
@@ -38,6 +49,7 @@ enum Panels {
 
     /// The page's groups in registration order.
     static func groups(_ page: PanelPage, model: AppModel) -> [String] {
+        if page == .instruments { return model.hostedInstruments.map(\.id) }
         let groups = model.specs(withPrefix: page.prefixes).map { groupKey($0.id, component: page.groupComponent) }
             .reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
         guard page == .voices else { return groups }
@@ -50,14 +62,24 @@ enum Panels {
     }
 
     static func title(_ panel: PanelID) -> String {
-        panel.page == .voices ? "\(panel.group.capitalized) voice" : ParamSection.title(panel.group)
+        switch panel.page {
+        case .voices: "\(panel.group.capitalized) voice"
+        case .instruments: panel.group
+        case .generators: ParamSection.title(panel.group)
+        }
     }
 
-    static func color(_ panel: PanelID) -> Color { Pages.color(forGroup: panel.group) }
+    static func color(_ panel: PanelID, model: AppModel) -> Color {
+        if panel.page == .instruments, let role = role(panel, model: model) { return RoleStyle.color(role) }
+        return Pages.color(forGroup: panel.group)
+    }
 
     /// The voice whose notes this panel makes or carries, if any.
     static func role(_ panel: PanelID, model: AppModel) -> String? {
         if panel.page == .voices { return panel.group }
+        if panel.page == .instruments {
+            return model.scene.voices.first { $0.destination == InstrumentConfig.destinationPrefix + panel.group }?.role
+        }
         if panel.group == "packets" {
             let i = Int(model.base("gen.packets.role"))
             return PacketGenerator.roles.indices.contains(i) ? PacketGenerator.roles[i] : "pulse"
@@ -69,15 +91,41 @@ enum Panels {
         switch panel.page {
         case .generators: panel.group == "activity" ? nil : "gen.\(panel.group).enabled"
         case .voices: "voice.\(panel.group).enabled"
+        case .instruments: nil
         }
+    }
+
+    /// On/off for a tile's light: the enabled switch, or for a hosted synth its mixer mute (inverted).
+    static func isOn(_ panel: PanelID, model: AppModel) -> Bool? {
+        if panel.page == .instruments {
+            let id = "au.\(panel.group).mute"
+            return model.specsByID[id] == nil ? nil : model.effective(id) < 0.5
+        }
+        guard let id = enabledParam(panel), model.specsByID[id] != nil else { return nil }
+        return model.effective(id) >= 0.5
+    }
+
+    static func setOn(_ panel: PanelID, _ on: Bool, model: AppModel) {
+        if panel.page == .instruments { model.set("au.\(panel.group).mute", on ? 0 : 1); return }
+        if let id = enabledParam(panel) { model.set(id, on ? 1 : 0) }
     }
 
     /// Two short lines: what it's doing now.
     static func summary(_ panel: PanelID, model: AppModel) -> [String] {
         guard let s = model.status else { return ["Not running"] }
         let now = s.time
-        if let id = enabledParam(panel), model.specsByID[id] != nil, model.effective(id) < 0.5 { return ["Switched off"] }
+        if isOn(panel, model: model) == false { return [panel.page == .instruments ? "Muted in the mixer" : "Switched off"] }
         switch (panel.page, panel.group) {
+        case (.instruments, let id):
+            let inst = model.hostedInstruments.first { $0.id == id }
+            let preset = model.specsByID["au.\(id).preset"].map { spec in
+                spec.options.indices.contains(Int(model.base(spec.id))) ? spec.options[Int(model.base(spec.id))].trimmingCharacters(in: .whitespaces) : "?"
+            }
+            let roles = model.scene.voices.filter { $0.destination == InstrumentConfig.destinationPrefix + id }.map(\.role)
+            let peak = Double(model.mixLevels()[id] ?? 0)
+            let level = peak > 0.001 ? String(format: " · %.0f dB", 20 * log10(peak)) : ""
+            return ["\(inst?.component ?? id)\(preset.map { " · \($0)" } ?? "")",
+                    (roles.isEmpty ? "plays no voices" : "plays " + roles.joined(separator: ", ")) + level]
         case (.generators, "activity"):
             let recent = s.apps.filter { ($0.lastWake ?? -.infinity) > now - 60 }.count
             return ["Wakes above \(Format.rate(model.effective("activity.threshold")))", "\(recent) app\(recent == 1 ? "" : "s") woke in the last minute"]
@@ -116,7 +164,15 @@ struct GroupPanel: View {
         let all = Panels.specs(panel, model: model).filter { s in
             filter.isEmpty || s.id.localizedCaseInsensitiveContains(filter) || s.help.localizedCaseInsensitiveContains(filter)
         }
-        let color = Panels.color(panel)
+        let color = Panels.color(panel, model: model)
+        if panel.page == .instruments, let config = model.hostedInstruments.first(where: { $0.id == panel.group }) {
+            InstrumentPanel(config: config)
+        } else {
+            controls(all, color)
+        }
+    }
+
+    @ViewBuilder private func controls(_ all: [ParamSpec], _ color: Color) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             if showDoc, let first = all.first,
                let doc = ParamDocs.description(for: Panels.groupPrefix(first.id, component: panel.page.groupComponent)) {
@@ -154,7 +210,7 @@ struct PanelHeader: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            RoundedRectangle(cornerRadius: 2).fill(Panels.color(panel)).frame(width: 12, height: 12)
+            RoundedRectangle(cornerRadius: 2).fill(Panels.color(panel, model: model)).frame(width: 12, height: 12)
             Text(Panels.title(panel)).font(.title3.weight(.semibold))
             Spacer()
             PinButton(panel: panel)
@@ -178,7 +234,7 @@ struct PinButton: View {
         let pinned = model.pinned.contains(panel)
         Button { model.togglePin(panel) } label: { Image(systemName: pinned ? "pin.fill" : "pin") }
             .buttonStyle(.borderless)
-            .foregroundStyle(pinned ? Panels.color(panel) : .secondary)
+            .foregroundStyle(pinned ? Panels.color(panel, model: model) : .secondary)
             .help(pinned ? "Remove from the Tabletop" : "Pin to the Tabletop")
     }
 }
@@ -201,6 +257,10 @@ struct TilePage: View {
         Group {
             if model.specs.isEmpty {
                 NotRunningHint()
+            } else if page == .instruments, model.hostedInstruments.isEmpty {
+                ContentUnavailableView(
+                    "No hosted synths in this scene", systemImage: "pianokeys",
+                    description: Text("Open a scene with instruments (e.g. scenes/audiokit-hosted.json), or point a voice at a hosted synth."))
             } else {
                 let groups = Panels.groups(page, model: model)
                 let matching = filter.isEmpty ? groups : groups.filter { g in
@@ -250,20 +310,20 @@ struct PanelTile: View {
     let action: () -> Void
 
     var body: some View {
-        let color = Panels.color(panel)
+        let color = Panels.color(panel, model: model)
         let role = Panels.role(panel, model: model)
-        let enabledID = Panels.enabledParam(panel).flatMap { model.specsByID[$0] != nil ? $0 : nil }
-        let on = enabledID.map { model.effective($0) >= 0.5 } ?? true
+        let state = Panels.isOn(panel, model: model)
+        let on = state ?? true
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 Button {
-                    if let enabledID { model.set(enabledID, on ? 0 : 1) }
+                    Panels.setOn(panel, !on, model: model)
                 } label: {
                     Circle().fill(on ? color : Color.secondary.opacity(0.4)).frame(width: 10, height: 10)
                         .shadow(color: on ? color : .clear, radius: 3)
                 }
-                .buttonStyle(.plain).disabled(enabledID == nil)
-                .help(enabledID == nil ? "" : on ? "Switch off" : "Switch on")
+                .buttonStyle(.plain).disabled(state == nil)
+                .help(state == nil ? "" : panel.page == .instruments ? (on ? "Mute in the mixer" : "Unmute") : on ? "Switch off" : "Switch on")
                 Text(Panels.title(panel)).font(.headline).lineLimit(1)
                 Spacer(minLength: 4)
                 PinButton(panel: panel)
@@ -394,7 +454,7 @@ struct TabletopCard: View {
         }
         .padding(14)
         .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(targeted ? Panels.color(panel) : .clear, lineWidth: 2))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(targeted ? Panels.color(panel, model: model) : .clear, lineWidth: 2))
         .dropDestination(for: String.self) { items, _ in
             guard let id = items.first else { return false }
             model.movePin(id, before: panel)

@@ -79,7 +79,7 @@ struct ContentView: View {
         case .voices: TilePage(page: .voices)
         case .tabletop: TabletopView()
         case .mixer: MixerView()
-        case .instruments: InstrumentsView()
+        case .instruments: TilePage(page: .instruments)
         case .modulation: ModulationView()
         }
     }

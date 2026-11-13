@@ -2,31 +2,8 @@ import Params
 import Router
 import SwiftUI
 
-struct InstrumentsView: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        let instruments = model.session?.scene.instruments ?? model.scene.instruments
-        Group {
-            if instruments.isEmpty {
-                ContentUnavailableView(
-                    "No hosted synths in this scene", systemImage: "pianokeys",
-                    description: Text("Open a scene with instruments (e.g. scenes/audiokit-hosted.json), or add an \"instruments\" list to a scene and point voices at \"au:<id>\"."))
-            } else if !model.isRunning {
-                NotRunningHint()
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 16) {
-                        ForEach(instruments, id: \.id) { InstrumentPanel(config: $0) }
-                    }
-                    .padding(20)
-                }
-            }
-        }
-        .navigationTitle("Instruments")
-    }
-}
-
+/// One hosted synth: its voices, preset, volume/pan, editor window and every plugin parameter.
+/// Shown when its tile on the Instruments page is opened (see Panels.swift).
 struct InstrumentPanel: View {
     @Environment(AppModel.self) private var model
     let config: InstrumentConfig

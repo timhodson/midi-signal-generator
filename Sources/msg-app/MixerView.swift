@@ -251,6 +251,7 @@ struct Fader: View {
                 }
                 .frame(width: 40, height: height)
                 Text(label(v)).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                    .lineLimit(1).fixedSize().frame(width: 56)
             }
             .help("\(spec.help) Double-click to reset.")
         }
@@ -278,8 +279,10 @@ struct LevelMeter: View {
                         .mask(alignment: .bottom) { Rectangle().frame(height: height * fill) }
                 }
                 .frame(width: 8, height: height)
+                .frame(width: 26)
+                // Fixed width: the number changing from "-41" to "-6" mustn't shift the fader beside it.
                 Text(db > -60 ? String(format: "%.0f", db) : "").font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
-                    .frame(height: 14)
+                    .frame(width: 26, height: 14)
             }
         }
     }
