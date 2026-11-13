@@ -18,6 +18,7 @@
 - [x] Destination picker per voice in the app: virtual, network, hosted, Bluetooth / USB / network / IAC / app destinations (incl. offline), live switching, Bluetooth MIDI pairing panel
 - [x] Tile pages for Generators and Voices (live tile per group, click to expand one), pop-out windows, a Tabletop of pinned panels
 - [x] Mixer page: channel strips (EQ, reverb/delay sends, pan, mute/solo, fader, meter) for hosted synths, FX returns, master; MIDI voices get a velocity-trim strip
+- [x] Instruments as tiles; Studio skin batch 1 (generated panel, knob cap and LCD textures) on the Mixer, switchable in the toolbar
 - [ ] **Listen to it on the iPad** and tune the default and hosted scenes by ear (drums heard on an iPhone over Bluetooth MIDI: fine)
 
 ## Next

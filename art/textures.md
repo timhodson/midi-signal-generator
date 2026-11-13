@@ -112,6 +112,9 @@ reflection, glare, fingerprints, scratches, perspective, bright green, neon, blu
 
 | Texture | File | Model | Seed | Steps / CFG | Notes |
 |---|---|---|---|---|---|
-| panel | | | | | |
-| knob-cap | | | | | |
-| lcd | | | | | |
+| panel | raw/panel-303-klein.png → panel.png | FLUX.2 klein 4B | 303 | 4 / 1 | flattened, desaturated, toned to #2B2B2D, made seamless |
+| knob-cap | raw/knob-cap-404-klein.png → knob-cap.png | FLUX.2 klein 4B | 404 | 4 / 1 | its sheen is kept: the app holds the cap still and turns only the pointer and arc |
+| lcd | raw/lcd-404-klein.png → lcd.png | FLUX.2 klein 4B | 404 | 4 / 1 | side strips trimmed, blotches softened, toned to #1F2620 |
+
+Processing: `~/AI/ComfyUI/current/.venv/bin/python -I art/tools/process_textures.py` (writes
+`art/textures/*.png` and copies them into `Sources/msg-app/Skin/`).

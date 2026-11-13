@@ -260,6 +260,13 @@ final class AppModel {
         setMotifDesigns(all)
     }
 
+    // MARK: Skin
+
+    /// The look (System or Studio). Saved per user.
+    var skin: SkinStyle = SkinStyle(rawValue: UserDefaults.standard.string(forKey: "skin") ?? "") ?? .system {
+        didSet { if persistsLayout { UserDefaults.standard.set(skin.rawValue, forKey: "skin") } }
+    }
+
     // MARK: Tabletop
 
     /// Panels pinned to the Tabletop, in order. Saved per user (not per scene).

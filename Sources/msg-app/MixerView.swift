@@ -16,13 +16,18 @@ struct MixerView: View {
             } else {
                 let hosted = model.hostedInstruments
                 let external = model.scene.voices.filter { !$0.destination.hasPrefix(InstrumentConfig.destinationPrefix) }
+                let explanation = hosted.isEmpty
+                    ? "This scene has no hosted synths, so there's no audio to mix in the app. Voices sent out over MIDI are mixed where they play; their strips trim velocity instead."
+                    : "Sends are after the fader, so pulling a fader down also quietens its reverb and echoes. Every knob and fader is a setting you can route traffic to in Modulation."
                 ScrollView([.horizontal, .vertical]) {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text(hosted.isEmpty
-                             ? "This scene has no hosted synths, so there's no audio to mix in the app. Voices sent out over MIDI are mixed where they play; their strips trim velocity instead."
-                             : "Sends are after the fader, so pulling a fader down also quietens its reverb and echoes. Every knob and fader is a setting you can route traffic to in Modulation.")
-                            .font(.callout).foregroundStyle(.secondary)
-                            .frame(maxWidth: 900, alignment: .leading)
+                        if model.skin == .studio {
+                            LCDScreen(lines: lcdLines).frame(maxWidth: 760).help(explanation)
+                        } else {
+                            Text(explanation)
+                                .font(.callout).foregroundStyle(.secondary)
+                                .frame(maxWidth: 900, alignment: .leading)
+                        }
                         HStack(alignment: .top, spacing: 8) {
                             ForEach(hosted, id: \.id) { ChannelStrip(instrument: $0) }
                             if !external.isEmpty {
@@ -40,15 +45,28 @@ struct MixerView: View {
                     .padding(16)
                 }
                 .defaultScrollAnchor(.topLeading)
+                .environment(\.skin, model.skin)
+                .background { if model.skin == .studio { PanelBackground(cornerRadius: 0, shade: 0.45).ignoresSafeArea() } }
             }
         }
         .navigationTitle("Mixer")
+    }
+
+    /// What the LCD shows: the scene, the musical state, and the latest reason a note played.
+    private var lcdLines: [String] {
+        guard let s = model.status else { return [model.scene.name] }
+        let chord = s.chordHistory.last?.name ?? s.chord.joined(separator: " ")
+        let why = s.recentNotes.last { $0.time <= s.time }.map { "\($0.role): \($0.why)" } ?? "waiting for notes"
+        return [model.session?.scene.name ?? model.scene.name,
+                "mood \(s.mood) · \(s.key) · chord \(chord) · \(Int(s.bpm.rounded())) bpm",
+                why]
     }
 }
 
 // MARK: - Strips
 
 private struct StripFrame<Content: View>: View {
+    @Environment(\.skin) private var skin
     let title: String
     var subtitle: String = ""
     var color: Color = .accentColor
@@ -58,8 +76,10 @@ private struct StripFrame<Content: View>: View {
     var body: some View {
         VStack(spacing: 8) {
             VStack(spacing: 2) {
-                Text(title.uppercased()).font(.caption.weight(.bold)).lineLimit(1)
-                Text(subtitle).font(.caption2).foregroundStyle(.secondary).lineLimit(2).multilineTextAlignment(.center)
+                Text(title.uppercased()).font(skin == .studio ? Studio.legend(12, weight: .bold) : .caption.weight(.bold))
+                    .tracking(skin == .studio ? 1 : 0).lineLimit(1)
+                Text(subtitle).font(skin == .studio ? Studio.legend(8, weight: .regular) : .caption2)
+                    .foregroundStyle(.secondary).lineLimit(2).multilineTextAlignment(.center)
                     .frame(height: 24, alignment: .top)
             }
             Rectangle().fill(color).frame(height: 3).clipShape(Capsule())
@@ -67,7 +87,9 @@ private struct StripFrame<Content: View>: View {
         }
         .padding(10)
         .frame(width: width)
-        .background(Color.primary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+        .background {
+            if skin == .studio { PanelBackground(cornerRadius: 8) } else { RoundedRectangle(cornerRadius: 10).fill(Color.primary.opacity(0.06)) }
+        }
     }
 }
 
@@ -93,7 +115,7 @@ struct ChannelStrip: View {
         let roles = model.scene.voices.filter { $0.destination == instrument.destination }.map(\.role)
         let color = roles.first.map { RoleStyle.color($0) } ?? .accentColor
         StripFrame(title: instrument.id, subtitle: "\(instrument.component)\(roles.isEmpty ? "" : " · " + roles.joined(separator: ", "))", color: color) {
-            Text("EQ").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+            SectionLegend(text: "EQ")
             Knob(id: "\(p).eqHigh", label: "High", color: color)
             HStack(spacing: 2) {
                 Knob(id: "\(p).eqMid", label: "Mid", color: color)
@@ -101,7 +123,7 @@ struct ChannelStrip: View {
             }
             Knob(id: "\(p).eqLow", label: "Low", color: color)
             Divider()
-            Text("SENDS").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+            SectionLegend(text: "SENDS")
             HStack(spacing: 2) {
                 Knob(id: "\(p).sendReverb", label: "Reverb", color: color)
                 Knob(id: "\(p).sendDelay", label: "Delay", color: color)
@@ -179,12 +201,22 @@ struct MasterStrip: View {
 /// A small latching button bound to a toggle param.
 struct ToggleChip: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.skin) private var skin
     let id: String
     let label: String
     let on: Color
 
     var body: some View {
         let isOn = model.effective(id) >= 0.5
+        if skin == .studio {
+            StudioLEDButton(label: label, on: isOn, color: on) { model.set(id, isOn ? 0 : 1) }
+                .help(model.specsByID[id]?.help ?? "")
+        } else {
+            chip(isOn)
+        }
+    }
+
+    private func chip(_ isOn: Bool) -> some View {
         Button { model.set(id, isOn ? 0 : 1) } label: {
             Text(label).font(.caption.weight(.bold)).frame(width: 30, height: 20)
                 .background(isOn ? on.opacity(0.85) : Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 4))
@@ -199,6 +231,7 @@ struct ToggleChip: View {
 /// other params move linearly.
 struct Fader: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.skin) private var skin
     let id: String
     var color: Color = .accentColor
     var height: CGFloat = 200
@@ -227,7 +260,9 @@ struct Fader: View {
                     let h = geo.size.height, travel = h - 22
                     let y = (1 - position(v, spec)) * travel
                     ZStack(alignment: .top) {
-                        Capsule().fill(Color.primary.opacity(0.18)).frame(width: 4)
+                        Capsule().fill(skin == .studio ? Color.black.opacity(0.8) : Color.primary.opacity(0.18))
+                            .frame(width: skin == .studio ? 5 : 4)
+                            .overlay(Capsule().stroke(Color.white.opacity(skin == .studio ? 0.08 : 0), lineWidth: 1))
                             .frame(maxHeight: .infinity).padding(.vertical, 11)
                         if isGain {
                             ForEach([0.0, -6, -12, -24, -48], id: \.self) { db in
@@ -250,7 +285,7 @@ struct Fader: View {
                     .onTapGesture(count: 2) { model.set(id, spec.defaultValue) }
                 }
                 .frame(width: 40, height: height)
-                Text(label(v)).font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+                Text(label(v)).font(skin == .studio ? Studio.legend(9) : .caption2.monospacedDigit()).foregroundStyle(.secondary)
                     .lineLimit(1).fixedSize().frame(width: 56)
             }
             .help("\(spec.help) Double-click to reset.")
@@ -284,6 +319,24 @@ struct LevelMeter: View {
                 Text(db > -60 ? String(format: "%.0f", db) : "").font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
                     .frame(width: 26, height: 14)
             }
+        }
+    }
+}
+
+/// "EQ", "SENDS": plain caption, or an engraved legend with rules in the studio skin.
+private struct SectionLegend: View {
+    @Environment(\.skin) private var skin
+    let text: String
+
+    var body: some View {
+        if skin == .studio {
+            HStack(spacing: 4) {
+                Rectangle().fill(Studio.label.opacity(0.3)).frame(height: 1)
+                Text(text).font(Studio.legend(9, weight: .bold)).tracking(1).foregroundStyle(Studio.label).fixedSize()
+                Rectangle().fill(Studio.label.opacity(0.3)).frame(height: 1)
+            }
+        } else {
+            Text(text).font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
         }
     }
 }

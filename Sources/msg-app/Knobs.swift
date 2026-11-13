@@ -7,6 +7,7 @@ import SwiftUI
 /// params such as pan; an orange dot marks the live value when modulation moves it.
 struct ParamKnob: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.skin) private var skin
     let spec: ParamSpec
     var label: String?
     var color: Color = .accentColor
@@ -49,6 +50,10 @@ struct ParamKnob: View {
             Control(value: binding, in: 0 ... 1, geometry: .verticalDrag(ySensitivity: 1.5),
                     onStarted: { dragging = true }, onEnded: { dragging = false }) { geo in
                 let d = min(geo.size.width, geo.size.height)
+                if skin == .studio {
+                    StudioKnobFace(position: p, origin: origin, modulated: abs(e - p) > 0.004 ? e : nil, color: color)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                } else {
                 ZStack {
                     Circle().trim(from: 0, to: Self.sweep)
                         .stroke(Color.primary.opacity(0.15), style: StrokeStyle(lineWidth: d / 10, lineCap: .round))
@@ -70,11 +75,23 @@ struct ParamKnob: View {
                         .foregroundStyle(abs(e - p) > 0.004 && !dragging ? Color.orange : .primary)
                 }
                 .frame(width: geo.size.width, height: geo.size.height)
+                }
             }
             .frame(width: size, height: size)
-            Text(label ?? (spec.label == spec.id ? ParamRow.shortLabel(spec.id) : spec.label))
-                .font(.caption).lineLimit(2).multilineTextAlignment(.center)
-                .frame(width: size + 34)
+            if skin == .studio {
+                // Hardware legends: the name in small caps; the value only while turning or modulated.
+                let shown = dragging || abs(e - p) > 0.004
+                Text(shown ? ParamRow.format(dragging ? base : effective, spec)
+                     : (label ?? (spec.label == spec.id ? ParamRow.shortLabel(spec.id) : spec.label)).uppercased())
+                    .font(Studio.legend(9)).tracking(0.5)
+                    .foregroundStyle(shown ? (dragging ? Color.white : .orange) : Studio.label)
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                    .frame(width: size + 24)
+            } else {
+                Text(label ?? (spec.label == spec.id ? ParamRow.shortLabel(spec.id) : spec.label))
+                    .font(.caption).lineLimit(2).multilineTextAlignment(.center)
+                    .frame(width: size + 34)
+            }
         }
         .help(spec.help)
     }

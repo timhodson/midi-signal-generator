@@ -57,7 +57,7 @@ let package = Package(
         .executableTarget(name: "msg-app", dependencies: [
             "Runtime", "Engine", "AUHost", "MIDIOut", "Music", "Params", "Router", "Sources",
             .product(name: "Controls", package: "Controls"),
-        ], exclude: ["Info.plist"], linkerSettings: [
+        ], exclude: ["Info.plist"], resources: [.copy("Skin")], linkerSettings: [
             // An embedded Info.plist, so macOS lets the unbundled app use Bluetooth (pairing
             // Bluetooth MIDI devices) and shows the reason.
             .unsafeFlags(["-Xlinker", "-sectcreate", "-Xlinker", "__TEXT", "-Xlinker", "__info_plist", "-Xlinker", appInfoPlist]),

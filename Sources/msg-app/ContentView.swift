@@ -46,6 +46,11 @@ struct ContentView: View {
         .toolbar {
             ToolbarItemGroup {
                 @Bindable var model = model
+                Picker("Skin", selection: $model.skin) {
+                    ForEach(SkinStyle.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .help("The look. Studio is the hardware-style skin (on the Mixer page so far).")
                 Picker("Controls", selection: $model.useKnobs) {
                     Label("Knobs", systemImage: "dial.medium").tag(true)
                     Label("Sliders", systemImage: "slider.horizontal.3").tag(false)

@@ -97,6 +97,9 @@ enum Snapshot {
     static func run(model: AppModel, directory: URL, seconds: Double, height: Double = 860) {
         model.forceVisualsActive = true
         model.persistsLayout = false
+        if let skin = arg("--skin").flatMap({ name in SkinStyle.allCases.first { $0.rawValue.lowercased() == name.lowercased() } }) {
+            model.skin = skin
+        }
         model.pinned = [PanelID(page: .generators, group: "drums"), PanelID(page: .voices, group: "lead"),
                         PanelID(page: .generators, group: "pulse")]
         setvbuf(stdout, nil, _IOLBF, 0)
