@@ -159,7 +159,7 @@ extension AUHostSink {
         let room = min(max(store.int("mix.reverb.room"), 0), Mixer.reverbRooms.count - 1)
         if room != reverbRoom { reverb.loadFactoryPreset(Mixer.reverbRooms[room].1); reverbRoom = room }
         buses[1].output.outputVolume = Float(store.value("mix.delay.return"))
-        let bpm = max(store.value("clock.bpm"), 1)
+        let bpm = store.specs["clock.bpm"] != nil ? max(store.value("clock.bpm"), 1) : 120 // no clock (e.g. a bare store in tests)
         delay.delayTime = min(store.value("mix.delay.beats") * 60 / bpm, 2)
         delay.feedback = Float(store.value("mix.delay.feedback") * 100)
         delay.lowPassCutoff = Float(store.value("mix.delay.tone"))
