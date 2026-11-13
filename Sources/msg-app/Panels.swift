@@ -379,6 +379,7 @@ struct PanelTile: View {
             .shadow(color: selected && skin == .studio ? color.opacity(0.8) : .clear, radius: 4))
         .contentShape(RoundedRectangle(cornerRadius: 10))
         .onTapGesture(perform: action)
+        .contextMenu { PanelContextMenu(panel: panel) }
     }
 }
 
@@ -444,11 +445,16 @@ struct TabletopView: View {
 
     var body: some View {
         Group {
-            if model.pinned.isEmpty {
-                ContentUnavailableView("Nothing on the tabletop yet", systemImage: "pin",
-                                       description: Text("Pin tiles on the Generators and Voices pages (the pin button) to lay them out here side by side."))
-            } else if model.specs.isEmpty {
+            if model.specs.isEmpty {
                 NotRunningHint()
+            } else if model.pinned.isEmpty {
+                ContentUnavailableView {
+                    Label("Nothing on the tabletop yet", systemImage: "pin")
+                } description: {
+                    Text("Add generators, voices and synths here to tweak them side by side. You can also right-click any tile (or a box in Signal flow) and choose Pin to Tabletop.")
+                } actions: {
+                    AddToTabletopMenu().fixedSize()
+                }
             } else {
                 GeometryReader { geo in
                     let columns = max(1, Int(geo.size.width / 540))
@@ -470,6 +476,9 @@ struct TabletopView: View {
         }
         .environment(\.skin, model.skin)
         .background { if model.skin == .studio { PanelBackground(cornerRadius: 0, shade: 0.45).ignoresSafeArea() } }
+        .toolbar {
+            ToolbarItem(placement: .navigation) { AddToTabletopMenu() }
+        }
         .navigationTitle("Tabletop")
     }
 }
@@ -495,10 +504,65 @@ struct TabletopCard: View {
             if skin == .studio { PanelBackground(cornerRadius: 10) } else { RoundedRectangle(cornerRadius: 12).fill(Color.primary.opacity(0.05)) }
         }
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(targeted ? Panels.color(panel, model: model) : .clear, lineWidth: 2))
+        .contextMenu { PanelContextMenu(panel: panel) }
         .dropDestination(for: String.self) { items, _ in
             guard let id = items.first else { return false }
             model.movePin(id, before: panel)
             return true
         } isTargeted: { targeted = $0 }
+    }
+}
+
+/// Pick what's on the tabletop: every generator, voice and hosted synth, ticked when pinned.
+struct AddToTabletopMenu: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Menu {
+            ForEach(PanelPage.allCases, id: \.self) { page in
+                let groups = Panels.groups(page, model: model)
+                if !groups.isEmpty {
+                    Section(page.title) {
+                        ForEach(groups, id: \.self) { g in
+                            let panel = PanelID(page: page, group: g)
+                            Button { model.togglePin(panel) } label: {
+                                if model.pinned.contains(panel) {
+                                    Label(Panels.title(panel), systemImage: "checkmark")
+                                } else {
+                                    Text(Panels.title(panel))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if !model.pinned.isEmpty {
+                Divider()
+                Button("Clear the tabletop", role: .destructive) { model.pinned = [] }
+            }
+        } label: {
+            Label("Add to Tabletop", systemImage: "plus")
+        }
+        .help("Add or remove generators, voices and synths on the tabletop")
+    }
+}
+
+/// Right-click actions for a tile, card or signal-flow box.
+struct PanelContextMenu: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
+    let panel: PanelID
+
+    var body: some View {
+        let pinned = model.pinned.contains(panel)
+        Button(pinned ? "Remove from Tabletop" : "Pin to Tabletop", systemImage: pinned ? "pin.slash" : "pin") {
+            model.togglePin(panel)
+        }
+        Button("Open in Its Own Window", systemImage: "macwindow.on.rectangle") { openWindow(value: panel) }
+        Divider()
+        Button("Show in Signal Flow", systemImage: "point.3.filled.connected.trianglepath.dotted") {
+            UserDefaults.standard.set(FlowGraph.id(panel), forKey: "flow.selected")
+            model.navigate = .flow
+        }
     }
 }
