@@ -58,6 +58,16 @@ See [ADR 0010](decisions/0010-hosted-audio-unit-instruments.md).
 If the destination warning says the session is disabled, step 2 hasn't taken effect yet.
 Restart `msg-spike` after enabling it.
 
+## Syncing arps, LFOs and delays (MIDI clock)
+
+The app sends MIDI clock (24 pulses a beat) to every external destination a voice plays on, with
+Start on a bar line and Stop when playback stops (Harmony → Clock; ADR 0018). In the iPad synth, set
+its clock / sync source to **external MIDI** (in AudioKit's apps: Settings → MIDI → sync to MIDI
+clock, or the arpeggiator's sync option); its arpeggiator and tempo-synced delay then follow the
+piece's tempo, including tempo that traffic or a variation moves. If it lost its place (it
+reconnected, or you stopped it), press **Restart on the next bar**. Hosted synths on the Mac follow
+the tempo without any setting.
+
 ## USB cable to the iPad
 
 This has lower latency than Wi-Fi. In Audio MIDI Setup → MIDI Studio, the iPad appears once it's plugged in and

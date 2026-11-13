@@ -150,3 +150,97 @@ import Params
         #expect(MotifGenerator.shape(for: "Safari", length: 6, range: 7, seed: 42) == MotifGenerator.shape(for: "Safari", length: 6, range: 7, seed: 42))
     }
 }
+
+@Suite struct ClockOutTests {
+    /// Run the clock from beat 0 in 5 ms ticks at `bpm` for `seconds`, as the engine does.
+    func run(_ c: inout ClockOut, seconds: Double, bpm: Double = 120, from: Double = 0,
+             clock: inout MusicalClock, destinations: Set<String> = ["ipad"], enabled: Bool = true,
+             transport: Bool = true) -> [ClockOut.Message] {
+        var out: [ClockOut.Message] = []
+        var t = from
+        while t < from + seconds - 1e-9 {
+            t += 0.005
+            let beats = clock.advance(to: t, bpm: bpm)
+            out += c.advance(beats: beats, clock: clock, destinations: destinations, enabled: enabled, transport: transport)
+        }
+        return out
+    }
+
+    @Test func twentyFourPulsesPerBeatOnTime() {
+        var c = ClockOut(), clock = MusicalClock()
+        let out = run(&c, seconds: 2.0, clock: &clock) // 4 beats at 120 bpm
+        let pulses = out.filter { $0.bytes == [0xF8] }
+        // Beat 0 is the first tick (0.005 s), so 2 s covers just under 4 beats: pulses 0…95.
+        #expect(pulses.count == 4 * 24)
+        #expect(abs((pulses.first?.time ?? 9) - clock.time(ofBeat: 0)) < 1e-9)
+        // Evenly spaced: 0.5 s per beat / 24.
+        let times = pulses.compactMap(\.time)
+        for (a, b) in zip(times, times.dropFirst()) { #expect(abs((b - a) - 0.5 / 24) < 1e-9) }
+        // Start once, on beat 0, before that beat's pulse.
+        #expect(out.filter { $0.bytes == [0xFA] }.count == 1)
+        #expect(out.first?.bytes == [0xFA])
+    }
+
+    @Test func newDestinationStartsOnTheNextBar() {
+        var c = ClockOut(), clock = MusicalClock()
+        _ = run(&c, seconds: 0.6, clock: &clock) // into beat 2
+        let out = run(&c, seconds: 2.0, from: 0.6, clock: &clock, destinations: ["ipad", "bt"])
+        // The newcomer gets clock straight away (to lock its tempo) but Start only at beat 4.
+        let start = out.first { $0.bytes == [0xFA] }
+        #expect(start?.destination == "bt")
+        #expect(abs((start?.time ?? 0) - clock.time(ofBeat: 4)) < 1e-9) // the next bar line
+        #expect(out.contains { $0.destination == "bt" && $0.bytes == [0xF8] && ($0.time ?? 9) < clock.time(ofBeat: 4) })
+        #expect(!out.contains { $0.destination == "ipad" && $0.bytes == [0xFA] })
+    }
+
+    @Test func droppedOrDisabledDestinationsGetStop() {
+        var c = ClockOut(), clock = MusicalClock()
+        _ = run(&c, seconds: 0.5, clock: &clock, destinations: ["ipad", "bt"])
+        let dropped = run(&c, seconds: 0.1, from: 0.5, clock: &clock, destinations: ["ipad"])
+        #expect(dropped.first == .init(destination: "bt", bytes: [0xFC], time: nil))
+        let off = run(&c, seconds: 0.1, from: 0.6, clock: &clock, enabled: false)
+        #expect(off == [.init(destination: "ipad", bytes: [0xFC], time: nil)])
+        #expect(c.targets.isEmpty)
+    }
+
+    @Test func pulsesOnlyWithoutTransport() {
+        var c = ClockOut(), clock = MusicalClock()
+        let out = run(&c, seconds: 1, clock: &clock, transport: false)
+        #expect(!out.contains { $0.bytes != [0xF8] })
+    }
+
+    @Test func noBurstAfterAStall() {
+        var c = ClockOut(), clock = MusicalClock()
+        _ = run(&c, seconds: 0.5, clock: &clock)
+        // The queue was blocked for 3 s: one big step.
+        let beats = clock.advance(to: 3.5, bpm: 120)
+        let out = c.advance(beats: beats, clock: clock, destinations: ["ipad"], enabled: true, transport: true,
+                            notBefore: 3.5 - 0.005)
+        #expect(out.filter { $0.bytes == [0xF8] }.count <= 1) // not the 6 beats' worth it missed
+    }
+
+    @Test func tempoChangesFollow() {
+        var c = ClockOut(), clock = MusicalClock()
+        _ = run(&c, seconds: 1, clock: &clock)
+        let out = run(&c, seconds: 1, bpm: 60, from: 1, clock: &clock)
+        let times = out.filter { $0.bytes == [0xF8] }.compactMap(\.time)
+        #expect(times.count >= 20)
+        #expect(abs((times[11] - times[10]) - 1.0 / 24) < 1e-9) // 60 bpm: 1 s a beat
+    }
+
+    @Test func restartSendsStopThenStartOnTheNextBar() {
+        var c = ClockOut(), clock = MusicalClock()
+        _ = run(&c, seconds: 0.3, clock: &clock)
+        #expect(c.restart() == [.init(destination: "ipad", bytes: [0xFC], time: nil)])
+        let out = run(&c, seconds: 2, from: 0.3, clock: &clock)
+        #expect(abs((out.first { $0.bytes == [0xFA] }?.time ?? 0) - clock.time(ofBeat: 4)) < 1e-9)
+    }
+}
+
+@Suite struct TransportTests {
+    @Test func beatAtAnotherTime() {
+        let s = TransportState(bpm: 120, beat: 8, uptimeNanos: 1_000_000_000, beatsPerBar: 4, playing: true)
+        #expect(abs(s.beat(atUptimeNanos: 1_500_000_000) - 9) < 1e-9)
+        #expect(abs(s.beat(atUptimeNanos: 750_000_000) - 7.5) < 1e-9) // before the anchor
+    }
+}

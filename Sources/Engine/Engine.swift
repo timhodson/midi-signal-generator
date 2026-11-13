@@ -28,6 +28,8 @@ public final class Engine: @unchecked Sendable {
     private let generators: [Generator]
     private var router: VoiceRouter
     private let scheduler: NoteScheduler
+    private let sink: MIDISink
+    private var clockOut = ClockOut()
     private let parameterisedSink: ParameterisedSink?
     private var quantiser = Quantiser()
     private var activity = ActivityTracker()
@@ -83,12 +85,14 @@ public final class Engine: @unchecked Sendable {
         generators = [DroneGenerator(), motif, PulseGenerator(), BassGenerator(), SubDroneGenerator(), packets, drums]
         router = VoiceRouter(voices: scene.voices)
         scheduler = NoteScheduler(sink: sink)
+        self.sink = sink
         parameterisedSink = sink as? ParameterisedSink
 
         params.register(Conductor.params)
         params.register(Quantiser.params)
         params.register(ActivityTracker.params)
         params.register(Variation.params)
+        params.register(ClockOut.params)
         for g in generators { params.register(g.params) }
         router.registerParams(in: params)
         parameterisedSink?.registerParams(in: params)
@@ -147,6 +151,9 @@ public final class Engine: @unchecked Sendable {
         queue.sync {
             timer?.cancel()
             timer = nil
+            send(clockOut.stopAll())
+            sink.transport(TransportState(bpm: clock.bpm, beat: clock.beat, uptimeNanos: uptime(now),
+                                          beatsPerBar: clock.beatsPerBar, playing: false))
             scheduler.panic()
             recorder?.close()
         }
@@ -166,6 +173,7 @@ public final class Engine: @unchecked Sendable {
         // scheduler holds notes before they're due.
         let horizon = t + Self.lookahead
         let beats = clock.advance(to: horizon, bpm: params.value("clock.bpm"))
+        tickClock(beats)
 
         // Fresh per-app data -> activations + mood.
         var activations: [Activation] = []
@@ -363,6 +371,33 @@ extension Engine {
         }
     }
 
+    // MARK: - Clock out
+
+    /// Engine time → the uptime clock CoreMIDI timestamps are made from.
+    private func uptime(_ t: Double) -> UInt64 { startTime &+ UInt64(max(t, 0) * 1e9) }
+
+    /// Every external MIDI destination an enabled voice plays on (hosted synths, "au:…", get the
+    /// tempo through their host musical context instead).
+    private var clockDestinations: Set<String> {
+        Set(router.voices.values.filter { !$0.destination.hasPrefix("au:") && params.bool("voice.\($0.role).enabled") }
+            .map(\.destination))
+    }
+
+    private func tickClock(_ beats: Range<Double>) {
+        send(clockOut.advance(beats: beats, clock: clock, destinations: clockDestinations,
+                              enabled: params.bool("clock.midiOut"), transport: params.bool("clock.transport"),
+                              notBefore: now - 0.005))
+        sink.transport(TransportState(bpm: clock.bpm, beat: clock.beat, uptimeNanos: uptime(clock.time),
+                                      beatsPerBar: clock.beatsPerBar, playing: true))
+    }
+
+    private func send(_ messages: [ClockOut.Message]) {
+        for m in messages { sink.sendRaw(destination: m.destination, m.bytes, atUptimeNanos: m.time.map(uptime)) }
+    }
+
+    /// Send Stop, then Start again on the next bar line, to every clocked destination. Call on `queue`.
+    public func restartClock() { send(clockOut.restart()) }
+
     fileprivate func status(at t: Double, harmony: HarmonyContext, total: Double) -> EngineStatus {
         var signals: [String: Double] = [:]
         for (id, keyed) in bus.streams {
@@ -398,7 +433,8 @@ extension Engine {
             root: harmony.root, scaleSteps: harmony.scaleSteps, chordSize: harmony.chordSize,
             apps: appInfos(), motifs: motif.designs, netEvents: netEvents, capture: capture,
             drums: drums.status(params: params),
-            variation: .init(log: variation.log, nextIn: nextVariationIn, pending: variation.pendingReason ?? (pendingHome ? "back home" : nil))
+            variation: .init(log: variation.log, nextIn: nextVariationIn, pending: variation.pendingReason ?? (pendingHome ? "back home" : nil)),
+            clock: .init(destinations: clockOut.targets.sorted(), started: clockOut.started.sorted())
         )
     }
 }

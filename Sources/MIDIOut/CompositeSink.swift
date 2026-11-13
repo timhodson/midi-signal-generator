@@ -48,6 +48,12 @@ public final class CompositeSink: ParameterisedSink {
 
     public func allNotesOff() { all.forEach { $0.allNotesOff() } }
 
+    public func sendRaw(destination: String, _ bytes: [UInt8], atUptimeNanos: UInt64?) {
+        sink(for: destination).sendRaw(destination: destination, bytes, atUptimeNanos: atUptimeNanos)
+    }
+
+    public func transport(_ state: TransportState) { all.forEach { $0.transport(state) } }
+
     public func registerParams(in store: ParamStore) {
         for case let s as ParameterisedSink in all { s.registerParams(in: store) }
     }

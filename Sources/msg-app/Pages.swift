@@ -19,6 +19,7 @@ enum Pages {
     }
 
     @MainActor static func harmonyAccessory(_ group: String) -> AnyView? {
+        if group == "clock" { return AnyView(ClockOutCard()) }
         guard group == "harmony" else { return nil }
         return AnyView(VStack(spacing: 12) {
             VisualCard(title: "Chords in this key",
@@ -143,6 +144,43 @@ struct VoiceRangeEditor: View {
             .frame(height: 70)
             PianoRoll(roles: [role], window: 12, ahead: 2, pitchRange: lo...max(hi, lo + 12), showChords: false, fps: 12)
                 .frame(height: 80)
+        }
+    }
+}
+
+/// Who gets MIDI clock, who is running in step, and a way to bring a synth back in step.
+struct ClockOutCard: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let info = model.status?.clock
+        let on = model.base("clock.midiOut") >= 0.5
+        VisualCard(title: "MIDI clock out",
+                   caption: "24 pulses a beat to every external MIDI destination a voice plays on, timestamped so they land exactly on the beat. Set the synth (or its arpeggiator / delay) to follow external MIDI clock. Hosted synths get the tempo and beat directly. Each destination gets Start on a bar line; if a synth loses its place (it reconnected, or you stopped it), restart it.") {
+            HStack(alignment: .center, spacing: 14) {
+                Circle().fill(on && !(info?.destinations.isEmpty ?? true) ? Color.green : Color.secondary.opacity(0.4))
+                    .frame(width: 9, height: 9)
+                VStack(alignment: .leading, spacing: 2) {
+                    if !on {
+                        Text("Off").foregroundStyle(.secondary)
+                    } else if let info, !info.destinations.isEmpty {
+                        Text(info.destinations.map { d in
+                            let name = DestinationPicker.label(d, model: model)
+                            return info.started.contains(d) || model.base("clock.transport") < 0.5 ? name : "\(name) (starts on the next bar)"
+                        }.joined(separator: " · "))
+                        Text(String(format: "%.1f bpm · %@", model.status?.bpm ?? 0,
+                                    model.base("clock.transport") >= 0.5 ? "clock with Start / Stop" : "clock pulses only"))
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        Text("No external MIDI voices: every voice plays a hosted synth, which follows the tempo without clock.")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+                Button { model.restartClock() } label: { Label("Restart on the next bar", systemImage: "arrow.counterclockwise") }
+                    .disabled(!on || (info?.started.isEmpty ?? true))
+                    .help("Send Stop now, then Start on the next bar line, so every clocked synth begins again on beat 1 with the piece.")
+            }
         }
     }
 }

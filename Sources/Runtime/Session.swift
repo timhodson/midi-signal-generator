@@ -235,6 +235,9 @@ public final class Session: @unchecked Sendable {
     /// Make what's playing the new home, from any thread.
     public func makeHome() { engine.queue.async { [engine] in engine.makeHome() } }
 
+    /// MIDI clock: Stop now, Start again on the next bar line, from any thread.
+    public func restartClock() { engine.queue.async { [engine] in engine.restartClock() } }
+
     /// Replace the edited drum grooves (live), from any thread.
     public func setGrooves(_ grooves: [DrumGroove]) {
         engine.queue.async { [engine] in engine.setGrooves(grooves) }

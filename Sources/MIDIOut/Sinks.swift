@@ -120,6 +120,36 @@ public final class CoreMIDISink: MIDISink, @unchecked Sendable {
         send(destination, .cc(UInt7(controller), value: .midi1(UInt7(value)), channel: UInt4(channel)))
     }
 
+    /// Raw bytes with a CoreMIDI timestamp, so clock pulses land exactly on time however the
+    /// engine's tick falls. Goes straight to CoreMIDI: swift-midi-io's own send has no timestamp.
+    public func sendRaw(destination: String, _ bytes: [UInt8], atUptimeNanos: UInt64?) {
+        guard !bytes.isEmpty, bytes.count <= 256 else { return }
+        let stamp: MIDITimeStamp = atUptimeNanos.map(Self.hostTime(uptimeNanos:)) ?? 0
+        var list = MIDIPacketList()
+        let size = MemoryLayout<MIDIPacketList>.size
+        withUnsafeMutablePointer(to: &list) { ptr in
+            let packet = MIDIPacketListInit(ptr)
+            guard MIDIPacketListAdd(ptr, size, packet, stamp, bytes.count, bytes) != nil else { return }
+            if destination == Self.virtualDestination {
+                if let source = manager.managedOutputs[destination]?.coreMIDIOutputPortRef { MIDIReceived(source, ptr) }
+            } else if let conn = manager.managedOutputConnections[destination], let port = conn.coreMIDIOutputPortRef {
+                for endpoint in conn.coreMIDIInputEndpointRefs { MIDISend(port, endpoint, ptr) }
+            }
+        }
+    }
+
+    private static let timebase: mach_timebase_info_data_t = {
+        var info = mach_timebase_info_data_t()
+        mach_timebase_info(&info)
+        return info
+    }()
+
+    /// `DispatchTime` uptime nanoseconds → mach host ticks (CoreMIDI timestamps).
+    static func hostTime(uptimeNanos: UInt64) -> MIDITimeStamp {
+        let tb = timebase
+        return MIDITimeStamp((Double(uptimeNanos) * Double(tb.denom) / Double(tb.numer)).rounded())
+    }
+
     public func allNotesOff() {
         for d in destinations {
             for ch in 0..<16 {

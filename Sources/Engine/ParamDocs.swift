@@ -5,7 +5,7 @@ import Music
 /// Keys are id prefixes; the longest matching prefix wins.
 public enum ParamDocs {
     public static let groups: [String: String] = [
-        "clock": "Tempo of the grid that notes snap to and chords are counted in.",
+        "clock": "Tempo of the grid that notes snap to and chords are counted in, and the MIDI clock that lets external synths follow it.",
         "harmony": "The key, scale and chords. Everything melodic is bent towards these, so changing scale re-colours the whole piece at once.",
         "conductor": """
             The conductor turns overall traffic into a MOOD, and each mood plays its own chord progression \

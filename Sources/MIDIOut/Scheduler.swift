@@ -8,6 +8,41 @@ public protocol MIDISink: AnyObject {
     func controlChange(destination: String, channel: Int, controller: Int, value: Int)
     /// CC 123 on every channel of every destination this sink knows about.
     func allNotesOff()
+    /// Raw bytes (MIDI clock, Start, Stop, song position), delivered at `uptimeNanos` (the
+    /// `DispatchTime` uptime clock) or as soon as possible when nil. Sinks without real MIDI
+    /// ports ignore it.
+    func sendRaw(destination: String, _ bytes: [UInt8], atUptimeNanos: UInt64?)
+    /// Where the music is: tempo, beat and whether it's playing. Hosted instruments read this
+    /// as the host's musical context, so their arpeggiators and tempo-synced effects follow.
+    func transport(_ state: TransportState)
+}
+
+extension MIDISink {
+    public func sendRaw(destination: String, _ bytes: [UInt8], atUptimeNanos: UInt64?) {}
+    public func transport(_ state: TransportState) {}
+}
+
+/// The engine's beat clock at one instant, for hosted instruments.
+public struct TransportState: Sendable, Equatable {
+    public var bpm: Double
+    /// Beat position at `uptimeNanos`.
+    public var beat: Double
+    public var uptimeNanos: UInt64
+    public var beatsPerBar: Int
+    public var playing: Bool
+
+    public init(bpm: Double, beat: Double, uptimeNanos: UInt64, beatsPerBar: Int, playing: Bool) {
+        self.bpm = bpm
+        self.beat = beat
+        self.uptimeNanos = uptimeNanos
+        self.beatsPerBar = beatsPerBar
+        self.playing = playing
+    }
+
+    /// The beat at another instant, at this tempo.
+    public func beat(atUptimeNanos t: UInt64) -> Double {
+        beat + (Double(Int64(bitPattern: t &- uptimeNanos)) / 1e9) * bpm / 60
+    }
 }
 
 /// Holds future note-ons, note-offs and CCs, and fires them when due. Keeps a ledger of

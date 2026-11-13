@@ -23,7 +23,10 @@
 - [x] Studio skin on every page: Overview (LCD readouts), Modulation (a depth knob per route), Harmony and Quantise (engraved panel sections), Motifs
 - [x] Studio controls: bevelled keys for buttons and menus, sliders with a fader cap (AudioKit Controls, like the knobs), LED switches, − / + steppers, recessed LCD-green text fields
 - [x] Variation: randomise key, scale, progressions, motifs, registers (and optionally tempo, drums) by a deviation, by hand or every 5 min … 4 h, from home or drifting (ADR 0017); Save asks before overwriting a loaded scene
-- [ ] **Listen to it on the iPad** and tune the default and hosted scenes by ear (drums heard on an iPhone over Bluetooth MIDI: fine)
+- [x] Listened to on the iPad and tuned by ear (2026-11-13)
+- [x] Overview: a legend for the traffic chart; drag the quiet / busy lines to move the thresholds
+- [x] Public repo, CI (build + test) and tagged releases (an Apple-silicon zip); v0.1.0
+- [x] MIDI clock out: 24 PPQN, CoreMIDI-timestamped, Start on a bar line and Stop, to every external voice destination; hosted synths get the host's tempo and beat (ADR 0018)
 
 ## Next
 
@@ -81,9 +84,11 @@
    - no reuse of AudioKit's artwork
 4. **App, next round:** adding
    and removing hosted instruments, scene A/B comparison, MIDI-learn for params, an app bundle.
-5. **MIDI clock** out (and in, to follow a DAW). CoreMIDI timestamped sends.
+5. **MIDI clock**: out done (ADR 0018). Still to come: clock **in**, to follow a DAW; timestamped notes.
 6. More generators: arpeggiator over the chord, flow-voice (one voice per live connection with voice stealing).
 7. Drums, next: more grooves and odd meters, per-lane timing feel (laid-back snare), groove morphing between moods.
+8. **Chord progressions from favourite songs** (asked 2026-11-13): pick a song and use its progression for a mood, from an open chord dataset; see the research notes when they land.
+9. **Signal flow, editable**: drag cables to rewire voices and create mod routes; route long cables along the gutters.
 
 ## Later
 

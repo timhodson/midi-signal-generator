@@ -73,7 +73,12 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
     var mixerDirty = false
     var reverbRoom = -1
 
+    /// Tempo, beat and play state for the plugins (their arps and synced effects follow it).
+    let hostTransport = HostTransport()
+
     private init() {}
+
+    public func transport(_ state: TransportState) { hostTransport.update(state) }
 
     /// Highest absolute sample on the output mix since the last call (0...1+). Lets a headless
     /// run confirm sound is really being rendered, and will feed the UI's level meter.
@@ -128,6 +133,9 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
                 with: component.audioComponentDescription,
                 options: config.outOfProcess ? .loadOutOfProcess : []
             )
+            // Before render resources are allocated, so the plugin picks them up.
+            unit.auAudioUnit.musicalContextBlock = host.hostTransport.musicalContextBlock
+            unit.auAudioUnit.transportStateBlock = host.hostTransport.transportStateBlock
             let inst = Instrument(config: config, unit: unit)
             if let name = config.preset {
                 guard let i = Self.presetIndex(of: name, in: inst.presetNames) else {
@@ -141,6 +149,7 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
         if !configs.isEmpty {
             host.buildMixer()
             host.installMeter()
+            host.hostTransport.sampleRateBits.store(host.engine.outputNode.outputFormat(forBus: 0).sampleRate.bitPattern, ordering: .relaxed)
             host.engine.prepare()
             try host.engine.start()
             // The MIDI block is only valid once render resources are allocated.

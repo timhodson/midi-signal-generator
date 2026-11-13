@@ -102,6 +102,13 @@ public struct EngineStatus: Sendable {
     public var drums: DrumStatus?
     /// Variations made so far, and when the next scheduled one is due.
     public var variation: VariationInfo?
+    /// MIDI clock out: who gets it, and who has been sent Start.
+    public var clock: ClockInfo?
+
+    public struct ClockInfo: Sendable, Equatable {
+        public var destinations: [String]
+        public var started: [String]
+    }
 
     public struct VariationInfo: Sendable {
         public var log: [Variation.Applied]
