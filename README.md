@@ -40,7 +40,7 @@ Randomise dice. The screenshots below use the Studio skin, with synthetic traffi
 ### At a glance
 
 **Overview**: mood, chord, tempo, traffic and output level. A 3-minute traffic graph with the quiet/busy
-thresholds, the busiest apps, and every recent note with the reason it played. The **Faithfulness** macro
+thresholds (drag a dashed line to move it), the busiest apps, and every recent note with the reason it played. The **Faithfulness** macro
 goes from tidy and musical (0) to raw sonification (1).
 
 ![Overview](docs/screenshots/overview.jpg)

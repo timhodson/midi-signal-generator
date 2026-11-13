@@ -141,6 +141,9 @@ struct Card: View {
 
 struct TrafficChart: View {
     @Environment(AppModel.self) private var model
+    /// The threshold being dragged ("conductor.quietBelow" / "conductor.busyAbove").
+    @State private var dragging: String?
+    @State private var nearLine = false
 
     var body: some View {
         let points = model.history
@@ -157,12 +160,41 @@ struct TrafficChart: View {
                     .lineStyle(StrokeStyle(lineWidth: 2))
             }
             RuleMark(y: .value("Quiet below", max(quiet, 1)))
-                .foregroundStyle(.green.opacity(0.6)).lineStyle(StrokeStyle(dash: [4, 4]))
+                .foregroundStyle(.green.opacity(dragging == Self.quietID ? 1 : 0.6))
+                .lineStyle(StrokeStyle(lineWidth: dragging == Self.quietID ? 2 : 1, dash: [4, 4]))
                 .annotation(position: .top, alignment: .leading) { Text("quiet").font(.caption2).foregroundStyle(.green) }
+                .annotation(position: .overlay, alignment: .trailing) { handle(.green, Self.quietID) }
             RuleMark(y: .value("Busy above", max(busy, 1)))
-                .foregroundStyle(.red.opacity(0.6)).lineStyle(StrokeStyle(dash: [4, 4]))
+                .foregroundStyle(.red.opacity(dragging == Self.busyID ? 1 : 0.6))
+                .lineStyle(StrokeStyle(lineWidth: dragging == Self.busyID ? 2 : 1, dash: [4, 4]))
                 .annotation(position: .top, alignment: .leading) { Text("busy").font(.caption2).foregroundStyle(.red) }
+                .annotation(position: .overlay, alignment: .trailing) { handle(.red, Self.busyID) }
         }
+        // Drag a dashed line to move that threshold (the same settings as Harmony → Mood).
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                let plot = proxy.plotFrame.map { geo[$0] } ?? .zero
+                Rectangle().fill(.clear).contentShape(Rectangle())
+                    .onContinuousHover { phase in
+                        if case .active(let p) = phase {
+                            let near = line(near: p.y - plot.minY, proxy: proxy, quiet: quiet, busy: busy) != nil
+                            if near != nearLine { nearLine = near; near ? NSCursor.resizeUpDown.push() : NSCursor.pop() }
+                        } else if nearLine { nearLine = false; NSCursor.pop() }
+                    }
+                    .gesture(DragGesture(minimumDistance: 1)
+                        .onChanged { g in
+                            if dragging == nil {
+                                guard let id = line(near: g.startLocation.y - plot.minY, proxy: proxy, quiet: quiet, busy: busy) else { return }
+                                dragging = id
+                            }
+                            guard let id = dragging, let raw: Double = proxy.value(atY: g.location.y - plot.minY) else { return }
+                            let v = Self.tidy(min(max(raw, 100), 100_000_000))
+                            if id == Self.quietID { model.set(id, min(v, busy * 0.9)) } else { model.set(id, max(v, quiet * 1.1)) }
+                        }
+                        .onEnded { _ in dragging = nil })
+            }
+        }
+        .onDisappear { if nearLine { nearLine = false; NSCursor.pop() } }
         .chartYScale(domain: 100...100_000_000, type: .log)
         .chartXScale(domain: -180...0)
         .chartPlotStyle { $0.clipped() }
@@ -173,6 +205,32 @@ struct TrafficChart: View {
             }
         }
         .chartXAxisLabel("seconds ago")
+    }
+}
+
+extension TrafficChart {
+    static let quietID = "conductor.quietBelow", busyID = "conductor.busyAbove"
+
+    /// The grip at the right end of a threshold line.
+    func handle(_ color: Color, _ id: String) -> some View {
+        Capsule().fill(color.opacity(dragging == id ? 1 : 0.75))
+            .overlay(Image(systemName: "arrow.up.and.down").font(.system(size: 7, weight: .bold)).foregroundStyle(.black.opacity(0.7)))
+            .frame(width: 22, height: 11)
+            .help("Drag to move this threshold")
+    }
+
+    /// Which threshold line (if any) is within grabbing distance of a y position in the plot.
+    func line(near y: CGFloat, proxy: ChartProxy, quiet: Double, busy: Double) -> String? {
+        let candidates = [(Self.quietID, quiet), (Self.busyID, busy)].compactMap { id, v in
+            proxy.position(forY: max(v, 1)).map { (id, abs($0 - y)) }
+        }
+        return candidates.filter { $0.1 <= 8 }.min { $0.1 < $1.1 }?.0
+    }
+
+    /// Thresholds read better as round numbers: two significant figures (8.3 kB/s, not 8,271 B/s).
+    static func tidy(_ v: Double) -> Double {
+        let p = pow(10, floor(log10(v)) - 1)
+        return (v / p).rounded() * p
     }
 }
 
@@ -190,7 +248,7 @@ struct TrafficLegend: View {
             item(line, .green, "quiet below \(Format.rate(model.base("conductor.quietBelow")))", dash: [3, 3])
             item(line, .red, "busy above \(Format.rate(model.base("conductor.busyAbove")))", dash: [3, 3])
             Spacer(minLength: 0)
-            Text("Log scale. Move the thresholds on Harmony → Mood.").foregroundStyle(.tertiary)
+            Text("Log scale. Drag a dashed line to move its threshold.").foregroundStyle(.tertiary)
         }
         .font(.caption)
     }
