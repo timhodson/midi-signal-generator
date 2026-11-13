@@ -57,7 +57,7 @@ jobs:
           See README.md and https://github.com/timhodson/midi-signal-generator for more.
           EOF
           (cd dist && ditto -c -k --keepParent "$NAME" "$NAME.zip")
-          shasum -a 256 "dist/$NAME.zip" | tee "dist/$NAME.zip.sha256"
+          (cd dist && shasum -a 256 "$NAME.zip" | tee "$NAME.zip.sha256")  # names the zip as downloaded, so shasum -c works
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
 
       - name: Upload artifact
