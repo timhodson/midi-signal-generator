@@ -209,25 +209,25 @@ struct DesignEditor: View {
                         Text("Applies to")
                         TextField("app name, part of a name, or * for all", text: Binding(
                             get: { design.match }, set: { v in update { $0.match = v } }))
-                            .textFieldStyle(.roundedBorder).frame(width: 320)
+                            .skinField().frame(width: 320)
                         Text(design.match == "*" ? "every app without a more specific design" : "apps whose name contains this (an exact name wins)")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     GridRow {
                         Text("Steps follow")
-                        Picker("", selection: Binding(get: { design.anchor }, set: { v in update { $0.anchor = v } })) {
-                            Text("the chord (moves with the harmony)").tag(MotifDesign.Anchor.chord)
-                            Text("the key (same notes on every chord)").tag(MotifDesign.Anchor.key)
-                        }
-                        .labelsHidden().frame(width: 320)
+                        SkinPicker(selection: Binding(get: { design.anchor }, set: { v in update { $0.anchor = v } }),
+                                   options: [(MotifDesign.Anchor.chord, "the chord (moves with the harmony)"),
+                                             (MotifDesign.Anchor.key, "the key (same notes on every chord)")])
+                            .frame(width: 320)
                         Text("Following the chord, step 0 is the chord's root, so the motif always fits.")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     GridRow {
                         Text("Step length")
                         HStack {
-                            Slider(value: Binding(get: { design.stepBeats ?? model.base("gen.motif.stepBeats") },
-                                                  set: { v in update { $0.stepBeats = (v * 4).rounded() / 4 } }), in: 0.25...2)
+                            SkinSlider(value: Binding(get: { design.stepBeats ?? model.base("gen.motif.stepBeats") },
+                                                      set: { v in update { $0.stepBeats = (v * 4).rounded() / 4 } }), range: 0.25...2,
+                                       color: .orange)
                             Text("\((design.stepBeats ?? model.base("gen.motif.stepBeats")).formatted()) beats").monospacedDigit()
                         }
                         .frame(width: 320)
@@ -235,7 +235,7 @@ struct DesignEditor: View {
                     }
                     GridRow {
                         Text("Octave")
-                        Stepper("\(octave)", value: Binding(get: { octave }, set: { v in update { $0.octave = v } }), in: 2...7)
+                        SkinStepper(label: "\(octave)", value: Binding(get: { Double(octave) }, set: { v in update { $0.octave = Int(v) } }), range: 2...7)
                         Button("Use the generator's setting") { update { $0.octave = nil } }.disabled(design.octave == nil)
                     }
                 }
@@ -286,7 +286,7 @@ struct DesignEditor: View {
                         .help("Replace the steps with a random motif of the same length, and play it")
                     Spacer()
                     Button { model.previewMotif(for: previewApp) } label: { Label("Play now", systemImage: "play.fill") }
-                        .buttonStyle(.borderedProminent)
+                        .skinProminent(.orange)
                         .help("Plays as if \(previewApp) woke up")
                     Button(role: .destructive) { model.deleteDesign(design.id) } label: { Label("Delete design", systemImage: "trash") }
                 }

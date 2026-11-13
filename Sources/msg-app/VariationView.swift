@@ -21,8 +21,7 @@ struct VariationView: View {
                 }
             }
         }
-        .environment(\.skin, model.skin)
-        .background { if model.skin == .studio { PanelBackground(cornerRadius: 0, shade: 0.45).ignoresSafeArea() } }
+        .skinnedPage(model.skin, shade: 0.45)
         .navigationTitle("Variation")
     }
 }
@@ -36,7 +35,7 @@ private struct VariationActions: View {
                    caption: "A fresh take on the piece: a new key or scale, reworked chord progressions, a new set of app motifs, different registers and patterns. How far it strays is the deviation below. Changes land on the next chord change; scheduled ones wait for the end of a phrase.") {
             HStack(spacing: 10) {
                 Button { model.randomise() } label: { Label("Randomise now", systemImage: "dice") }
-                    .buttonStyle(.borderedProminent)
+                    .skinProminent(.yellow)
                 Button { model.returnHome() } label: { Label("Return home", systemImage: "house") }
                     .help("Go back to the home settings (the scene as loaded, or what you last made home)")
                 Button { model.makeHome() } label: { Label("Make this home", systemImage: "house.badge.plus") }

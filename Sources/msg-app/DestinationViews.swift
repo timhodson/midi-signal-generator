@@ -19,7 +19,7 @@ struct DestinationPicker: View {
                 } label: {
                     Label(Self.label(current, model: model), systemImage: Self.icon(current, model: model))
                 }
-                .frame(maxWidth: 360)
+                .frame(maxWidth: 360, alignment: .leading)
                 StatusText(destination: current)
                 Spacer()
                 Button("Bluetooth MIDI…") { model.showBluetoothMIDI() }

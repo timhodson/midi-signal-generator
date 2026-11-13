@@ -101,6 +101,7 @@ enum Snapshot {
             model.skin = skin
             Self.skin = skin
         }
+        if args.contains("--sliders") { model.useKnobs = false }
         model.pinned = [PanelID(page: .generators, group: "drums"), PanelID(page: .voices, group: "lead"),
                         PanelID(page: .generators, group: "pulse")]
         setvbuf(stdout, nil, _IOLBF, 0)

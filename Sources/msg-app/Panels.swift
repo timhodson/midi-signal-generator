@@ -302,8 +302,7 @@ struct TilePage: View {
                 }
             }
         }
-        .environment(\.skin, model.skin)
-        .background { if model.skin == .studio { PanelBackground(cornerRadius: 0, shade: 0.45).ignoresSafeArea() } }
+        .skinnedPage(model.skin, shade: 0.45)
         .searchable(text: $filter, placement: .toolbar, prompt: "Filter \(page.title.lowercased())")
         .navigationTitle(page.title)
     }
@@ -433,8 +432,7 @@ struct PanelWindow: View {
             }
         }
         .frame(minWidth: 520, minHeight: 360)
-        .environment(\.skin, model.skin)
-        .background { if model.skin == .studio { PanelBackground(cornerRadius: 0, shade: 0.35).ignoresSafeArea() } }
+        .skinnedPage(model.skin, shade: 0.35)
         .navigationTitle(Panels.title(panel))
     }
 }
@@ -474,8 +472,7 @@ struct TabletopView: View {
                 }
             }
         }
-        .environment(\.skin, model.skin)
-        .background { if model.skin == .studio { PanelBackground(cornerRadius: 0, shade: 0.45).ignoresSafeArea() } }
+        .skinnedPage(model.skin, shade: 0.45)
         .toolbar {
             ToolbarItem(placement: .navigation) { AddToTabletopMenu() }
         }

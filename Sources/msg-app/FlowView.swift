@@ -226,8 +226,7 @@ struct FlowView: View {
                 }
             }
         }
-        .environment(\.skin, model.skin)
-        .background { if model.skin == .studio { PanelBackground(cornerRadius: 0, shade: 0.45).ignoresSafeArea() } }
+        .skinnedPage(model.skin, shade: 0.45)
         .navigationTitle("Signal flow")
     }
 }

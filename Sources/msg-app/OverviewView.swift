@@ -53,22 +53,20 @@ struct TransportBar: View {
                 Button { Task { await model.start() } } label: { Label("Start", systemImage: "play.fill") }
                     .keyboardShortcut(.return, modifiers: .command)
                     .disabled(model.isStarting)
-                    .buttonStyle(.borderedProminent)
+                    .skinProminent(.green)
             }
             if model.isStarting { ProgressView().controlSize(.small) }
 
-            Picker("Source", selection: $model.sourceKind) {
-                ForEach(AppModel.SourceKind.allCases) { Text($0.rawValue).tag($0) }
-            }
+            SkinPicker(title: "Source", selection: $model.sourceKind,
+                       options: AppModel.SourceKind.allCases.map { ($0, $0.rawValue) })
             .frame(width: 220)
             .disabled(model.isRunning)
 
             if model.sourceKind == .replay {
                 Button(model.replayURL?.lastPathComponent ?? "Choose recording…") { model.chooseReplayFile() }
                     .disabled(model.isRunning)
-                Picker("Speed", selection: $model.replaySpeed) {
-                    ForEach([0.5, 1, 2, 4, 8], id: \.self) { Text("×\($0.formatted())").tag($0) }
-                }
+                SkinPicker(title: "Speed", selection: $model.replaySpeed,
+                           options: [0.5, 1, 2, 4, 8].map { ($0, "×\($0.formatted())") })
                 .frame(width: 110).disabled(model.isRunning)
                 Toggle("Loop", isOn: $model.replayLoop).disabled(model.isRunning)
             }

@@ -154,11 +154,9 @@ struct DrumGrooveEditor: View {
         let groove = d?.grooves.first { $0.name == name }
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Picker("Groove", selection: $chosen) {
-                    Text("Following the mood (\(playing))").tag(String?.none)
-                    Divider()
-                    ForEach(DrumGroove.choices.dropFirst(), id: \.self) { Text($0).tag(String?.some($0)) }
-                }
+                SkinPicker(title: "Groove", selection: $chosen,
+                           options: [(String?.none, "Following the mood (\(playing))")]
+                               + DrumGroove.choices.dropFirst().map { (String?.some($0), $0) })
                 .frame(maxWidth: 320)
                 if name == playing {
                     Text("playing now").font(.caption).foregroundStyle(.green)

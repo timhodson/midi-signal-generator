@@ -42,6 +42,7 @@ swift run msg-app --scene scenes/audiokit-hosted.json --source synthetic --snaps
 # README screenshots: wider window, Studio skin, a variation applied, a panel open
 swift run msg-app --scene SCENE --source synthetic --no-packets --snapshot DIR --seconds 25 --height 900 --width 1720 \
   --skin studio --randomise -flow.selected "panel:generators/drums" -tiles.generators.expanded drums
+# add --sliders to render settings as sliders instead of knobs
 # then: sips -s format jpeg -s formatOptions 82 --resampleWidth 1720 DIR/<page>.png --out docs/screenshots/<page>.jpg
 ```
 

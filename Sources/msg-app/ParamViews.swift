@@ -84,7 +84,7 @@ struct ParamRow: View {
             if typing, spec.kind == .continuous || spec.kind == .normalised || spec.kind == .integer {
                 TextField("", value: Binding(get: { base }, set: { model.set(spec.id, $0) }),
                           format: .number.precision(.significantDigits(1...6)))
-                    .textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing).frame(width: 100)
+                    .skinField().multilineTextAlignment(.trailing).frame(width: 100)
                     .help("Type an exact value and press Return")
             } else {
                 Text(Self.format(base, spec)).monospacedDigit()
@@ -100,28 +100,20 @@ struct ParamRow: View {
     @ViewBuilder private var control: some View {
         switch spec.kind {
         case .toggle:
-            Toggle("", isOn: Binding(get: { base >= 0.5 }, set: { model.set(spec.id, $0 ? 1 : 0) }))
-                .labelsHidden().toggleStyle(.switch).frame(maxWidth: .infinity, alignment: .leading)
+            SkinSwitch(isOn: Binding(get: { base >= 0.5 }, set: { model.set(spec.id, $0 ? 1 : 0) }))
+                .frame(maxWidth: .infinity, alignment: .leading)
         case .choice:
-            Picker("", selection: Binding(get: { Int(base) }, set: { model.set(spec.id, Double($0)) })) {
-                ForEach(Array(spec.options.enumerated()), id: \.offset) { i, name in
-                    Text(name.trimmingCharacters(in: .whitespaces)).tag(i)
-                }
-            }
-            .labelsHidden()
+            SkinPicker(selection: Binding(get: { Int(base) }, set: { model.set(spec.id, Double($0)) }),
+                       options: spec.options.enumerated().map { ($0.offset, $0.element.trimmingCharacters(in: .whitespaces)) })
         case .integer:
             HStack {
-                if spec.span <= 24 {
-                    Slider(value: Binding(get: { base }, set: { model.set(spec.id, $0.rounded()) }), in: spec.range, step: 1)
-                } else {
-                    Slider(value: Binding(get: { base }, set: { model.set(spec.id, $0.rounded()) }), in: spec.range)
-                }
-                Stepper("", value: Binding(get: { base }, set: { model.set(spec.id, $0) }), in: spec.range, step: 1)
-                    .labelsHidden()
+                SkinSlider(value: Binding(get: { base }, set: { model.set(spec.id, $0.rounded()) }), range: spec.range,
+                           step: spec.span <= 24 ? 1 : nil)
+                SkinStepper(value: Binding(get: { base }, set: { model.set(spec.id, $0) }), range: spec.range)
             }
         case .normalised, .continuous:
             ZStack(alignment: .bottomLeading) {
-                Slider(value: sliderBinding, in: 0...1)
+                SkinSlider(value: sliderBinding)
                 if modulated {
                     GeometryReader { geo in
                         Capsule().fill(.orange)

@@ -39,7 +39,7 @@ struct InstrumentPanel: View {
                 }
                 let synthParams = model.specs(withPrefix: [prefix]).filter { !["preset", "volume", "pan"].contains($0.id.dropFirst(prefix.count)) }
                 DisclosureGroup("Synth parameters (\(synthParams.count)) — every one is a mod-matrix target", isExpanded: $showParams) {
-                    TextField("Filter", text: $filter).textFieldStyle(.roundedBorder).padding(.vertical, 4)
+                    TextField("Filter", text: $filter).skinField().padding(.vertical, 4)
                     let matching = synthParams.filter {
                         filter.isEmpty || $0.id.localizedCaseInsensitiveContains(filter) || $0.label.localizedCaseInsensitiveContains(filter)
                     }

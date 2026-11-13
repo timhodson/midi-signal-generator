@@ -45,8 +45,7 @@ struct MixerView: View {
                     .padding(16)
                 }
                 .defaultScrollAnchor(.topLeading)
-                .environment(\.skin, model.skin)
-                .background { if model.skin == .studio { PanelBackground(cornerRadius: 0, shade: 0.45).ignoresSafeArea() } }
+                .skinnedPage(model.skin, shade: 0.45)
             }
         }
         .navigationTitle("Mixer")
@@ -167,10 +166,9 @@ struct BusStrip: View {
         StripFrame(title: bus, subtitle: bus == "reverb" ? "FX return" : "FX return · tempo-synced", color: .gray) {
             if bus == "reverb" {
                 if let room = model.specsByID["mix.reverb.room"] {
-                    Picker("", selection: Binding(get: { Int(model.base(room.id)) }, set: { model.set(room.id, Double($0)) })) {
-                        ForEach(room.options.indices, id: \.self) { Text(room.options[$0]).tag($0) }
-                    }
-                    .labelsHidden().controlSize(.small)
+                    SkinPicker(selection: Binding(get: { Int(model.base(room.id)) }, set: { model.set(room.id, Double($0)) }),
+                               options: room.options.enumerated().map { ($0.offset, $0.element) })
+                        .controlSize(.small)
                 }
                 Spacer().frame(height: 120)
             } else {
