@@ -429,6 +429,8 @@ struct MoodLadder: View {
 /// Each mood's chords as chips. Click a chip to change, move or remove it; + adds a chord.
 struct ProgressionEditor: View {
     @Environment(AppModel.self) private var model
+    /// The mood a song's chords are being picked for (shows the song picker).
+    @State private var songFor: String?
 
     private func condition(_ mood: String) -> String {
         let quiet = Format.rate(model.base("conductor.quietBelow")), busy = Format.rate(model.base("conductor.busyAbove"))
@@ -469,13 +471,23 @@ struct ProgressionEditor: View {
                             .help("Add a chord to the end")
                     }
                     Spacer()
+                    if SongPicker.moods.contains(p.mood) {
+                        Button { songFor = p.mood } label: { Label("From a song…", systemImage: "music.note.list") }
+                            .controlSize(.small)
+                            .help("Use the chords of a verse, chorus or bridge from a real song (or type some)")
+                    }
                     if let defaults = Self.defaults[p.mood], defaults != p.degrees {
                         Button("Reset") { model.setProgression(p.mood, defaults) }.controlSize(.small)
                     }
                 }
             }
         }
+        .sheet(item: Binding(get: { songFor.map(SongTarget.init) }, set: { songFor = $0?.id })) { t in
+            SongPicker(mood: t.id).environment(model)
+        }
     }
+
+    struct SongTarget: Identifiable { let id: String }
 
     private func chip(_ p: MoodProgression, _ i: Int, _ degree: Int, playing: Bool) -> some View {
         ProgressionChip(progression: p, index: i, degree: degree, playing: playing)

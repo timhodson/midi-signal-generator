@@ -30,3 +30,4 @@ is made or reversed; don't rewrite history. Mark superseded ones in their status
 | [0016](decisions/0016-drummer.md) | The drummer: steady grooves whose feel follows the data |
 | [0017](decisions/0017-variation.md) | Variation: randomising the melodic presentation by a deviation, now or on a schedule |
 | [0018](decisions/0018-midi-clock.md) | MIDI clock out (timestamped, Start on a bar line), and the host's tempo for hosted synths |
+| [0019](decisions/0019-song-progressions.md) | Chord progressions from real songs: the McGill Billboard library, decade and genre search |

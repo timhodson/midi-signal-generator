@@ -281,3 +281,67 @@ private let dDorian = HarmonyContext(root: 2, scale: .dorian)
         #expect(g.drainDecisions().first?.played == false)
     }
 }
+
+@Suite struct SongLibraryTests {
+    let lib = SongLibrary.billboard
+
+    @Test func bundledLibraryLoads() {
+        #expect(lib.songs.count > 700)
+        #expect(lib.decades.first == 1950 && lib.decades.last == 1990)
+        #expect(lib.genres.contains("Rock") && lib.genres.contains("Soul & R&B"))
+        #expect(lib.songs.allSatisfy { !$0.sections.isEmpty && $0.sections.allSatisfy { $0.chords.count >= 2 } })
+    }
+
+    @Test func searchByTextDecadeAndGenre() {
+        let stand = lib.search("stand by me")
+        #expect(stand.contains { $0.artist.contains("Ruffin") })
+        #expect(lib.search(decade: 1960).allSatisfy { (1960..<1970).contains($0.year) })
+        #expect(lib.search(genre: "Country").allSatisfy { $0.genres.contains("Country") })
+        #expect(lib.search(genre: "").allSatisfy { $0.genres.isEmpty })
+        #expect(lib.search("beatles", decade: 1960).allSatisfy { $0.artist.contains("Beatles") })
+    }
+
+    /// The build script fits songs to modes by index; the indices must mean the same scales here.
+    @Test func modeIndicesMatchTheCatalogue() {
+        let expected: [[Int]] = [[0, 2, 4, 5, 7, 9, 11], [0, 2, 3, 5, 7, 8, 10], [0, 2, 3, 5, 7, 9, 10], [0, 1, 3, 5, 7, 8, 10],
+                                 [0, 2, 4, 6, 7, 9, 11], [0, 2, 4, 5, 7, 9, 10], [0, 1, 3, 5, 6, 8, 10], [0, 2, 3, 5, 7, 8, 11]]
+        for (i, steps) in expected.enumerated() {
+            #expect(HarmonyContext(root: 0, scale: ScaleCatalogue.scales[i]).scaleSteps == steps)
+        }
+    }
+
+    @Test func standByMeIsOneSixFourFive() throws {
+        let song = try #require(lib.search("stand by me").first)
+        let verse = try #require(song.sections.first { $0.name == "verse" })
+        let fit = SongLibrary.fit(verse.chords, into: HarmonyContext(root: 0, scale: ScaleCatalogue.scales[0]))
+        #expect(Array(fit.degrees.prefix(4)) == [0, 5, 3, 4])
+        #expect(fit.bentCount == 0)
+        #expect(verse.chords.prefix(4).map(\.numeral) == ["I", "vi", "IV", "V"])
+        #expect(verse.chords.prefix(4).map { $0.name(key: song.key) } == ["G", "Em", "C", "D"])
+    }
+
+    @Test func flatSevenFitsMixolydianButBendsInMajor() {
+        let chords = [SongChord(semitones: 0, quality: .major), SongChord(semitones: 10, quality: .major), SongChord(semitones: 5, quality: .major)]
+        let major = SongLibrary.fit(chords, into: HarmonyContext(root: 0, scale: ScaleCatalogue.scales[0]))
+        #expect(major.fits == [.exact, .bent, .exact])
+        let mixo = SongLibrary.fit(chords, into: HarmonyContext(root: 0, scale: ScaleCatalogue.scales[5]))
+        #expect(mixo.fits == [.exact, .exact, .exact])
+        #expect(mixo.degrees == [0, 6, 3])
+        #expect(chords[1].name(key: 0) == "B♭" && chords[1].numeral == "♭VII")
+    }
+
+    @Test func secondaryDominantKeepsItsRoot() {
+        // A major II (V of V) in a major key: the scale's own ii on that root.
+        let fit = SongLibrary.fit([SongChord(semitones: 2, quality: .major)], into: HarmonyContext(root: 0, scale: ScaleCatalogue.scales[0]))
+        #expect(fit.degrees == [1] && fit.fits == [.quality])
+    }
+
+    @Test func typedChords() {
+        #expect(SongChord.parse("Am F C G", key: 0) == [.init(semitones: 9, quality: .minor), .init(semitones: 5, quality: .major),
+                                                         .init(semitones: 0, quality: .major), .init(semitones: 7, quality: .major)])
+        #expect(SongChord.parse("Bb7 | Ebmaj7, F#dim Cm7/G", key: 0)?.map(\.numeral) == ["♭VII", "♭III", "♯iv°", "i"])
+        #expect(SongChord.parse("Dm G", key: 2)?.map(\.numeral) == ["i", "IV"])
+        #expect(SongChord.parse("H7", key: 0) == nil)
+        #expect(SongChord.parse("   ", key: 0) == nil)
+    }
+}

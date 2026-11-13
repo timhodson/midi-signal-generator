@@ -150,6 +150,9 @@ enum Snapshot {
             await render(TabletopView().environment(model), to: directory.appendingPathComponent("tabletop-empty.png"),
                          size: NSSize(width: 1000, height: 500))
             model.pinned = pins
+            let song = SongLibrary.billboard.search("stand by me").first?.id
+            await render(SongPicker(mood: "calm", selection: song, typed: "Am F C G").environment(model),
+                         to: directory.appendingPathComponent("song-picker.png"), size: NSSize(width: 1040, height: 700))
             await render(DrumsCard().environment(model).frame(width: 1100).padding(20),
                          to: directory.appendingPathComponent("drums.png"), size: NSSize(width: 1140, height: 900))
             model.stop()

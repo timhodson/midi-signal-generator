@@ -28,7 +28,7 @@ let package = Package(
         .target(name: "Music", dependencies: [
             "Params", "SignalBus",
             .product(name: "Tonic", package: "Tonic"),
-        ]),
+        ], resources: [.copy("Songs")]),
         // Role -> device/channel/range mapping.
         .target(name: "Router", dependencies: ["Params", "Music"]),
         // Note scheduling + CoreMIDI output (virtual port, network session).

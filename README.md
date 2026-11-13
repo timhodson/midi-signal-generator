@@ -75,6 +75,8 @@ curve, smoothing and depth. Each route shows its input and the target's value mo
 
 **Harmony**: the mood thresholds (drag the handles), the key and scale on a keyboard, a piano roll of
 every voice against the chords, plus tempo, scale, chord size and a chord progression for each mood.
+**From a song…** borrows a verse or chorus from 734 hand-annotated Billboard hits (search by title, artist, decade
+or genre) or takes typed chords ("Am F C G"). The Clock section sends MIDI clock to external synths.
 
 ![Harmony](docs/screenshots/harmony.jpg)
 
@@ -117,6 +119,14 @@ and meters, and a master. External MIDI voices get a velocity trim.
 
 Screenshots are regenerated offscreen with
 `msg-app --scene … --source synthetic --snapshot DIR --width 1720 --skin studio` (see [Development](docs/development.md)).
+
+## Credits
+
+- Song chords: [The McGill Billboard Project](https://ddmal.music.mcgill.ca/research/The_McGill_Billboard_Project_(Chord_Analysis_Dataset))
+  (J. A. Burgoyne, J. Wild, I. Fujinaga, "An Expert Ground Truth Set for Audio Chord Recognition and Music
+  Analysis", ISMIR 2011), CC0. Genres: [Wikidata](https://www.wikidata.org), CC0.
+- Built with AudioKit's [Tonic](https://github.com/AudioKit/Tonic) and [Controls](https://github.com/AudioKit/Controls),
+  and [swift-midi-io](https://github.com/orchetect/swift-midi-io).
 
 ## Docs
 

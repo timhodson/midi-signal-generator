@@ -87,7 +87,7 @@
 5. **MIDI clock**: out done (ADR 0018). Still to come: clock **in**, to follow a DAW; timestamped notes.
 6. More generators: arpeggiator over the chord, flow-voice (one voice per live connection with voice stealing).
 7. Drums, next: more grooves and odd meters, per-lane timing feel (laid-back snare), groove morphing between moods.
-8. **Chord progressions from favourite songs** (asked 2026-11-13): pick a song and use its progression for a mood, from an open chord dataset; see the research notes when they land.
+8. **Chord progressions from songs**: done (ADR 0019), McGill Billboard with decade / genre search and typed chords. Later: an optional Chordonomicon import (666k songs, non-commercial licence).
 9. **Signal flow, editable**: drag cables to rewire voices and create mod routes; route long cables along the gutters.
 
 ## Later
