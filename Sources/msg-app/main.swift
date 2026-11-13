@@ -115,7 +115,7 @@ enum Snapshot {
             try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             for item in SidebarItem.allCases {
                 let url = directory.appendingPathComponent("\(item.rawValue.lowercased()).png")
-                await render(ContentView(selection: item).environment(model), to: url, size: NSSize(width: 1280, height: height))
+                await render(ContentView(selection: item).environment(model), to: url, size: NSSize(width: Double(arg("--width") ?? "") ?? 1280, height: height))
                 print("wrote \(url.path)")
             }
             // A piano roll being inspected: point at the most recent lead (motif) note.

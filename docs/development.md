@@ -39,6 +39,10 @@ swift run -c release msg-app --scene scenes/audiokit-hosted.json   # use release
 swift run msg-app --source synthetic                       # no network needed
 # headless check: render every screen to PNGs and exit (no window appears)
 swift run msg-app --scene scenes/audiokit-hosted.json --source synthetic --snapshot /tmp/msg-snap --seconds 10
+# README screenshots: wider window, Studio skin, a variation applied, a panel open
+swift run msg-app --scene SCENE --source synthetic --no-packets --snapshot DIR --seconds 25 --height 900 --width 1720 \
+  --skin studio --randomise -flow.selected "panel:generators/drums" -tiles.generators.expanded drums
+# then: sips -s format jpeg -s formatOptions 82 --resampleWidth 1720 DIR/<page>.png --out docs/screenshots/<page>.jpg
 ```
 
 Performance check (control re-renders, visual frames, CPU), see ADR 0013:
