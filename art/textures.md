@@ -13,10 +13,11 @@ LCD glass. More (fader caps, LED lenses, a footer bar, the app icon) come after 
 
 - **Model:** Z-Image Turbo first (photographic material detail). FLUX.2 klein 4B is the
   alternative if a texture comes out too "rendered".
-- **Settings:** the workflow's usual turbo settings (few steps, CFG ≈ 1). Turbo models mostly
-  ignore negative prompts at CFG 1, so the "avoid" lines are worded into the prompts as well; use
-  them as negative prompts only if the workflow runs CFG > 1.
-- **Variants:** 4 seeds per texture. Save as PNG, named `<texture>-<seed>.png`, into `art/textures/raw/`.
+- **Settings:** the workflow's usual turbo settings (`manage/smoke/run_image.py`: Z-Image 8 steps,
+  klein 4 steps, CFG 1). At CFG 1 negative prompts do nothing, and naming an unwanted thing in the
+  prompt tends to summon it, so the prompts describe only what *is* there. The "avoid" lists are
+  for judging the results (and for a negative prompt if a workflow runs CFG > 1).
+- **Variants:** 4 seeds per texture: two on Z-Image, two on klein, to compare the models. Save as PNG, named `<texture>-<seed>.png`, into `art/textures/raw/`.
 - Record the seed, model and settings of each image you keep in the table at the bottom.
 
 After generation, Claude processes the chosen ones (`art/textures/`): makes the panel seamless,
@@ -37,13 +38,12 @@ out when the texture repeats.
 
 **Prompt**
 
-> Seamless tileable texture, top-down orthographic view of a flat sheet of matte charcoal-grey
-> powder-coated steel, as used on the front panel of a vintage studio synthesizer. Very fine,
-> even, uniform grain like fine sandpaper or toner powder, with extremely subtle variation in
-> tone. Completely flat, evenly lit by soft diffuse light with no shadows, no highlights, no
-> reflections, no vignette. No scratches, no dents, no screws, no edges, no text, no logos, no
-> patterns or shapes. Neutral dark grey with a very slight cool tint. High detail, sharp focus,
-> photographic material reference.
+> Seamless tileable texture filling the whole frame: a close-up, straight-on view of a flat
+> sheet of matte charcoal-grey powder-coated steel, the front panel material of a vintage studio
+> synthesizer. The surface is a very fine, even, uniform grain like fine toner powder, with only
+> the faintest variation in tone across it. Soft, even, diffuse light falls evenly across the
+> whole surface. Neutral dark grey with a very slight cool tint. Sharp focus, photographic
+> material reference.
 
 **Avoid (negative):** scratches, dust specks, stains, rust, edges, borders, text, logos, screws,
 vignette, gradient, specular highlight, shadow, perspective, bokeh, blur, noise patterns, tiles, seams
@@ -67,14 +67,12 @@ the rotation readable.
 
 **Prompt**
 
-> Product photograph shot straight down from directly above (orthographic top view) of the flat
-> top face of a large black anodised aluminium synthesizer control knob. The top face is
-> perfectly circular, perfectly centred, and radially symmetric, with fine concentric machined
-> rings from metal spinning, like the face of a high-end audio knob. Dark graphite grey, matte
-> satin finish. Lit by perfectly even, flat, diffuse light from all sides: no highlights, no
-> reflections, no shadows, no shading gradient. No pointer line, no indicator dot, no notch, no
-> markings, no numbers, no text, no logo. Isolated on a pure black background. Ultra sharp,
-> high detail, macro photography.
+> Overhead macro photograph looking straight down onto the flat circular top face of a large
+> black anodised aluminium synthesizer knob, centred in the frame on a pure black background. The
+> face is a perfect circle covered edge to edge in fine concentric machined rings from metal
+> spinning, uniform all the way round, dark graphite grey with a matte satin finish. Soft,
+> perfectly even, diffuse light from all around, so the whole face has the same brightness.
+> Ultra sharp, high detail.
 
 **Avoid (negative):** pointer, indicator, notch, dot, line, numbers, scale, text, logo, side view,
 perspective, tilt, oval, off-centre, specular highlight, glare, reflection, shadow, gradient
@@ -97,12 +95,11 @@ backlight**: a dark olive-grey, faintly uneven backlight and the slight mottling
 
 **Prompt**
 
-> Front view, perfectly straight on, of the screen of a blank vintage monochrome LCD
-> display from a 1990s synthesizer, filling the entire frame edge to edge. Dark olive grey-green
-> glass with a faint, soft, uneven backlight that is slightly brighter in the middle, and very
-> subtle mottled patches and fine grain typical of old liquid-crystal panels. The screen is blank:
-> no characters, no text, no numbers, no pixels lit, no icons. No bezel, no frame, no reflections
-> of a room, no glare, no fingerprints. Flat, even, photographic, high detail.
+> A blank vintage monochrome liquid-crystal display screen filling the entire frame edge to edge,
+> seen perfectly straight on. Dark olive grey-green glass lit from behind by a faint, soft
+> backlight that is slightly brighter in the middle, with very subtle mottled patches and fine
+> grain typical of old LCD panels. The whole screen is one even, empty field of colour. Flat,
+> photographic, high detail.
 
 **Avoid (negative):** text, letters, numbers, segments, icons, pixels lit, bezel, frame, border,
 reflection, glare, fingerprints, scratches, perspective, bright green, neon, blue
