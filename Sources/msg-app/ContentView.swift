@@ -1,19 +1,27 @@
 import SwiftUI
 
+/// Pages, in the order signals travel: what's happening → signals → music → sound.
 enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
     case overview = "Overview"
     case flow = "Signal flow"
+    case tabletop = "Tabletop"
+    case modulation = "Modulation"
     case harmony = "Harmony"
-    case quantise = "Quantise"
     case generators = "Generators"
     case motifs = "Motifs"
+    case quantise = "Quantise"
     case voices = "Voices"
-    case tabletop = "Tabletop"
-    case mixer = "Mixer"
     case instruments = "Instruments"
-    case modulation = "Modulation"
+    case mixer = "Mixer"
 
     var id: String { rawValue }
+
+    static let sections: [(title: String, items: [SidebarItem])] = [
+        ("At a glance", [.overview, .flow, .tabletop]),
+        ("Signals", [.modulation, .harmony]),
+        ("Music", [.generators, .motifs, .quantise]),
+        ("Sound", [.voices, .instruments, .mixer]),
+    ]
 
     var icon: String {
         switch self {
@@ -38,8 +46,14 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(SidebarItem.allCases, selection: $selection) { item in
-                Label(item.rawValue, systemImage: item.icon).tag(item)
+            List(selection: $selection) {
+                ForEach(SidebarItem.sections, id: \.title) { section in
+                    Section(section.title) {
+                        ForEach(section.items) { item in
+                            Label(item.rawValue, systemImage: item.icon).tag(item)
+                        }
+                    }
+                }
             }
             .navigationSplitViewColumnWidth(min: 170, ideal: 190)
         } detail: {
@@ -68,6 +82,9 @@ struct ContentView: View {
             }
         }
         .navigationTitle(model.session?.scene.name ?? model.scene.name)
+        .onChange(of: model.navigate) { _, page in
+            if let page { selection = page; model.navigate = nil }
+        }
         .background(WindowVisibility { visible in
             if !model.forceVisualsActive { model.visualsActive = visible }
         })

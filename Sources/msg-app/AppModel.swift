@@ -260,6 +260,9 @@ final class AppModel {
         setMotifDesigns(all)
     }
 
+    /// Set to jump to a page (e.g. from the signal-flow inspector); ContentView follows it.
+    var navigate: SidebarItem?
+
     // MARK: Skin
 
     /// The look (System or Studio). Saved per user.

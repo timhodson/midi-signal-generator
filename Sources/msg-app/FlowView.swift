@@ -11,8 +11,10 @@ import SwiftUI
 struct FlowNode: Identifiable, Hashable {
     enum Kind: Hashable {
         case panel(PanelID)
-        case harmony, packets
+        case harmony, packets, quantise, mixer
         case output(String)
+        /// A signal that modulates settings (a mod route's source), e.g. "net.total.bytesPerSec".
+        case modSource(String)
     }
 
     let id: String
@@ -26,6 +28,9 @@ struct FlowEdge: Hashable {
     var role: String?
     /// Why the cable is there, for its tooltip in the inspector.
     var meaning: String
+    /// Modulation routes (indices into the scene's routes) this cable stands for; empty = not modulation.
+    var routes: [Int] = []
+    var isModulation: Bool { !routes.isEmpty }
 }
 
 /// Signals → Generators → Voices → Outputs, as the app is wired right now.
@@ -43,7 +48,7 @@ enum FlowGraph {
                        FlowNode(id: "packets", kind: .packets),
                        FlowNode(id: "harmony", kind: .harmony)]
         if !model.packetCapture && !gens.contains("packets") { signals.removeAll { $0.id == "packets" } }
-        let genNodes = gens.map { g -> FlowNode in let p = PanelID(page: .generators, group: g); return FlowNode(id: id(p), kind: .panel(p)) }
+        var genNodes = gens.map { g -> FlowNode in let p = PanelID(page: .generators, group: g); return FlowNode(id: id(p), kind: .panel(p)) }
         let voiceNodes = voices.map { v -> FlowNode in let p = PanelID(page: .voices, group: v); return FlowNode(id: id(p), kind: .panel(p)) }
 
         var outputs: [FlowNode] = []
@@ -83,7 +88,66 @@ enum FlowGraph {
             }
             edges.append(.init(from: voice(v), to: nodeID, role: v, meaning: "sends to \(DestinationPicker.label(dest, model: model))"))
         }
+
+        // Modulation: one box per route source, a cable to whatever owns each target setting.
+        var modEdges: [String: FlowEdge] = [:]
+        for (i, route) in model.routes.enumerated() {
+            let source = "mod:\(route.source)"
+            if !signals.contains(where: { $0.id == source }) { signals.append(FlowNode(id: source, kind: .modSource(route.source))) }
+            guard let owner = owner(of: route.target, model: model) else { continue }
+            switch owner {
+            case "quantise" where !genNodes.contains(where: { $0.id == "quantise" }):
+                genNodes.append(FlowNode(id: "quantise", kind: .quantise))
+            case "mixer" where !outputs.contains(where: { $0.id == "mixer" }):
+                outputs.append(FlowNode(id: "mixer", kind: .mixer))
+            default: break
+            }
+            let key = source + ">" + owner
+            let text = "modulates \(targetName(route.target, model: model)) (\(route.amount >= 0 ? "+" : "")\(route.amount.formatted(.number.precision(.fractionLength(2)))))"
+            if var e = modEdges[key] {
+                e.routes.append(i)
+                e.meaning += "; " + text
+                modEdges[key] = e
+            } else {
+                modEdges[key] = FlowEdge(from: source, to: owner, meaning: text, routes: [i])
+            }
+        }
+        edges += modEdges.values.sorted { ($0.from, $0.to) < ($1.from, $1.to) }
         return ([signals, genNodes, voiceNodes, outputs], edges)
+    }
+
+    /// The box that owns a setting: its generator, voice, hosted synth, or the Quantise / Harmony / Mixer box.
+    static func owner(of target: String, model: AppModel) -> String? {
+        let parts = target.split(separator: ".").map(String.init)
+        guard parts.count >= 2 else { return nil }
+        switch parts[0] {
+        case "gen": return id(PanelID(page: .generators, group: parts[1]))
+        case "activity": return id(PanelID(page: .generators, group: "activity"))
+        case "voice": return id(PanelID(page: .voices, group: parts[1]))
+        case "au":
+            return model.hostedInstruments.contains { $0.id == parts[1] } ? id(PanelID(page: .instruments, group: parts[1])) : nil
+        case "mix": return "mixer"
+        case "quant", "macro": return "quantise"
+        case "harmony", "conductor", "clock": return "harmony"
+        default: return nil
+        }
+    }
+
+    static func targetName(_ target: String, model: AppModel) -> String {
+        model.specsByID[target].map { $0.label == $0.id ? ParamRow.shortLabel($0.id).lowercased() : $0.label } ?? target
+    }
+
+    static func sourceName(_ source: String) -> String {
+        let parts = source.split(separator: "#", maxSplits: 1).map(String.init)
+        let key = parts.count > 1 ? parts[1] : nil
+        switch parts[0] {
+        case "net.total.bytesPerSec": return "Total traffic"
+        case "net.app.bytesPerSec": return "\(key ?? "App") traffic"
+        case "net.pkt.perSec": return "Packets per second"
+        case "net.flows.tcp": return "Open connections"
+        case "net.proto.bytesPerSec": return "\(key?.uppercased() ?? "Protocol") traffic"
+        default: return source
+        }
     }
 
     /// Everything upstream and downstream of `focus` (including it).
@@ -200,7 +264,7 @@ private struct Cables: View {
                     var path = Path()
                     path.move(to: p0)
                     path.addCurve(to: p1, control1: CGPoint(x: p0.x + dx, y: p0.y), control2: CGPoint(x: p1.x - dx, y: p1.y))
-                    let colour = e.role.map { RoleStyle.color($0) } ?? Color(white: 0.75)
+                    let colour = e.isModulation ? Color(red: 1, green: 0.72, blue: 0.25) : e.role.map { RoleStyle.color($0) } ?? Color(white: 0.75)
                     let dim = lit.map { $0.contains(e) ? 1.0 : 0.15 } ?? 0.75
                     let activity = self.activity(e, now: now)
                     if activity > 0 {
@@ -208,7 +272,8 @@ private struct Cables: View {
                     }
                     gc.stroke(path, with: .color(Color.black.opacity(0.5 * dim)), style: StrokeStyle(lineWidth: 4.5, lineCap: .round))
                     gc.stroke(path, with: .color(colour.opacity((0.55 + 0.45 * activity) * dim)),
-                              style: StrokeStyle(lineWidth: 2.5, lineCap: .round, dash: e.role == nil ? [6, 4] : []))
+                              style: StrokeStyle(lineWidth: e.isModulation ? 2 : 2.5, lineCap: .round,
+                                                 dash: e.isModulation ? [1, 4] : e.role == nil ? [6, 4] : []))
                     for p in [p0, p1] {
                         let r = CGRect(x: p.x - 4.5, y: p.y - 4.5, width: 9, height: 9)
                         gc.fill(Path(ellipseIn: r), with: .color(Color(white: 0.15).opacity(dim)))
@@ -222,6 +287,16 @@ private struct Cables: View {
     /// 0…1: how busy this cable is right now.
     private func activity(_ e: FlowEdge, now: Double) -> Double {
         guard let s = model.status else { return 0 }
+        if e.isModulation {
+            // How far the routes on this cable are pushing their targets right now.
+            let pushes = e.routes.compactMap { i -> Double? in
+                guard model.routes.indices.contains(i) else { return nil }
+                let t = model.routes[i].target
+                guard let spec = model.specsByID[t], let v = s.values[t], let b = s.bases[t] else { return nil }
+                return abs(v - b) / max(spec.span, .ulpOfOne)
+            }
+            return min((pushes.max() ?? 0) * 4, 1)
+        }
         if let role = e.role {
             let n = s.recentNotes.lazy.filter { $0.role == role && $0.time <= now && $0.time > now - 1.5 }.count
             return min(Double(n) / 4, 1)
@@ -261,6 +336,21 @@ private struct FlowNodeView: View {
             InfoTile(title: "Network packets", icon: "antenna.radiowaves.left.and.right", color: .teal,
                      lines: [live ? "capturing · \(Int(s?.capture?.packetsPerSecond ?? 0)) packets/s" : model.packetCapture ? "not capturing" : "off this session",
                              s?.netEvents.last.map { "\(EventFeed.kindLabel($0)) \($0.name)" } ?? "no events yet"],
+                     selected: selected, action: action)
+        case .modSource(let source):
+            let value = model.status?.signals[source] ?? 0
+            let count = model.routes.filter { $0.source == source }.count
+            InfoTile(title: FlowGraph.sourceName(source), icon: "waveform.path", color: Color(red: 1, green: 0.72, blue: 0.25),
+                     lines: [source.contains("bytesPerSec") ? Format.rate(value) : value.formatted(.number.precision(.fractionLength(0...1))),
+                             "modulates \(count) setting\(count == 1 ? "" : "s")"],
+                     selected: selected, action: action)
+        case .quantise:
+            InfoTile(title: "Quantise", icon: "square.grid.3x3", color: .gray,
+                     lines: ["pitch \(model.effective("quant.pitch.strength").formatted(.number.precision(.fractionLength(2)))) · time \(model.effective("quant.time.strength").formatted(.number.precision(.fractionLength(2))))"],
+                     selected: selected, action: action)
+        case .mixer:
+            InfoTile(title: "Mixer", icon: "slider.vertical.3", color: .gray,
+                     lines: ["master \(model.effective("mix.master").formatted(.number.precision(.fractionLength(2))))"],
                      selected: selected, action: action)
         case .output(let dest):
             let ok: Bool = dest == CoreMIDISink.virtualDestination || (model.destinationStatus[dest] ?? false)
@@ -330,12 +420,27 @@ private struct FlowInspector: View {
                 case .harmony:
                     Text("Harmony").font(.title3.weight(.semibold))
                     connections
-                    Text("The conductor turns smoothed traffic into a mood; each mood plays its own chord progression, changing on bar lines. The pad, bass and sub play the chords; the drummer's groove follows the mood and fills at the end of each progression. Edit it on the Harmony page.")
+                    Text("The conductor turns smoothed traffic into a mood; each mood plays its own chord progression, changing on bar lines. The pad, bass and sub play the chords; the drummer's groove follows the mood and fills at the end of each progression.")
                         .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Button("Open the Harmony page") { model.navigate = .harmony }
                 case .packets:
                     Text("Network packets").font(.title3.weight(.semibold))
                     connections
                     NetworkEventsCard()
+                case .modSource(let source):
+                    Text(FlowGraph.sourceName(source)).font(.title3.weight(.semibold))
+                    connections
+                    Text("A signal that moves settings through Modulation routes. Each route maps the signal's range onto part of a setting's range; the cables glow by how far each one is pushing its setting right now.")
+                        .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Button("Edit routes on the Modulation page") { model.navigate = .modulation }
+                case .quantise:
+                    Text("Quantise").font(.title3.weight(.semibold))
+                    connections
+                    Button("Open the Quantise page") { model.navigate = .quantise }
+                case .mixer:
+                    Text("Mixer").font(.title3.weight(.semibold))
+                    connections
+                    Button("Open the Mixer") { model.navigate = .mixer }
                 case .output(let dest):
                     Text(DestinationPicker.label(dest, model: model)).font(.title3.weight(.semibold))
                     connections
@@ -364,6 +469,9 @@ private struct FlowInspector: View {
 
     private func name(_ id: String) -> String {
         if id == "harmony" { return "Harmony" }
+        if id == "quantise" { return "Quantise" }
+        if id == "mixer" { return "Mixer" }
+        if id.hasPrefix("mod:") { return FlowGraph.sourceName(String(id.dropFirst(4))) }
         if id == "packets" { return "Network packets" }
         if id.hasPrefix("out:") { return DestinationPicker.label(String(id.dropFirst(4)), model: model) }
         let parts = id.dropFirst("panel:".count).split(separator: "/", maxSplits: 1).map(String.init)

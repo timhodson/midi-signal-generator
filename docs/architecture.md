@@ -121,6 +121,9 @@ types are `@unchecked Sendable` because the queue is their isolation. There are 
 through the session. Its parameter panels are generated from `ParamSpec`. See
 [ADR 0012](decisions/0012-mac-app-generated-from-params.md).
 
+The sidebar follows the same flow: **At a glance** (Overview, Signal flow, Tabletop), **Signals**
+(Modulation, Harmony), **Music** (Generators, Motifs, Quantise), **Sound** (Voices, Instruments, Mixer).
+
 Generators and Voices are **tile pages** (`Panels.swift`): one live tile per group (a note strip of
 its voice, two summary lines, an on/off light, pin and pop-out), and clicking a tile opens that
 group's settings underneath. The same `GroupPanel` view is used in its own window (`WindowGroup`
@@ -131,7 +134,10 @@ The **Signal flow** page (`FlowView.swift`) lays the patch out as four columns, 
 Generators → Voices → Outputs, joined by cables built from the live wiring: app activity → lead,
 packets → network events (and drums when accents are on), harmony → pad, bass, sub and drums,
 each generator → its voice (by role), each voice → its hosted synth or MIDI destination. Cables
-glow while notes, events or chord changes travel them; hovering or selecting a box lights its
+glow while notes, events or chord changes travel them. **Modulation** routes appear as amber dotted
+cables from a box per route source (e.g. Total traffic) to whatever owns the target setting (a
+generator, voice, hosted synth, or the Quantise, Harmony or Mixer box), glowing by how far they push
+their targets right now; hovering or selecting a box lights its
 upstream and downstream path; the selected box's settings open in the inspector.
 
 The **Mixer** page is a desk for the hosted synths (`AUHost/Mixer.swift`): each synth runs
