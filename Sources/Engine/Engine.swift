@@ -56,6 +56,7 @@ public final class Engine: @unchecked Sendable {
     private let motif = MotifGenerator()
     private let packets = PacketGenerator()
     private let drums = DrumGenerator()
+    private let lfos = [LFOGenerator(index: 1), LFOGenerator(index: 2)]
     private let variation = Variation()
     private var pendingHome = false
     private var nextVariationIn: Double?
@@ -87,7 +88,7 @@ public final class Engine: @unchecked Sendable {
         conductor = Conductor(progressions: progressions, gestures: scene.gestures)
         motif.designs = scene.motifs
         drums.custom = scene.grooves
-        generators = [DroneGenerator(), motif, PulseGenerator(), BassGenerator(), SubDroneGenerator(), packets, drums]
+        generators = [DroneGenerator(), motif, PulseGenerator(), BassGenerator(), SubDroneGenerator(), packets, drums] + lfos
         router = VoiceRouter(voices: scene.voices)
         scheduler = NoteScheduler(sink: sink)
         self.sink = sink
@@ -281,6 +282,9 @@ public final class Engine: @unchecked Sendable {
                 if let routed = router.route(control, params: params) { scheduler.schedule(routed) }
             }
         }
+
+        // LFO values as signals, for Modulation routes (lfo.1, lfo.2).
+        bus.post(lfos.map { SignalSample(.stream, "lfo.\($0.index)", value: $0.value, time: t) }, at: t)
 
         for d in packets.drainDecisions() {
             netEventCounter += 1

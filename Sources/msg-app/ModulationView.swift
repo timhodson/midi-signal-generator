@@ -20,7 +20,7 @@ struct ModulationView: View {
     private var studio: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 12) {
-                if !model.isRunning { NotRunningHint() }
+                if !model.isRunning { NotRunningHint() } else { LFOCard() }
                 HStack {
                     Text("ROUTES · \(model.routes.count)").font(Studio.legend(12, weight: .bold)).tracking(1.5)
                         .foregroundStyle(Studio.label)
@@ -40,7 +40,7 @@ struct ModulationView: View {
 
     private var list: some View {
         List {
-            if !model.isRunning { NotRunningHint() }
+            if !model.isRunning { NotRunningHint() } else { LFOCard().listRowSeparator(.hidden) }
             Section {
                 ForEach(Array(model.routes.enumerated()), id: \.offset) { i, route in
                     RouteRow(index: i, route: route)
@@ -140,6 +140,10 @@ struct AddRouteSheet: View {
             .filter { targetFilter.isEmpty || $0.id.localizedCaseInsensitiveContains(targetFilter) || $0.label.localizedCaseInsensitiveContains(targetFilter) }
         Form {
             Picker("Source signal", selection: $source) { ForEach(sources, id: \.self) { Text($0).tag($0) } }
+                .onChange(of: source) { _, s in
+                    // LFOs are already 0–1 and fast: linear, unsmoothed.
+                    if s.hasPrefix("lfo.") { scale = .linear; inputMin = 0; inputMax = 1; smoothing = 0 }
+                }
             TextField("Find target", text: $targetFilter)
             Picker("Target parameter", selection: $target) {
                 Text("Choose…").tag("")
@@ -203,6 +207,45 @@ struct Sparkline: View {
             .chartYAxis(.hidden)
             .padding(4)
             .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 6))
+        }
+    }
+}
+
+/// The two tempo-synced LFOs: a CC to a voice (wobble, pumping) and a signal for routes.
+struct LFOCard: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        VisualCard(title: "Tempo-synced LFOs",
+                   caption: "Shapes locked to the beat. Switch one on to send it to a voice as a MIDI CC: CC74 (filter) at 1/8 is a dubstep wobble; Pump on CC11 (expression) at 1/4 ducks like sidechain compression. Each is also the signal lfo.1 / lfo.2: add a route from it to ride any setting, hosted synths and the mixer included.") {
+            HStack(alignment: .top, spacing: 16) {
+                ForEach([1, 2], id: \.self) { n in lfo(n) }
+            }
+        }
+    }
+
+    private func lfo(_ n: Int) -> some View {
+        let id = { (s: String) in "lfo.\(n).\(s)" }
+        let value = model.status?.signals["lfo.\(n)"] ?? 0
+        let on = model.base(id("enabled")) >= 0.5
+        return SkinBox(title: "LFO \(n)") {
+            HStack(spacing: 10) {
+                if let spec = model.specsByID[id("enabled")] { LEDButton(spec: spec, label: "CC out", color: .orange) }
+                // Live level.
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.black.opacity(0.35))
+                        Capsule().fill(on ? Color.orange : Color.secondary.opacity(0.6))
+                            .frame(width: max(4, geo.size.width * value))
+                    }
+                }
+                .frame(height: 8)
+                Text(String(format: "%.2f", value)).font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 34)
+            }
+            ForEach(["rate", "shape", "role"], id: \.self) { s in
+                if let spec = model.specsByID[id(s)] { ParamRow(spec: spec) }
+            }
+            KnobGrid(specs: ["cc", "low", "high", "phase"].compactMap { model.specsByID[id($0)] }, color: .orange)
         }
     }
 }

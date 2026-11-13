@@ -153,7 +153,7 @@ struct ParamRow: View {
     static func shortLabel(_ id: String) -> String {
         var parts = id.split(separator: ".").map(String.init)
         parts.removeFirst()
-        if ["gen", "voice", "au", "mod"].contains(String(id.split(separator: ".").first ?? "")), parts.count > 1 {
+        if ["gen", "voice", "au", "mod", "lfo"].contains(String(id.split(separator: ".").first ?? "")), parts.count > 1 {
             parts.removeFirst()
         }
         var out = ""
@@ -161,7 +161,8 @@ struct ParamRow: View {
             if c.isUppercase, !out.isEmpty, out.last != " " { out.append(" ") }
             out.append(c)
         }
-        return out.prefix(1).uppercased() + out.dropFirst().lowercased()
+        let label = out.prefix(1).uppercased() + out.dropFirst().lowercased()
+        return label == "Cc" ? "CC" : label
     }
 
     static func format(_ v: Double, _ spec: ParamSpec) -> String {

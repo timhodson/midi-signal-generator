@@ -38,11 +38,25 @@ arpeggios and chord stabs.
   doesn't re-apply it over later tweaks; a scene that only sets `style.name` gets it at the first chord.
 - First pass: Synthwave, House, Disco, Funk, Hip hop, Dubstep, Rock, Pop.
 
+## Second pass
+
+- **15 more styles:** Techno, Trance, Drum & bass, Lo-fi, Trap, R&B, Reggae & dub, Jazz, Blues (twelve-bar
+  progressions), Country, Bossa nova, Reggaeton, Afrobeat, UK garage, Synth-pop. 23 in all.
+- **11 more grooves:** Techno, Drum & bass, Trap, One drop, Jazz swing, Shuffle, Train, Bossa nova,
+  Dembow, Afrobeat, Two-step. **6 more bass figures:** Rolling, 808, Reggae, Boogie, Bossa, Two-step.
+- **Tempo-synced LFOs** (`Music/LFO.swift`, `lfo.1`, `lfo.2`): Sine, Triangle, Saw up/down, Square,
+  Pump, at 4 bars … 1/16 and triplets, locked to the clock. On: a CC to one voice (CC74 at 1/8 =
+  the dubstep wobble; Pump on CC11 at 1/4 = sidechain-style ducking), at most every 8 ms and only on
+  change. Always: the signal `lfo.N` (0–1) on the bus, so a Modulation route can ride any setting
+  with it (new routes from an LFO default to linear 0–1, no smoothing). Dubstep, Drum & bass turn on
+  a bass filter LFO; House, Techno, Trance pump the pad. Every style resets both LFOs first.
+- **Sound suggestions:** per style and role, words to look for in preset names; the Style page lists
+  matching presets of hosted synths (click to load) and the words for external synths.
+- **Flat spelling:** chord and note names use flats when the key's relative major is a flat key.
+
 ## Consequences
 
-- The sound is still the synths': a style can't make a hosted pad a TR-909. Next pass: patch
-  suggestions per style for the hosted synths, and a tempo-synced LFO mod source (dubstep wobble,
-  sidechain-style pumping).
-- More styles are data only: techno, trance, drum & bass, lo-fi, trap, R&B, reggae/dub, ambient,
-  jazz, blues, country, bossa nova, reggaeton, afrobeat, UK garage, synth-pop.
-- Chord names are spelled with sharps (A♯ in D minor); flat spelling for flat keys is a follow-up.
+- The sound is still the synths': suggestions only match preset names, and a synth has to respond to
+  CC74 / CC11 for the wobble and pump (map them in the synth if not).
+- Grooves are one bar of 16ths: trap hi-hat rolls and jazz triplet swing are approximations (32nds and
+  a true triplet grid would need longer or finer grooves).

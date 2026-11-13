@@ -17,6 +17,7 @@ struct StyleView: View {
                     VStack(spacing: 12) {
                         StyleHeader()
                         StyleGrid()
+                        StyleSounds()
                         VariationHistory()
                     }
                     .padding(18)
@@ -121,5 +122,54 @@ private struct StyleGrid: View {
         if let p = setting("gen.pulse.mode") { parts.append("pulse: \(p)") }
         if !style.songGenres.isEmpty { parts.append("songs: \(style.songGenres.joined(separator: ", "))") }
         return parts.joined(separator: " · ")
+    }
+}
+
+/// Sounds for the chosen style: matching presets on hosted synths (click to load), and what to
+/// look for on external ones.
+private struct StyleSounds: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let i = Int(model.base("style.name"))
+        if i > 0, i <= Style.all.count {
+            let style = Style.all[i - 1]
+            VisualCard(title: "Sounds for \(style.name)",
+                       caption: "A style can't change what your synths sound like, so here are presets whose names suit it. Click one to load it on that voice's hosted synth; for external synths (the iPad, Bluetooth), the words to look for in its preset browser. Nothing changes until you pick.") {
+                ForEach(["pad", "bass", "pulse", "lead"], id: \.self) { role in row(style, role) }
+            }
+        }
+    }
+
+    @ViewBuilder private func row(_ style: Style, _ role: String) -> some View {
+        let dest = model.destination(of: role)
+        let words = ((Style.soundHints[style.name]?[role] ?? []) + (Style.roleHints[role] ?? []))
+            .reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(role.capitalized).fontWeight(.medium).frame(width: 60, alignment: .leading)
+            if dest.hasPrefix("au:"), let spec = model.specsByID["au.\(dest.dropFirst(3)).preset"] {
+                let current = Int(model.base(spec.id))
+                let picks = style.suggestedPresets(role: role, presets: spec.options)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(String(dest.dropFirst(3))) · now \(spec.options[safe: current]?.trimmingCharacters(in: .whitespaces) ?? "–")")
+                        .font(.caption).foregroundStyle(.secondary)
+                    if picks.isEmpty {
+                        Text("No preset names match (\(words.prefix(4).joined(separator: ", ")))").font(.caption).foregroundStyle(.tertiary)
+                    } else {
+                        HStack(spacing: 6) {
+                            ForEach(picks, id: \.index) { p in
+                                Button(p.name) { model.set(spec.id, Double(p.index)) }
+                                    .controlSize(.small)
+                                    .disabled(p.index == current)
+                            }
+                        }
+                    }
+                }
+            } else {
+                Text("\(DestinationPicker.label(dest, model: model)): look for \(words.prefix(5).joined(separator: ", "))")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
     }
 }

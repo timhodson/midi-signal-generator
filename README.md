@@ -68,7 +68,7 @@ surface. Any panel can also pop out into its own window.
 
 ### Signals
 
-**Modulation**: routes from a signal such as total traffic to any parameter, with range,
+**Modulation**: two tempo-synced LFOs (a CC to a voice, or a signal for routes), and routes from a signal such as total traffic to any parameter, with range,
 curve, smoothing and depth. Each route shows its input and the target's value moving live.
 
 ![Modulation](docs/screenshots/modulation.jpg)
@@ -82,10 +82,12 @@ or genre) or takes typed chords ("Am F C G"). The Clock section sends MIDI clock
 
 ### Music
 
-**Style**: make it **Synthwave, House, Disco, Funk, Hip hop, Dubstep, Rock or Pop**. A style sets tempo, scale,
-chord progressions (some borrowed from real songs of that genre), drum grooves, bass figures and arpeggios, all
-as ordinary settings. The network still drives it: a quiet network is the breakdown, a busy one the drop.
-**New take** rolls a fresh tempo, scale and progressions; Variation stays inside the style.
+**Style**: 23 genres, from Synthwave, House, Techno, Trance, Drum & bass and Dubstep to Funk, Disco, Hip hop,
+Lo-fi, Trap, R&B, Reggae & dub, Jazz, Blues, Country, Bossa nova, Reggaeton, Afrobeat, UK garage, Rock, Pop and
+Synth-pop. A style sets tempo, scale, chord progressions (some borrowed from real songs of that genre), drum
+grooves, bass figures, arpeggios and LFOs (the dubstep wobble, house pumping), all as ordinary settings, and
+suggests matching presets on your synths. The network still drives it: a quiet network is the breakdown, a busy
+one the drop. **New take** rolls a fresh tempo, scale and progressions; Variation stays inside the style.
 
 ![Style](docs/screenshots/style.jpg)
 

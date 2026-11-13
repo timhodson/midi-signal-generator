@@ -9,7 +9,8 @@ public final class BassGenerator: Generator {
     public let id = "bass"
     /// New patterns go on the end: scenes store the index.
     public static let patterns = ["Hold", "Beats", "Root–fifth", "Walk",
-                                  "Eighths", "Octaves", "Off-beat", "Funk", "Boom bap", "Wobble"]
+                                  "Eighths", "Octaves", "Off-beat", "Funk", "Boom bap", "Wobble",
+                                  "Rolling", "808", "Reggae", "Boogie", "Bossa", "Two-step"]
 
     /// A one-bar bass figure on the 16th grid: (step, chord tone, octave up?, length in 16ths, level).
     struct Hit { let step: Int; let tone: Int; let up: Bool; let length: Double; let level: Double }
@@ -33,6 +34,23 @@ public final class BassGenerator: Generator {
         // Wobble: dubstep, long low roots (a tempo-synced filter LFO on the synth gives the wobble).
         9: [Hit(step: 0, tone: 0, up: false, length: 7.5, level: 1), Hit(step: 8, tone: 0, up: false, length: 5.5, level: 0.95),
             Hit(step: 14, tone: 0, up: true, length: 1.5, level: 0.8)],
+        // Rolling: techno and trance, every 16th between the kicks.
+        10: (0..<16).filter { $0 % 4 != 0 }.map { Hit(step: $0, tone: 0, up: false, length: 0.8, level: $0 % 4 == 2 ? 0.9 : 0.7) },
+        // 808: trap and reggaeton, long low notes that follow the kick.
+        11: [Hit(step: 0, tone: 0, up: false, length: 5, level: 1), Hit(step: 7, tone: 0, up: false, length: 2.5, level: 0.85),
+             Hit(step: 10, tone: 0, up: false, length: 5.5, level: 0.9)],
+        // Reggae: rests on the one, melodic roots and fifths around the drop.
+        12: [Hit(step: 2, tone: 0, up: false, length: 3, level: 0.95), Hit(step: 6, tone: 2, up: false, length: 1.5, level: 0.8),
+             Hit(step: 8, tone: 0, up: false, length: 2, level: 1), Hit(step: 11, tone: 1, up: false, length: 1.5, level: 0.75),
+             Hit(step: 14, tone: 0, up: false, length: 1.5, level: 0.8)],
+        // Boogie: blues and rock 'n' roll, up the chord and back in 8ths.
+        13: zip(stride(from: 0, to: 16, by: 2), [0, 0, 1, 1, 2, 2, 1, 1]).map { Hit(step: $0, tone: $1, up: false, length: 1.6, level: $0 % 4 == 0 ? 1 : 0.8) },
+        // Bossa: root on one, the fifth anticipating three.
+        14: [Hit(step: 0, tone: 0, up: false, length: 3, level: 1), Hit(step: 6, tone: 2, up: false, length: 2, level: 0.8),
+             Hit(step: 8, tone: 2, up: false, length: 3, level: 0.9), Hit(step: 14, tone: 0, up: false, length: 2, level: 0.8)],
+        // Two-step: UK garage, syncopated with an octave pop.
+        15: [Hit(step: 0, tone: 0, up: false, length: 2, level: 1), Hit(step: 7, tone: 0, up: false, length: 1, level: 0.8),
+             Hit(step: 10, tone: 0, up: false, length: 2.5, level: 0.9), Hit(step: 13, tone: 0, up: true, length: 1, level: 0.75)],
     ]
     public init() {}
 

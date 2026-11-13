@@ -89,10 +89,9 @@
 7. Drums, next: more grooves and odd meters, per-lane timing feel (laid-back snare), groove morphing between moods.
 8. **Chord progressions from songs**: done (ADR 0019), McGill Billboard with decade / genre search and typed chords. Later: an optional Chordonomicon import (666k songs, non-commercial licence).
 9. **Signal flow, editable**: drag cables to rewire voices and create mod routes; route long cables along the gutters.
-10. **Styles** (ADR 0020): first pass done: Synthwave, House, Disco, Funk, Hip hop, Dubstep, Rock, Pop, with new grooves,
-   bass figures and arp / stab modes. Next pass: more styles (techno, trance, drum & bass, lo-fi, trap, R&B, reggae/dub,
-   jazz, blues, country, bossa nova, reggaeton, afrobeat, UK garage, synth-pop), a tempo-synced LFO mod source
-   (wobble, pumping), patch suggestions for hosted synths, flat chord spelling.
+10. **Styles** (ADR 0020): 23 genres, genre grooves and bass figures, arp / stab pulse modes, tempo-synced LFOs (wobble,
+   pumping), preset suggestions, flat chord spelling. Later: grooves longer than a bar or on a triplet grid (trap rolls,
+   jazz swing), style-aware motif rhythms, per-style mixer settings (reverb / delay sends).
 
 ## Later
 

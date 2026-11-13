@@ -438,3 +438,45 @@ private let dDorian = HarmonyContext(root: 2, scale: .dorian)
         #expect(!HarmonyContext(root: 2, scale: ScaleCatalogue.scales[2]).spellsWithFlats)
     }
 }
+
+@Suite struct LFOTests {
+    @Test func shapesStayInRange() {
+        for s in LFOGenerator.shapes.indices {
+            for i in 0..<100 { let v = LFOGenerator.shape(s, Double(i) / 100); #expect(v >= 0 && v <= 1) }
+        }
+        #expect(LFOGenerator.shape(5, 0) == 0)            // pump: ducked on the beat
+        #expect(LFOGenerator.shape(5, 0.7) == 1)          // …and back up
+        #expect(abs(LFOGenerator.shape(0, 0.5) - 1) < 1e-9)
+    }
+
+    @Test func wobbleSendsCCsLockedToTheBeat() throws {
+        let p = ParamStore()
+        let lfo = LFOGenerator(index: 1)
+        p.register(lfo.params)
+        try p.set("lfo.1.enabled", 1)
+        try p.set("lfo.1.rate", 5)    // 1/8: a cycle every half beat
+        try p.set("lfo.1.low", 0); try p.set("lfo.1.high", 1)
+        var clock = MusicalClock()
+        var rng = SeededRandom(seed: 1)
+        var values: [(beat: Double, cc: Int)] = []
+        var t = 0.0
+        while t < 1.0 { // 2 beats at 120 bpm
+            t += 0.005
+            let beats = clock.advance(to: t + 0.05, bpm: 120)
+            let ctx = GeneratorContext(now: t + 0.05, clock: clock, beats: beats, harmony: HarmonyContext(root: 0, scale: ScaleCatalogue.scales[0]),
+                                       params: p, chordChanged: false, activations: [], totalRate: 0)
+            for c in lfo.tick(ctx, rng: &rng).controls {
+                #expect(c.role == "bass" && c.controller == 74)
+                values.append((clock.beat(atTime: c.time), c.value))
+            }
+        }
+        #expect(values.count > 30)
+        // Sine: bottom at each half beat, top a quarter beat later.
+        let tops = values.filter { $0.cc >= 125 }.map { ($0.beat * 4).rounded() / 4 }
+        #expect(!tops.isEmpty && tops.allSatisfy { Int(($0 * 4).rounded()) % 2 == 1 })
+        try p.set("lfo.1.enabled", 0)
+        let ctx = GeneratorContext(now: 2, clock: clock, beats: 3..<3.1, harmony: HarmonyContext(root: 0, scale: ScaleCatalogue.scales[0]),
+                                   params: p, chordChanged: false, activations: [], totalRate: 0)
+        #expect(lfo.tick(ctx, rng: &rng).controls.isEmpty)
+    }
+}

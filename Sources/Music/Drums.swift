@@ -137,7 +137,9 @@ public struct DrumGroove: Codable, Sendable, Equatable, Identifiable {
     /// Choice options for the per-mood groove params. "Off" = no drums in that mood.
     /// New grooves go on the end: scenes store the index.
     public static let choices = ["Off", "Shaker", "Heartbeat", "Brushes", "Halftime", "Broken", "Euclidean",
-                                 "Four on the floor", "Disco", "Synthwave", "Backbeat", "Boom bap", "Dubstep", "Funk", "Breakdown"]
+                                 "Four on the floor", "Disco", "Synthwave", "Backbeat", "Boom bap", "Dubstep", "Funk", "Breakdown",
+                                 "Techno", "Drum & bass", "Trap", "One drop", "Jazz swing", "Shuffle", "Train", "Bossa nova",
+                                 "Dembow", "Afrobeat", "Two-step"]
     public static let euclidean = "Euclidean"
 
     public static let builtIn: [DrumGroove] = [
@@ -223,6 +225,79 @@ public struct DrumGroove: Codable, Sendable, Equatable, Identifiable {
             .hat:     "..x...x...x...x.",
             .shaker:  "x.g.x.g.x.g.x.g.",
             .rim:     "............-...",
+        ]),
+        DrumGroove(name: "Techno", lanes: [
+            .kick:    "X...x...x...x...",
+            .snare:   "....o.......o...",
+            .hat:     "xgxgxgxgxgxgxgxg",
+            .openHat: "..x...x...x...x.",
+            .rim:     "...g..o....g.o..",
+        ]),
+        DrumGroove(name: "Drum & bass", lanes: [
+            .kick:    "X.........x.....",
+            .snare:   "....X..g....X..g",
+            .hat:     "x.x.x.x.x.x.x.x.",
+            .openHat: "..............-.",
+            .shaker:  "gxgxgxgxgxgxgxgx",
+        ]),
+        DrumGroove(name: "Trap", lanes: [
+            .kick:    "X......x..x.....",
+            .snare:   "........X.......",
+            .hat:     "xgxgxgxgxgxgxxxx",
+            .openHat: "..............-.",
+            .rim:     "...........g....",
+        ]),
+        DrumGroove(name: "One drop", lanes: [
+            .kick:    "........X.......",
+            .rim:     "........x.......",
+            .hat:     "x.x.x.x.x.x.x.x.",
+            .openHat: "..............g.",
+            .shaker:  "..g...g...g...g.",
+        ]),
+        DrumGroove(name: "Jazz swing", lanes: [
+            .hat:     "x...x..gx...x..g",
+            .openHat: "....g.......g...",
+            .kick:    "g...g...g...g...",
+            .snare:   "......g.....-..g",
+            .rim:     "..........-.....",
+        ]),
+        DrumGroove(name: "Shuffle", lanes: [
+            .kick:    "X.......x.......",
+            .snare:   "....X.......X...",
+            .hat:     "x..gx..gx..gx..g",
+            .openHat: "..............-.",
+        ]),
+        DrumGroove(name: "Train", lanes: [
+            .kick:    "X.......X.......",
+            .snare:   "xgxgXgxgxgxgXgxg",
+            .hat:     "....x.......x...",
+        ]),
+        DrumGroove(name: "Bossa nova", lanes: [
+            .kick:    "X..xX..xX..xX..x",
+            .rim:     "x..x..x...x..x..",
+            .hat:     "g.g.g.g.g.g.g.g.",
+            .shaker:  "-.-.-.-.-.-.-.-.",
+        ]),
+        DrumGroove(name: "Dembow", lanes: [
+            .kick:    "X...x...X...x...",
+            .snare:   "...x..x....x..x.",
+            .hat:     "x.x.x.x.x.x.x.x.",
+            .rim:     ".......g.......g",
+        ]),
+        DrumGroove(name: "Afrobeat", lanes: [
+            .kick:    "X.....x...x.....",
+            .snare:   "....x..g....x...",
+            .hat:     "xgxgxgxgxgxgxgxg",
+            .openHat: "..x.......x.....",
+            .shaker:  "x.x.x.x.x.x.x.x.",
+            .tomLow:  "......o.......o.",
+        ]),
+        DrumGroove(name: "Two-step", lanes: [
+            .kick:    "X......x..x.....",
+            .snare:   "....X.......X...",
+            .hat:     "..x...x.gx..x.gx",
+            .openHat: ".......-.......-",
+            .shaker:  "g.g.g.g.g.g.g.g.",
         ]),
         DrumGroove(name: "Broken", lanes: [
             .kick:   "X..o..x...o..g..",

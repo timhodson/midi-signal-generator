@@ -251,7 +251,7 @@ import Params
     @Test func everySettingResolves() throws {
         let engine = try Engine(scene: .default, sink: PrintSink { _ in })
         for style in Style.all {
-            for (id, value) in style.settings {
+            for (id, value) in style.settings where !id.hasPrefix("au.") && !id.hasPrefix("mix.") { // hosted-only
                 let spec = try #require(engine.params.specs[id], "\(style.name): no param \(id)")
                 switch value {
                 case .option(let name):
@@ -315,3 +315,19 @@ import Params
     }
 }
 
+
+@Suite struct SoundSuggestionTests {
+    @Test func everyStyleHasHints() {
+        for style in Style.all { #expect(Style.soundHints[style.name] != nil, "\(style.name) has no sound hints") }
+    }
+
+    @Test func presetsMatchedByName() {
+        let presets = ["Init", "Juno Strings Pad", "Big Brass 80s", "Saw Bass 1", "Pluck Arp", "Wobble Monster", "Glass Bell"]
+        let synthwave = Style.all.first { $0.name == "Synthwave" }!
+        #expect(synthwave.suggestedPresets(role: "pad", presets: presets).first?.name == "Big Brass 80s")
+        #expect(synthwave.suggestedPresets(role: "bass", presets: presets).first?.name == "Saw Bass 1")
+        let dubstep = Style.all.first { $0.name == "Dubstep" }!
+        #expect(dubstep.suggestedPresets(role: "bass", presets: presets).first?.name == "Wobble Monster")
+        #expect(synthwave.suggestedPresets(role: "pulse", presets: ["Init"]).isEmpty)
+    }
+}
