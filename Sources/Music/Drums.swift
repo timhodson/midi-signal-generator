@@ -135,7 +135,9 @@ public struct DrumGroove: Codable, Sendable, Equatable, Identifiable {
     // MARK: Library
 
     /// Choice options for the per-mood groove params. "Off" = no drums in that mood.
-    public static let choices = ["Off", "Shaker", "Heartbeat", "Brushes", "Halftime", "Broken", "Euclidean"]
+    /// New grooves go on the end: scenes store the index.
+    public static let choices = ["Off", "Shaker", "Heartbeat", "Brushes", "Halftime", "Broken", "Euclidean",
+                                 "Four on the floor", "Disco", "Synthwave", "Backbeat", "Boom bap", "Dubstep", "Funk", "Breakdown"]
     public static let euclidean = "Euclidean"
 
     public static let builtIn: [DrumGroove] = [
@@ -168,6 +170,59 @@ public struct DrumGroove: Codable, Sendable, Equatable, Identifiable {
             .hat:     "x.g.o.g.x.g.o.g.",
             .openHat: "......-.......-.",
             .tomLow:  "-.............-.",
+        ]),
+        // Genre grooves (styles, ADR 0020). Snare backbeats need presence ≥ 0.55, crashes 0.7.
+        DrumGroove(name: "Four on the floor", lanes: [
+            .kick:    "X...x...x...x...",
+            .snare:   "....x.......x...",
+            .hat:     "g.o.g.o.g.o.g.o.",
+            .openHat: "..x...x...x...x.",
+            .shaker:  ".g.g.g.g.g.g.g.g",
+        ]),
+        DrumGroove(name: "Disco", lanes: [
+            .kick:    "X...x...x...x...",
+            .snare:   "....X.......X...",
+            .hat:     "x..gx..gx..gx..g",
+            .openHat: "..x...x...x...x.",
+            .tomLow:  "..............o.",
+        ]),
+        DrumGroove(name: "Synthwave", lanes: [
+            .kick:    "X.......x.o.....",
+            .snare:   "....X.......X...",
+            .hat:     "x.x.x.x.x.x.x.x.",
+            .openHat: "..............-.",
+            .tomLow:  "..............o.",
+        ]),
+        DrumGroove(name: "Backbeat", lanes: [
+            .kick:    "X.....o.x.o.....",
+            .snare:   "....X.......X..g",
+            .hat:     "x.x.x.x.x.x.x.x.",
+            .openHat: "..............o.",
+        ]),
+        DrumGroove(name: "Boom bap", lanes: [
+            .kick:    "X......o..x.....",
+            .snare:   "....X.......X..g",
+            .hat:     "x.x.x.x.x.x.x.xg",
+            .openHat: "..........-.....",
+            .rim:     "...........g....",
+        ]),
+        DrumGroove(name: "Dubstep", lanes: [
+            .kick:    "X.....o...x.....",
+            .snare:   "........X.......",
+            .hat:     "x.gx.gx.x.gx.gx.",
+            .openHat: ".......-.......-",
+            .tomLow:  "...........o..o.",
+        ]),
+        DrumGroove(name: "Funk", lanes: [
+            .kick:    "X..x..o.x.o..o..",
+            .snare:   "....X..g.g..X..g",
+            .hat:     "xgxgxgxgxgxgxgxg",
+            .openHat: "..........-.....",
+        ]),
+        DrumGroove(name: "Breakdown", lanes: [
+            .hat:     "..x...x...x...x.",
+            .shaker:  "x.g.x.g.x.g.x.g.",
+            .rim:     "............-...",
         ]),
         DrumGroove(name: "Broken", lanes: [
             .kick:   "X..o..x...o..g..",
@@ -318,7 +373,7 @@ public final class DrumGenerator: Generator {
         for mood in Conductor.Mood.allCases {
             let def: Double = switch mood { case .quiet: 1; case .calm: 2; case .busy: 3; case .focused: 4 }
             specs.append(ParamSpec("gen.drums.groove.\(mood.rawValue)", kind: .choice, default: def, options: DrumGroove.choices,
-                                   help: "The groove in the \(mood.rawValue.uppercased()) mood. Shaker = a light texture; Heartbeat = kick pairs and a soft backbeat; Brushes = a steady 16th feel; Halftime = slow and heavy; Broken = syncopated; Euclidean = built from the Euclid settings below. Off = no drums in this mood."))
+                                   help: "The groove in the \(mood.rawValue.uppercased()) mood. Shaker = a light texture; Heartbeat = kick pairs and a soft backbeat; Brushes = a steady 16th feel; Halftime = slow and heavy; Broken = syncopated; Euclidean = built from the Euclid settings below. Genre grooves (Four on the floor, Disco, Synthwave, Backbeat, Boom bap, Dubstep, Funk, Breakdown) come with styles and need presence ≥ 0.55 for their snare. Off = no drums in this mood."))
         }
         specs += [
             ParamSpec("gen.drums.accents", kind: .toggle, default: 0,

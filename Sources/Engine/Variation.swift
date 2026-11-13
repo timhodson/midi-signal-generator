@@ -66,7 +66,7 @@ public final class Variation {
         Item(id: "gen.pulse.octave", group: "generators", rule: .integer(3...5)),
         Item(id: "gen.pulse.span", group: "generators", rule: .integer(5...24)),
         Item(id: "gen.pulse.step", group: "generators", rule: .choice([1, 2, 3])),
-        Item(id: "gen.bass.pattern", group: "generators", rule: .choice(nil)),
+        Item(id: "gen.bass.pattern", group: "generators", rule: .choice([0, 1, 2, 3])), // genre figures come with styles
         Item(id: "gen.bass.octave", group: "generators", rule: .integer(1...3)),
         Item(id: "gen.sub.mode", group: "generators", rule: .choice(nil)),
         Item(id: "clock.bpm", group: "tempo", rule: .continuous(40...110)),
@@ -81,6 +81,14 @@ public final class Variation {
     /// Scales by how far they are from everyday modes: the first list is always available, the
     /// second from deviation 0.5, the third from 0.85. Chromatic is never picked (it has no chords).
     static let scaleTiers: [[Int]] = [[0, 1, 2, 4, 5, 9, 10], [3, 7, 8], [6, 11]]
+
+    /// Settings a style chooses for its genre, which variations leave alone while it's active.
+    static let styleOwned: Set<String> = ["gen.bass.pattern", "gen.sub.mode", "gen.pulse.step", "harmony.chordSize"]
+
+    /// Record a change made elsewhere (a style), so "What changed" shows it.
+    func note(_ reason: String, changes: [String], now: Double) {
+        record(.init(time: now, reason: reason, changes: changes))
+    }
 
     public struct Applied: Sendable, Hashable {
         public var time: Double
@@ -147,7 +155,9 @@ public final class Variation {
     }
 
     /// Make a variation. Returns what changed, in words.
-    func apply(_ p: ParamStore, _ conductor: Conductor, rng: inout SeededRandom, now: Double) -> [String] {
+    /// With a style active, variations stay inside it: its scales, its tempo range, progressions
+    /// from its pool, and its bass, pulse and groove choices left alone.
+    func apply(_ p: ParamStore, _ conductor: Conductor, rng: inout SeededRandom, now: Double, style: Style? = nil) -> [String] {
         let reason = pendingReason ?? "randomised"
         pendingReason = nil
         if home == nil { makeHome(p, conductor) }
@@ -159,15 +169,32 @@ public final class Variation {
 
         for item in Self.items where enabled.contains(item.group) {
             guard let spec = p.specs[item.id] else { continue }
+            if style != nil, Self.styleOwned.contains(item.id) || item.id.hasPrefix("gen.drums.groove.") { continue }
             let start = fromHome ? (home.values[item.id] ?? p.baseValue(item.id)) : p.baseValue(item.id)
             var v = start
             // Seeds are all-or-nothing, so they change less often than other settings.
             let chance = { if case .seed = item.rule { return d * 0.7 } else { return d } }()
-            if rng.chance(chance) { v = mutate(item.rule, start, d: d, spec: spec, rng: &rng) }
+            if rng.chance(chance) {
+                if let style, item.id == "harmony.scale" {
+                    let pool = style.scales.filter { $0 != Int(start) }
+                    if !pool.isEmpty { v = Double(pool[Int(rng.next() % UInt64(pool.count))]) }
+                } else if let style, item.id == "clock.bpm" {
+                    v = (style.bpm.lowerBound + rng.unit() * (style.bpm.upperBound - style.bpm.lowerBound)).rounded()
+                } else {
+                    v = mutate(item.rule, start, d: d, spec: spec, rng: &rng)
+                }
+            }
             try? p.set(item.id, v)
         }
 
-        if enabled.contains("harmony") {
+        if let style, enabled.contains("harmony") {
+            // Fresh progressions from the style (and its genres' songs), as many moods as deviation says.
+            let before = conductor.progressions
+            _ = style.pickProgressions(p, conductor, scale: p.int("harmony.scale"), rng: &rng)
+            for mood in Conductor.Mood.allCases where !rng.chance(max(d, 0.25)) {
+                conductor.progressions[mood] = fromHome ? (home.progressions[mood] ?? before[mood]) : before[mood]
+            }
+        } else if enabled.contains("harmony") {
             let harmony = conductor.harmony(p)
             for mood in Conductor.Mood.allCases {
                 let start = fromHome ? (home.progressions[mood] ?? [0]) : (conductor.progressions[mood] ?? [0])

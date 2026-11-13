@@ -109,6 +109,9 @@ enum Snapshot {
         Task { @MainActor in
             await model.start()
             if let error = model.error { print("start error: \(error)") }
+            if let name = arg("--style"), let i = Style.choices.firstIndex(where: { $0.lowercased() == name.lowercased() }) {
+                model.set("style.name", Double(i))
+            }
             if args.contains("--randomise") {
                 try? await Task.sleep(for: .seconds(1))
                 model.randomise()

@@ -264,6 +264,7 @@ final class AppModel {
     func returnHome() { session?.returnHome() }
     func makeHome() { session?.makeHome() }
     func restartClock() { session?.restartClock() }
+    func restyle() { session?.restyle() }
 
     /// Set to jump to a page (e.g. from the signal-flow inspector); ContentView follows it.
     var navigate: SidebarItem?

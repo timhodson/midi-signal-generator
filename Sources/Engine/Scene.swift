@@ -23,6 +23,10 @@ public struct Scene: Codable, Sendable {
     public var gestures: [String: [Int]]
     /// Apps that never trigger motifs (always-on daemons) while `activity.ignore` is on.
     public var ignoreApps: [String]
+    /// The style whose settings are already in `params` (saved with the scene), so loading it
+    /// doesn't apply the style again over later tweaks. A scene that sets `style.name` without
+    /// this (written by hand, or `--set style.name=…`) gets the style applied when it starts.
+    public var appliedStyle: String?
 
     public static let `default` = Scene(
         name: "Default — network ambient",
@@ -63,7 +67,7 @@ public struct Scene: Codable, Sendable {
     )
 
     private enum CodingKeys: String, CodingKey {
-        case name, seed, params, routes, macros, voices, instruments, motifs, grooves, progressions, gestures, ignoreApps
+        case name, seed, params, routes, macros, voices, instruments, motifs, grooves, progressions, gestures, ignoreApps, appliedStyle
     }
 
     public init(name: String, seed: UInt64, params: [String: Double], routes: [ModRoute], macros: [Macro],
@@ -95,6 +99,7 @@ public struct Scene: Codable, Sendable {
         progressions = try c.decode([String: [Int]].self, forKey: .progressions)
         gestures = try c.decode([String: [Int]].self, forKey: .gestures)
         ignoreApps = try c.decode([String].self, forKey: .ignoreApps)
+        appliedStyle = try c.decodeIfPresent(String.self, forKey: .appliedStyle)
         addDrumsIfMissing()
     }
 

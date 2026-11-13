@@ -238,6 +238,9 @@ public final class Session: @unchecked Sendable {
     /// MIDI clock: Stop now, Start again on the next bar line, from any thread.
     public func restartClock() { engine.queue.async { [engine] in engine.restartClock() } }
 
+    /// A new take on the current style (tempo, scale, progressions), from any thread.
+    public func restyle() { engine.queue.async { [engine] in engine.restyle() } }
+
     /// Replace the edited drum grooves (live), from any thread.
     public func setGrooves(_ grooves: [DrumGroove]) {
         engine.queue.async { [engine] in engine.setGrooves(grooves) }

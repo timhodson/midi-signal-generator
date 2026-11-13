@@ -7,7 +7,33 @@ import Params
 /// Traffic adds fills between the main notes and pushes the dynamics.
 public final class BassGenerator: Generator {
     public let id = "bass"
-    public static let patterns = ["Hold", "Beats", "Root–fifth", "Walk"]
+    /// New patterns go on the end: scenes store the index.
+    public static let patterns = ["Hold", "Beats", "Root–fifth", "Walk",
+                                  "Eighths", "Octaves", "Off-beat", "Funk", "Boom bap", "Wobble"]
+
+    /// A one-bar bass figure on the 16th grid: (step, chord tone, octave up?, length in 16ths, level).
+    struct Hit { let step: Int; let tone: Int; let up: Bool; let length: Double; let level: Double }
+
+    /// Genre figures (styles, ADR 0020), by pattern index.
+    static let figures: [Int: [Hit]] = [
+        // Eighths: straight driving 8ths on the root (synthwave, rock).
+        4: stride(from: 0, to: 16, by: 2).map { Hit(step: $0, tone: 0, up: false, length: 1.6, level: $0 % 4 == 0 ? 1 : 0.8) },
+        // Octaves: disco, root and the octave above in 8ths.
+        5: stride(from: 0, to: 16, by: 2).map { Hit(step: $0, tone: 0, up: $0 % 4 == 2, length: 1.4, level: $0 % 4 == 0 ? 1 : 0.85) },
+        // Off-beat: house, on every "and".
+        6: [2, 6, 10, 14].map { Hit(step: $0, tone: 0, up: false, length: 1.8, level: 0.95) },
+        // Funk: syncopated 16ths around the root, octave and fifth.
+        7: [Hit(step: 0, tone: 0, up: false, length: 1.5, level: 1), Hit(step: 3, tone: 0, up: false, length: 0.8, level: 0.6),
+            Hit(step: 6, tone: 0, up: true, length: 0.8, level: 0.85), Hit(step: 7, tone: 0, up: false, length: 0.8, level: 0.7),
+            Hit(step: 10, tone: 2, up: false, length: 1.5, level: 0.85), Hit(step: 12, tone: 0, up: false, length: 0.8, level: 0.75),
+            Hit(step: 14, tone: 0, up: true, length: 0.8, level: 0.8), Hit(step: 15, tone: 2, up: false, length: 0.8, level: 0.6)],
+        // Boom bap: sparse, with the kick.
+        8: [Hit(step: 0, tone: 0, up: false, length: 3, level: 1), Hit(step: 7, tone: 0, up: false, length: 1.5, level: 0.8),
+            Hit(step: 10, tone: 2, up: false, length: 2.5, level: 0.85)],
+        // Wobble: dubstep, long low roots (a tempo-synced filter LFO on the synth gives the wobble).
+        9: [Hit(step: 0, tone: 0, up: false, length: 7.5, level: 1), Hit(step: 8, tone: 0, up: false, length: 5.5, level: 0.95),
+            Hit(step: 14, tone: 0, up: true, length: 1.5, level: 0.8)],
+    ]
     public init() {}
 
     public var params: [ParamSpec] {
@@ -15,7 +41,7 @@ public final class BassGenerator: Generator {
             ParamSpec("gen.bass.enabled", kind: .toggle, default: 1,
                       help: "Play the bass line: the root of each chord, low down."),
             ParamSpec("gen.bass.pattern", kind: .choice, default: 2, options: Self.patterns,
-                      help: "Hold = one long note per chord. Beats = the root repeated every step. Root–fifth = alternates root and fifth. Walk = climbs root, third, fifth, octave."),
+                      help: "Hold = one long note per chord. Beats = the root repeated every step. Root–fifth = alternates root and fifth. Walk = climbs root, third, fifth, octave. Genre figures (one bar on the 16th grid, ignore Step): Eighths = driving 8ths; Octaves = disco root and octave; Off-beat = house, on every 'and'; Funk = syncopated 16ths; Boom bap = sparse, with the kick; Wobble = long dubstep roots."),
             ParamSpec("gen.bass.octave", kind: .integer, range: 0...4, default: 2,
                       help: "Register of the bass. 2 is a typical bass guitar range; 1 is deep, 3 sits in the low mids. The voice's range still folds notes into place."),
             ParamSpec("gen.bass.stepBeats", kind: .continuous, range: 0.5...8, default: 2, unit: "beats",
@@ -26,6 +52,8 @@ public final class BassGenerator: Generator {
                       help: "Base loudness of the bass."),
             ParamSpec("gen.bass.dynamics", default: 0.4,
                       help: "How much traffic volume changes bass loudness. 0 = steady, 1 = quiet network is soft, busy network is loud."),
+            ParamSpec("gen.bass.inQuiet", kind: .toggle, default: 1,
+                      help: "Play in the quiet mood. Off = the bass drops out when the network is quiet (a breakdown) and comes back with the traffic: the drop. Styles for dance music turn this off."),
             ParamSpec("gen.bass.fills", default: 0.35,
                       help: "Chance of an extra note halfway between steps when traffic is heavy. Scales with traffic, so a quiet network never fills. 0 = no fills."),
         ]
@@ -35,6 +63,7 @@ public final class BassGenerator: Generator {
         var out = GeneratorOutput()
         let p = ctx.params
         guard p.bool("gen.bass.enabled") else { return out }
+        if !p.bool("gen.bass.inQuiet"), ctx.mood == "quiet" { return out }
         let octave = p.int("gen.bass.octave")
         let level = trafficLevel(ctx.totalRate)
         let d = p.value("gen.bass.dynamics")
@@ -46,6 +75,20 @@ public final class BassGenerator: Generator {
                 let beats = Double(p.int("harmony.barsPerChord") * ctx.clock.beatsPerBar) * max(p.value("gen.bass.length"), 0.25)
                 out.notes.append(NoteIntent(role: "bass", pitch: .chordTone(0, octave: octave), intensity: intensity,
                                             time: ctx.now, beats: beats, essential: true, why: "chord changed → hold root"))
+            }
+            return out
+        }
+
+        if let figure = Self.figures[pattern] {
+            // One-bar figures on the 16th grid; "length" scales their note lengths.
+            for beat in MusicalClock.crossings(of: 0.25, in: ctx.beats) {
+                let i = Int((beat / 0.25).rounded()), step = ((i % 16) + 16) % 16
+                for h in figure where h.step == step {
+                    out.notes.append(NoteIntent(role: "bass", pitch: .chordTone(h.tone, octave: octave + (h.up ? 1 : 0)),
+                                                intensity: intensity * h.level, time: ctx.clock.time(ofBeat: beat),
+                                                beats: 0.25 * h.length * max(p.value("gen.bass.length"), 0.1) / 0.9, essential: true,
+                                                why: "\(Self.patterns[pattern].lowercased()) figure · 16th \(step + 1)"))
+                }
             }
             return out
         }

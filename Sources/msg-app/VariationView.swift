@@ -105,7 +105,7 @@ private struct VariationControls: View {
     }
 }
 
-private struct VariationHistory: View {
+struct VariationHistory: View {
     @Environment(AppModel.self) private var model
     @Environment(\.skin) private var skin
 

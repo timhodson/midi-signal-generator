@@ -345,3 +345,82 @@ private let dDorian = HarmonyContext(root: 2, scale: .dorian)
         #expect(SongChord.parse("   ", key: 0) == nil)
     }
 }
+
+@Suite struct GenrePatternTests {
+    func store(_ settings: [String: Double]) throws -> ParamStore {
+        let p = ParamStore()
+        p.register(Conductor.params)
+        p.register(BassGenerator().params)
+        p.register(PulseGenerator().params)
+        for (k, v) in settings { try p.set(k, v) }
+        return p
+    }
+
+    func ctx(_ p: ParamStore, beats: Range<Double> = -0.001..<3.999, mood: String = "busy") -> GeneratorContext {
+        var clock = MusicalClock()
+        _ = clock.advance(to: 1, bpm: 120)
+        return GeneratorContext(now: 1, clock: clock, beats: beats, harmony: HarmonyContext(root: 0, scale: ScaleCatalogue.scales[1]),
+                                params: p, chordChanged: false, activations: [], totalRate: 100_000, mood: mood)
+    }
+
+    func beats(_ notes: [NoteIntent], _ c: GeneratorContext) -> [Double] {
+        notes.map { ($0.time - c.clock.time) / c.clock.secondsPerBeat + c.clock.beat }.map { ($0 * 4).rounded() / 4 }
+    }
+
+    @Test func houseBassIsOnTheOffBeats() throws {
+        let p = try store(["gen.bass.pattern": Double(BassGenerator.patterns.firstIndex(of: "Off-beat")!)])
+        var rng = SeededRandom(seed: 1)
+        let c = ctx(p)
+        let out = BassGenerator().tick(c, rng: &rng)
+        #expect(beats(out.notes, c) == [0.5, 1.5, 2.5, 3.5])
+    }
+
+    @Test func discoBassJumpsOctaves() throws {
+        let p = try store(["gen.bass.pattern": Double(BassGenerator.patterns.firstIndex(of: "Octaves")!), "gen.bass.octave": 2])
+        var rng = SeededRandom(seed: 1)
+        let out = BassGenerator().tick(ctx(p), rng: &rng)
+        #expect(out.notes.count == 8)
+        #expect(out.notes.map(\.pitch).prefix(2) == [.chordTone(0, octave: 2), .chordTone(0, octave: 3)])
+    }
+
+    @Test func bassSitsOutTheBreakdown() throws {
+        let p = try store(["gen.bass.pattern": 4, "gen.bass.inQuiet": 0])
+        var rng = SeededRandom(seed: 1)
+        #expect(BassGenerator().tick(ctx(p, mood: "quiet"), rng: &rng).notes.isEmpty)
+        #expect(!BassGenerator().tick(ctx(p, mood: "calm"), rng: &rng).notes.isEmpty)
+    }
+
+    @Test func arpeggioClimbsTheChordThenTurns() throws {
+        let p = try store(["gen.pulse.mode": 2, "gen.pulse.density": 1, "gen.pulse.step": 3, "gen.pulse.octave": 4,
+                           "gen.pulse.arpOctaves": 2, "harmony.chordSize": 3])
+        var rng = SeededRandom(seed: 1)
+        let out = PulseGenerator().tick(ctx(p, beats: -0.001..<2.5), rng: &rng)
+        // Up-down over 2 octaves of a triad: 0 1 2 | 0 1 2 (an octave up) then back down.
+        let tones = out.notes.map { n -> String in
+            if case .chordTone(let t, let o) = n.pitch { return "\(t)@\(o)" }
+            return "?"
+        }
+        #expect(Array(tones.prefix(8)) == ["0@4", "1@4", "2@4", "0@5", "1@5", "2@5", "1@5", "0@5"])
+    }
+
+    @Test func offBeatStabsPlayTheWholeChord() throws {
+        let p = try store(["gen.pulse.mode": 3, "gen.pulse.density": 1, "gen.pulse.step": 1, "harmony.chordSize": 4])
+        var rng = SeededRandom(seed: 1)
+        let c = ctx(p)
+        let out = PulseGenerator().tick(c, rng: &rng)
+        #expect(out.notes.count == 4 * 4) // four off-beats × four chord tones
+        #expect(Set(beats(out.notes, c)) == [0.5, 1.5, 2.5, 3.5])
+    }
+
+    @Test func genreGroovesAreWellFormed() {
+        for name in DrumGroove.choices where name != "Off" && name != DrumGroove.euclidean {
+            let g = DrumGroove.builtIn.first { $0.name == name }
+            #expect(g != nil, "\(name) is a choice but not built in")
+            for (lane, row) in g?.lanes ?? [:] {
+                #expect(DrumLane(rawValue: lane) != nil)
+                #expect(row.count == 16, "\(name) \(lane) has \(row.count) steps")
+                #expect(row.allSatisfy { $0 == "." || DrumCell($0) != nil })
+            }
+        }
+    }
+}

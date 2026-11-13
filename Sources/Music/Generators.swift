@@ -220,11 +220,16 @@ public final class MotifGenerator: Generator {
 /// `gen.pulse.density` (route total traffic to it), pitch rising with traffic volume.
 public final class PulseGenerator: Generator {
     public let id = "pulse"
+    public static let modes = ["Sparkle", "Arp up", "Arp up-down", "Off-beat stabs", "Chord pulse"]
     public init() {}
 
     public var params: [ParamSpec] {
         [
             ParamSpec("gen.pulse.enabled", kind: .toggle, default: 1, help: "A sparse rhythmic sparkle: random notes on the grid whose density follows total traffic."),
+            ParamSpec("gen.pulse.mode", kind: .choice, default: 0, options: Self.modes,
+                      help: "Sparkle = random notes whose pitch rises with traffic (the original). Arp up / up-down = the chord's notes in turn on every step, over 'arp octaves' (synthwave, trance). Off-beat stabs = the whole chord on each off-beat (house, disco, reggae). Chord pulse = the whole chord on every step (rock, synthwave). Density is each step's chance of playing, so traffic can thin or fill it."),
+            ParamSpec("gen.pulse.arpOctaves", kind: .integer, range: 1...4, default: 2,
+                      help: "How many octaves an arpeggio climbs before it turns or starts again."),
             ParamSpec("gen.pulse.step", kind: .choice, default: 1, options: Quantiser.gridOptions.map(\.label),
                       help: "Grid the pulse fires on. 1/8 = gentle; 1/16 = busier, more glitchy."),
             ParamSpec("gen.pulse.density", default: 0.05, help: "Chance of a note on each step. Traffic adds to this by default, so a busy network sparkles more."),
@@ -244,6 +249,8 @@ public final class PulseGenerator: Generator {
         let p = ctx.params
         guard p.bool("gen.pulse.enabled") else { return out }
         let step = Quantiser.gridOptions[p.int("gen.pulse.step")].beats
+        let mode = p.int("gen.pulse.mode")
+        if mode > 0 { return chordPattern(mode, step: step, ctx, rng: &rng) }
         let level = min(max((log10(max(ctx.totalRate, 1)) - 3) / 4, 0), 1)
         for beat in MusicalClock.crossings(of: step, in: ctx.beats) where rng.chance(p.value("gen.pulse.density")) {
             let base = Double(12 * (p.int("gen.pulse.octave") + 1) + ctx.harmony.root)
@@ -253,6 +260,53 @@ public final class PulseGenerator: Generator {
                 time: ctx.clock.time(ofBeat: beat), beats: p.value("gen.pulse.noteBeats"),
                 why: String(format: "%.0f%% chance on this step · traffic %@", p.value("gen.pulse.density") * 100, formatRate(ctx.totalRate))
             ))
+        }
+        return out
+    }
+}
+
+extension PulseGenerator {
+    /// Arpeggios and stabs built from the current chord.
+    func chordPattern(_ mode: Int, step: Double, _ ctx: GeneratorContext, rng: inout SeededRandom) -> GeneratorOutput {
+        var out = GeneratorOutput()
+        let p = ctx.params
+        let octave = p.int("gen.pulse.octave")
+        let size = max(p.int("harmony.chordSize"), 1)
+        let density = p.value("gen.pulse.density")
+        let length = p.value("gen.pulse.noteBeats")
+        let intensity = p.value("gen.pulse.intensity")
+        let mood = Self.modes[mode].lowercased()
+        for beat in MusicalClock.crossings(of: step, in: ctx.beats) {
+            let i = Int((beat / step).rounded())
+            switch mode {
+            case 1, 2:
+                guard rng.chance(density) else { continue }
+                let span = size * max(p.int("gen.pulse.arpOctaves"), 1)
+                var k = i % span
+                if mode == 2, span > 1 {
+                    let cycle = 2 * span - 2
+                    let j = i % cycle
+                    k = j < span ? j : cycle - j
+                }
+                // Chord tone k of the chord, climbing an octave every `size` tones.
+                out.notes.append(NoteIntent(role: "pulse", pitch: .chordTone(k % size, octave: octave + k / size),
+                                            intensity: intensity * (k == 0 ? 1 : 0.85), time: ctx.clock.time(ofBeat: beat),
+                                            beats: length, essential: true, why: "\(mood) · note \(k + 1) of \(span)"))
+            case 3, 4:
+                // Off-beats: the second half of each beat when the grid is 1/8, the "and" when 1/16.
+                if mode == 3 {
+                    let perBeat = max(Int((1 / step).rounded()), 1)
+                    let pos = ((i % perBeat) + perBeat) % perBeat
+                    guard perBeat >= 2, pos == perBeat / 2 else { continue }
+                }
+                guard rng.chance(density) else { continue }
+                let t = ctx.clock.time(ofBeat: beat)
+                for tone in 0..<size {
+                    out.notes.append(NoteIntent(role: "pulse", pitch: .chordTone(tone, octave: octave), intensity: intensity * 0.85,
+                                                time: t, beats: length, essential: true, why: "\(mood) · chord on the grid"))
+                }
+            default: break
+            }
         }
         return out
     }

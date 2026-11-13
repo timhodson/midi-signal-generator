@@ -104,6 +104,13 @@ public struct EngineStatus: Sendable {
     public var variation: VariationInfo?
     /// MIDI clock out: who gets it, and who has been sent Start.
     public var clock: ClockInfo?
+    /// The genre style applied (index into `Style.choices`), and whether a change is waiting for the next chord.
+    public var style: StyleInfo?
+
+    public struct StyleInfo: Sendable, Equatable {
+        public var applied: Int
+        public var pending: Bool
+    }
 
     public struct ClockInfo: Sendable, Equatable {
         public var destinations: [String]

@@ -30,6 +30,11 @@ public final class Engine: @unchecked Sendable {
     private let scheduler: NoteScheduler
     private let sink: MIDISink
     private var clockOut = ClockOut()
+    /// The style last applied (index into `Style.choices`; 0 = none), a pending (re)apply, and the
+    /// scene as it was before the first style, for going back to "None".
+    private var appliedStyle = 0
+    private var styleRequested = false
+    private var beforeStyle: (values: [String: Double], progressions: [Conductor.Mood: [Int]])?
     private let parameterisedSink: ParameterisedSink?
     private var quantiser = Quantiser()
     private var activity = ActivityTracker()
@@ -93,6 +98,7 @@ public final class Engine: @unchecked Sendable {
         params.register(ActivityTracker.params)
         params.register(Variation.params)
         params.register(ClockOut.params)
+        params.register(Style.params)
         for g in generators { params.register(g.params) }
         router.registerParams(in: params)
         parameterisedSink?.registerParams(in: params)
@@ -111,6 +117,9 @@ public final class Engine: @unchecked Sendable {
             try setParam(id, value)
         }
         variation.makeHome(params, conductor)
+        // A scene saved with a style already has its settings: don't re-apply on load. One that
+        // only asks for a style gets it at the first chord.
+        appliedStyle = scene.appliedStyle.flatMap { Style.choices.firstIndex(of: $0) } ?? 0
     }
 
     /// Set a parameter (or macro) by id. Call on `queue` once running.
@@ -203,9 +212,13 @@ public final class Engine: @unchecked Sendable {
             // Variations (and going back home) land on chord boundaries, scheduled ones at the end of a phrase.
             let boundary = bar % max(params.int("harmony.barsPerChord"), 1) == 0
             let phraseStarts = boundary && !conductor.gesturePending && conductor.progressionIndex >= conductor.progressionLength - 1
-            if boundary, pendingHome || variation.shouldApply(atChordBoundary: boundary, phraseStarts: phraseStarts, params) {
+            if boundary, styleRequested || params.int("style.name") != appliedStyle {
+                applyStyle(now: t)
+                conductor.restartPhrase()
+                chordChanged = true
+            } else if boundary, pendingHome || variation.shouldApply(atChordBoundary: boundary, phraseStarts: phraseStarts, params) {
                 let changes = pendingHome ? variation.returnHome(params, conductor, now: t)
-                                          : variation.apply(params, conductor, rng: &rng, now: t)
+                                          : variation.apply(params, conductor, rng: &rng, now: t, style: activeStyle)
                 log("♪ \(pendingHome ? "back home" : "variation"): \(changes.isEmpty ? "no change" : changes.joined(separator: "; "))")
                 pendingHome = false
                 conductor.restartPhrase()
@@ -310,6 +323,7 @@ extension Engine {
         s.gestures = conductor.gestures
         s.motifs = motif.designs
         s.grooves = drums.custom
+        s.appliedStyle = appliedStyle > 0 ? Style.choices[safe: appliedStyle] : nil
         return s
     }
 
@@ -370,6 +384,44 @@ extension Engine {
             conductor.gestures[mood] = degrees
         }
     }
+
+    // MARK: - Styles
+
+    /// The style in force, if any.
+    var activeStyle: Style? {
+        let i = params.int("style.name")
+        return i > 0 && i <= Style.all.count ? Style.all[i - 1] : nil
+    }
+
+    /// Apply the chosen style (or a new take on it), or put the scene back for "None".
+    private func applyStyle(now t: Double) {
+        styleRequested = false
+        let index = params.int("style.name")
+        defer { appliedStyle = index }
+        if appliedStyle == 0, index != 0 {
+            beforeStyle = (params.baseValues, conductor.progressions)
+        }
+        guard let style = activeStyle else {
+            if let saved = beforeStyle {
+                for (id, v) in saved.values where id != "style.name" && params.specs[id]?.id.hasPrefix("mod.") == false {
+                    try? params.set(id, v)
+                }
+                conductor.progressions = saved.progressions
+                beforeStyle = nil
+                variation.note("style off: back to the scene", changes: ["settings and progressions as they were before the style"], now: t)
+                log("♪ style off: back to the scene")
+            }
+            variation.makeHome(params, conductor)
+            return
+        }
+        let changes = style.apply(params, conductor, rng: &rng)
+        variation.note(index == appliedStyle ? "new take: \(style.name)" : "style: \(style.name)", changes: changes, now: t)
+        variation.makeHome(params, conductor) // variations now start from the style
+        log("♪ style \(style.name): \(changes.joined(separator: "; "))")
+    }
+
+    /// Apply the current style again with a fresh tempo, scale and progressions. Call on `queue`.
+    public func restyle() { if activeStyle != nil { styleRequested = true } }
 
     // MARK: - Clock out
 
@@ -434,7 +486,8 @@ extension Engine {
             apps: appInfos(), motifs: motif.designs, netEvents: netEvents, capture: capture,
             drums: drums.status(params: params),
             variation: .init(log: variation.log, nextIn: nextVariationIn, pending: variation.pendingReason ?? (pendingHome ? "back home" : nil)),
-            clock: .init(destinations: clockOut.targets.sorted(), started: clockOut.started.sorted())
+            clock: .init(destinations: clockOut.targets.sorted(), started: clockOut.started.sorted()),
+            style: .init(applied: appliedStyle, pending: styleRequested || params.int("style.name") != appliedStyle)
         )
     }
 }
@@ -443,4 +496,8 @@ extension String {
     func padding(_ width: Int) -> String {
         count >= width ? self : self + String(repeating: " ", count: width - count)
     }
+}
+
+extension Array {
+    subscript(safe i: Int) -> Element? { indices.contains(i) ? self[i] : nil }
 }

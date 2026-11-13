@@ -82,6 +82,13 @@ or genre) or takes typed chords ("Am F C G"). The Clock section sends MIDI clock
 
 ### Music
 
+**Style**: make it **Synthwave, House, Disco, Funk, Hip hop, Dubstep, Rock or Pop**. A style sets tempo, scale,
+chord progressions (some borrowed from real songs of that genre), drum grooves, bass figures and arpeggios, all
+as ordinary settings. The network still drives it: a quiet network is the breakdown, a busy one the drop.
+**New take** rolls a fresh tempo, scale and progressions; Variation stays inside the style.
+
+![Style](docs/screenshots/style.jpg)
+
 **Generators**: one tile per generator: pad drone, lead motifs, pulse, bass, sub drone, network
 events (DNS lookups, handshakes, LAN chatter from `msg-pcap`) and the **drummer**. Each tile shows its
 recent notes and what it's doing; click one to open it. The drummer has a groove for each mood, with **presence**

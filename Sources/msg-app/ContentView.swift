@@ -7,6 +7,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
     case tabletop = "Tabletop"
     case modulation = "Modulation"
     case harmony = "Harmony"
+    case style = "Style"
     case generators = "Generators"
     case motifs = "Motifs"
     case quantise = "Quantise"
@@ -20,7 +21,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
     static let sections: [(title: String, items: [SidebarItem])] = [
         ("At a glance", [.overview, .flow, .tabletop]),
         ("Signals", [.modulation, .harmony]),
-        ("Music", [.generators, .motifs, .quantise, .variation]),
+        ("Music", [.style, .generators, .motifs, .quantise, .variation]),
         ("Sound", [.voices, .instruments, .mixer]),
     ]
 
@@ -29,6 +30,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
         case .overview: "waveform.path.ecg"
         case .flow: "point.3.filled.connected.trianglepath.dotted"
         case .variation: "dice"
+        case .style: "guitars"
         case .harmony: "music.note.list"
         case .quantise: "square.grid.3x3"
         case .generators: "sparkles"
@@ -100,6 +102,7 @@ struct ContentView: View {
         case .overview: OverviewView()
         case .flow: FlowView()
         case .variation: VariationView()
+        case .style: StyleView()
         case .harmony:
             ParamSection(title: "Harmony", prefixes: ["clock.", "harmony.", "conductor."],
                          hero: Pages.harmonyHero, accessory: Pages.harmonyAccessory)

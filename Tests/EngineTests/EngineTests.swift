@@ -244,3 +244,74 @@ import Params
         #expect(abs(s.beat(atUptimeNanos: 750_000_000) - 7.5) < 1e-9) // before the anchor
     }
 }
+
+@Suite struct StyleTests {
+    /// Every setting a style names must exist, and every named option must be one of its choices,
+    /// or the style would silently skip it.
+    @Test func everySettingResolves() throws {
+        let engine = try Engine(scene: .default, sink: PrintSink { _ in })
+        for style in Style.all {
+            for (id, value) in style.settings {
+                let spec = try #require(engine.params.specs[id], "\(style.name): no param \(id)")
+                switch value {
+                case .option(let name):
+                    #expect(spec.options.contains { $0.trimmingCharacters(in: .whitespaces) == name }, "\(style.name): \(id) has no option \(name)")
+                case .number(let n):
+                    #expect(spec.range.contains(n), "\(style.name): \(id) = \(n) is outside \(spec.range)")
+                }
+            }
+            #expect(style.scales.allSatisfy { ScaleCatalogue.scales.indices.contains($0) })
+            #expect(!style.progressions.isEmpty)
+        }
+        #expect(Style.choices.count == Style.all.count + 1)
+    }
+
+    @Test func applyingSetsTempoScaleGroovesAndProgressions() throws {
+        let engine = try Engine(scene: .default, sink: PrintSink { _ in })
+        let conductor = Conductor(progressions: Conductor.defaultProgressions, gestures: [:])
+        for (i, style) in Style.all.enumerated() {
+            var rng = SeededRandom(seed: UInt64(i + 1))
+            let changes = style.apply(engine.params, conductor, rng: &rng)
+            let p = engine.params
+            #expect(style.bpm.contains(p.value("clock.bpm")))
+            #expect(style.scales.contains(p.int("harmony.scale")))
+            #expect(changes.contains { $0.hasPrefix("tempo") })
+            let busy = DrumGroove.choices[p.int("gen.drums.groove.busy")]
+            #expect(DrumGroove.builtIn.contains { $0.name == busy } || busy == "Off", "\(style.name): busy groove \(busy)")
+            // No mood ends up on a diminished chord progression from the pool.
+            let h = conductor.harmony(p)
+            for mood in Conductor.Mood.allCases {
+                let prog = try #require(conductor.progressions[mood])
+                #expect(!prog.isEmpty)
+                #expect(!prog.allSatisfy { Variation.isDiminished($0, h) }, "\(style.name) \(mood): \(prog)")
+            }
+        }
+    }
+
+    @Test func songsLendProgressionsInTheirGenre() {
+        let funk = Style.all.first { $0.name == "Funk" }!
+        let sections = funk.songSections(scale: funk.scales[0])
+        #expect(!sections.isEmpty)
+        #expect(sections.allSatisfy { $0.song.genres.contains(where: funk.songGenres.contains) })
+    }
+
+    @Test func styleIsAppliedOnTheNextChordAndNoneRestoresTheScene() throws {
+        let engine = try Engine(scene: .default, sink: PrintSink { _ in })
+        let bpm = engine.params.value("clock.bpm"), bass = engine.params.int("gen.bass.pattern")
+        try engine.params.set("style.name", Double(Style.choices.firstIndex(of: "House")!))
+        #expect(engine.activeStyle?.name == "House")
+        try engine.start()
+        defer { engine.stop() }
+        // At 66 bpm a 2-bar chord boundary comes within ~8 s; the first bar crossing is enough here.
+        let deadline = Date().addingTimeInterval(12)
+        while Date() < deadline, engine.queue.sync(execute: { engine.params.value("clock.bpm") }) < 120 { Thread.sleep(forTimeInterval: 0.1) }
+        #expect(engine.queue.sync { engine.params.value("clock.bpm") } >= 120)
+        #expect(engine.queue.sync { BassGenerator.patterns[engine.params.int("gen.bass.pattern")] } == "Off-beat")
+        engine.queue.sync { try? engine.params.set("style.name", 0) }
+        let back = Date().addingTimeInterval(20)
+        while Date() < back, engine.queue.sync(execute: { engine.params.value("clock.bpm") }) != bpm { Thread.sleep(forTimeInterval: 0.1) }
+        #expect(engine.queue.sync { engine.params.value("clock.bpm") } == bpm)
+        #expect(engine.queue.sync { engine.params.int("gen.bass.pattern") } == bass)
+    }
+}
+
