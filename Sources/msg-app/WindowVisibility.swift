@@ -28,10 +28,14 @@ struct WindowVisibility: NSViewRepresentable {
             let center = NotificationCenter.default
             for name in [NSWindow.didChangeOcclusionStateNotification, NSWindow.didMiniaturizeNotification,
                          NSWindow.didDeminiaturizeNotification] {
-                observers.append(center.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in self?.report() })
+                observers.append(center.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.report() } // queue: .main delivers on the main thread
+                })
             }
             for name in [NSApplication.didHideNotification, NSApplication.didUnhideNotification] {
-                observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.report() })
+                observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.report() } // queue: .main delivers on the main thread
+                })
             }
             report()
         }

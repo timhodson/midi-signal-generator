@@ -19,7 +19,7 @@ public enum AppName {
         var buf = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
         let n = proc_pidpath(pid, &buf, UInt32(buf.count))
         guard n > 0 else { return nil }
-        return String(cString: buf)
+        return String(decoding: buf.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }, as: UTF8.self)
     }
 
     /// The app name for an executable path:

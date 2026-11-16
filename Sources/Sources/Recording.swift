@@ -94,14 +94,11 @@ public final class ReplaySource: SignalSource, @unchecked Sendable {
     }
 
     private func schedule(index: Int, origin: DispatchTime, emit: @escaping @Sendable ([SignalSample]) -> Void) {
-        var index = index
-        var origin = origin
-        if index >= batches.count {
-            guard loop else { return }
-            // Restart one second after the last batch so the loop has a breath.
-            origin = origin + (duration + 1) / speed
-            index = 0
-        }
+        guard index < batches.count || loop else { return }
+        // Past the end of a loop: restart one second after the last batch so it has a breath.
+        let wrapped = index >= batches.count
+        let index = wrapped ? 0 : index
+        let origin = wrapped ? origin + (duration + 1) / speed : origin
         let batch = batches[index]
         queue.asyncAfter(deadline: origin + batch.t / speed) { [weak self] in
             guard let self, self.running else { return }

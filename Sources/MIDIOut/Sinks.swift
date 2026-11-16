@@ -129,7 +129,8 @@ public final class CoreMIDISink: MIDISink, @unchecked Sendable {
         let size = MemoryLayout<MIDIPacketList>.size
         withUnsafeMutablePointer(to: &list) { ptr in
             let packet = MIDIPacketListInit(ptr)
-            guard MIDIPacketListAdd(ptr, size, packet, stamp, bytes.count, bytes) != nil else { return }
+            // Always fits: one packet of at most 256 bytes in a list sized for one.
+            _ = MIDIPacketListAdd(ptr, size, packet, stamp, bytes.count, bytes)
             if destination == Self.virtualDestination {
                 if let source = manager.managedOutputs[destination]?.coreMIDIOutputPortRef { MIDIReceived(source, ptr) }
             } else if let conn = manager.managedOutputConnections[destination], let port = conn.coreMIDIOutputPortRef {
