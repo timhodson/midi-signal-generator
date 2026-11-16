@@ -200,9 +200,12 @@ struct LCDLines: View {
 extension View {
     /// Passes the skin down to a whole page and, in the studio skin, paints the panel behind it
     /// (lists and scroll views drop their own background so the panel shows through).
+    /// The studio skin is dark hardware whatever the system appearance, so its text and controls
+    /// always draw in their dark-mode colours.
     func skinnedPage(_ skin: SkinStyle, shade: Double = 0.45) -> some View {
         modifier(SkinControls(skin: skin))
             .environment(\.skin, skin)
+            .transformEnvironment(\.colorScheme) { if skin == .studio { $0 = .dark } }
             .scrollContentBackground(skin == .studio ? .hidden : .automatic)
             .background { if skin == .studio { PanelBackground(cornerRadius: 0, shade: shade).ignoresSafeArea() } }
     }
@@ -318,6 +321,10 @@ private struct StudioButtonBody: View {
 }
 
 extension View {
+    /// The window's appearance for a skin: dark for the studio skin (sidebar and toolbar included),
+    /// the system's choice otherwise.
+    func skinWindow(_ skin: SkinStyle) -> some View { preferredColorScheme(skin == .studio ? .dark : nil) }
+
     /// The page's main action: bordered-prominent in the system look, a lit key in the studio skin.
     func skinProminent(_ color: Color = .accentColor) -> some View { modifier(SkinProminent(color: color)) }
 

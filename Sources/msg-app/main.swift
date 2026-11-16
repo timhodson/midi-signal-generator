@@ -63,6 +63,7 @@ struct MSGApp: App {
             ContentView()
                 .environment(model)
                 .frame(minWidth: 1050, minHeight: 700)
+                .skinWindow(model.skin)
                 .onAppear { delegate.model = model }
         }
         .commands {
@@ -84,7 +85,7 @@ struct MSGApp: App {
         }
         // A generator's or voice's settings in a window of their own (Open in its own window).
         WindowGroup("Panel", for: PanelID.self) { $panel in
-            if let panel { PanelWindow(panel: panel).environment(model) }
+            if let panel { PanelWindow(panel: panel).environment(model).skinWindow(model.skin) }
         }
         .defaultSize(width: 640, height: 720)
     }
