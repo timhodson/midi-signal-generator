@@ -74,7 +74,7 @@ public final class NoteScheduler: @unchecked Sendable {
     /// Sounding note -> token of the note-on that started it (so a stale note-off for a
     /// retriggered note doesn't cut the newer one short).
     private var sounding: [Sounding: Int] = [:]
-    /// Per role, sounding notes in start order, for polyphony limits.
+    /// Per voice output (role, destination, channel), sounding notes in start order, for polyphony limits.
     private var byRole: [String: [Sounding]] = [:]
 
     public init(sink: MIDISink) { self.sink = sink }
@@ -108,13 +108,15 @@ public final class NoteScheduler: @unchecked Sendable {
         switch item.action {
         case .on(let n):
             let key = Sounding(destination: n.destination, channel: n.channel, note: n.note)
-            if sounding[key] != nil { release(key, role: n.role) } // retrigger cleanly
-            var active = byRole[n.role, default: []]
+            // Polyphony counts per output, so a voice's layers don't steal each other's notes.
+            let voice = "\(n.role)|\(n.destination)|\(n.channel)"
+            if sounding[key] != nil { release(key, role: voice) } // retrigger cleanly
+            var active = byRole[voice, default: []]
             while active.count >= max(n.maxPolyphony, 1), let oldest = active.first {
                 active.removeFirst()
                 release(oldest, role: nil)
             }
-            byRole[n.role] = active + [key]
+            byRole[voice] = active + [key]
             sounding[key] = item.seq
             sink.noteOn(destination: n.destination, channel: n.channel, note: n.note, velocity: n.velocity)
             push(item.time + n.duration, .off(destination: n.destination, channel: n.channel, note: n.note, token: item.seq))

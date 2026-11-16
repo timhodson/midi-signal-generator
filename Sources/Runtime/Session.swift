@@ -107,7 +107,7 @@ public final class Session: @unchecked Sendable {
 
         var coreMIDI: CoreMIDISink?
         var fallback: MIDISink = PrintSink { _ in } // the engine logs notes itself
-        let external = Set(scene.voices.map(\.destination).filter { !$0.hasPrefix(InstrumentConfig.destinationPrefix) })
+        let external = Set(scene.voices.flatMap(\.destinations).filter { !$0.hasPrefix(InstrumentConfig.destinationPrefix) })
         // Live sessions always get CoreMIDI, so a voice can be moved to a device while running.
         if options.output == .live {
             let c = CoreMIDISink()
@@ -212,12 +212,13 @@ public final class Session: @unchecked Sendable {
 
     /// Send a voice to another destination ("virtual", "network", "au:<id>" of a loaded synth, or a
     /// MIDI destination's display name), from any thread.
-    public func setDestination(_ role: String, _ destination: String) {
+    /// `layer` 0 is the voice's main sound, 1… its layers.
+    public func setDestination(_ role: String, _ destination: String, layer: Int = 0) {
         engine.queue.async { [engine, coreMIDI] in
             if !destination.hasPrefix(InstrumentConfig.destinationPrefix) {
                 do { try coreMIDI?.connect(destination) } catch { engine.log("⚠︎ could not connect to \(destination): \(error)") }
             }
-            engine.setVoiceDestination(role, destination)
+            engine.setVoiceDestination(role, destination, layer: layer)
         }
     }
 

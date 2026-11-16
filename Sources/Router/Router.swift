@@ -16,9 +16,13 @@ public struct VoiceConfig: Codable, Sendable, Equatable {
     public var transpose: Int = 0
     public var latencyMs: Double = 0
     public var maxPolyphony: Int = 8
+    /// More sounds playing the same notes ("pad on the J6 *and* on the iPad"). Each layer has
+    /// its own destination and channel, and can be shifted, trimmed and delayed; the voice's
+    /// range and polyphony apply to all of them. Params `voice.<role>.layer<N>.*`, N from 1.
+    public var layers: [VoiceLayer] = []
 
     public init(role: String, destination: String, channel: Int, low: Int, high: Int,
-                transpose: Int = 0, latencyMs: Double = 0, maxPolyphony: Int = 8) {
+                transpose: Int = 0, latencyMs: Double = 0, maxPolyphony: Int = 8, layers: [VoiceLayer] = []) {
         self.role = role
         self.destination = destination
         self.channel = channel
@@ -27,7 +31,39 @@ public struct VoiceConfig: Codable, Sendable, Equatable {
         self.transpose = transpose
         self.latencyMs = latencyMs
         self.maxPolyphony = maxPolyphony
+        self.layers = layers
     }
+
+    private enum CodingKeys: String, CodingKey { case role, destination, channel, low, high, transpose, latencyMs, maxPolyphony, layers }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        role = try c.decode(String.self, forKey: .role)
+        destination = try c.decode(String.self, forKey: .destination)
+        channel = try c.decode(Int.self, forKey: .channel)
+        low = try c.decode(Int.self, forKey: .low)
+        high = try c.decode(Int.self, forKey: .high)
+        transpose = try c.decodeIfPresent(Int.self, forKey: .transpose) ?? 0
+        latencyMs = try c.decodeIfPresent(Double.self, forKey: .latencyMs) ?? 0
+        maxPolyphony = try c.decodeIfPresent(Int.self, forKey: .maxPolyphony) ?? 8
+        layers = try c.decodeIfPresent([VoiceLayer].self, forKey: .layers) ?? []
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(role, forKey: .role)
+        try c.encode(destination, forKey: .destination)
+        try c.encode(channel, forKey: .channel)
+        try c.encode(low, forKey: .low)
+        try c.encode(high, forKey: .high)
+        try c.encode(transpose, forKey: .transpose)
+        try c.encode(latencyMs, forKey: .latencyMs)
+        try c.encode(maxPolyphony, forKey: .maxPolyphony)
+        if !layers.isEmpty { try c.encode(layers, forKey: .layers) }
+    }
+
+    /// Every destination this voice plays on: its own, then its layers'.
+    public var destinations: [String] { [destination] + layers.map(\.destination) }
 
     public func params() -> [ParamSpec] {
         let r = "voice.\(role)"
@@ -47,6 +83,50 @@ public struct VoiceConfig: Codable, Sendable, Equatable {
                       help: "Max notes the \(role) voice holds at once. When exceeded, the oldest note is released. Lower = cleaner, less smeared."),
             ParamSpec("\(r).velocityScale", kind: .continuous, range: 0...2, default: 1,
                       help: "Loudness trim for the \(role) voice: 1 = as played, 0.5 = half velocity, 2 = double (capped)."),
+        ] + layers.enumerated().flatMap { i, layer in layer.params(role: role, number: i + 1) }
+    }
+}
+
+/// An extra sound on a voice: the same notes, sent somewhere else too.
+public struct VoiceLayer: Codable, Sendable, Equatable {
+    public var destination: String
+    /// 1...16.
+    public var channel: Int
+    /// Semitones on top of the voice's own notes, after its range: 12 doubles an octave up.
+    public var transpose: Int = 0
+    public var latencyMs: Double = 0
+
+    public init(destination: String, channel: Int, transpose: Int = 0, latencyMs: Double = 0) {
+        self.destination = destination
+        self.channel = channel
+        self.transpose = transpose
+        self.latencyMs = latencyMs
+    }
+
+    private enum CodingKeys: String, CodingKey { case destination, channel, transpose, latencyMs }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        destination = try c.decode(String.self, forKey: .destination)
+        channel = try c.decodeIfPresent(Int.self, forKey: .channel) ?? 1
+        transpose = try c.decodeIfPresent(Int.self, forKey: .transpose) ?? 0
+        latencyMs = try c.decodeIfPresent(Double.self, forKey: .latencyMs) ?? 0
+    }
+
+    public static func prefix(role: String, number: Int) -> String { "voice.\(role).layer\(number)" }
+
+    public func params(role: String, number: Int) -> [ParamSpec] {
+        let r = Self.prefix(role: role, number: number), name = "layer \(number) of the \(role) voice"
+        return [
+            ParamSpec("\(r).enabled", kind: .toggle, default: 1, help: "Mute or unmute \(name); the voice's main sound keeps playing."),
+            ParamSpec("\(r).channel", kind: .integer, range: 1...16, default: Double(channel), modulatable: false,
+                      help: "MIDI channel \(name) sends on."),
+            ParamSpec("\(r).transpose", kind: .integer, range: -36...36, default: Double(transpose), modulatable: false,
+                      help: "Shift \(name) in semitones against the main sound: 12 doubles it an octave up, -12 an octave down, 7 a fifth above."),
+            ParamSpec("\(r).velocityScale", kind: .continuous, range: 0...2, default: 1,
+                      help: "Loudness of \(name) against the main sound: 0.5 = a quieter layer underneath, 1 = as played."),
+            ParamSpec("\(r).latencyMs", kind: .continuous, range: 0...500, default: latencyMs, unit: "ms", modulatable: false,
+                      help: "Delay \(name) on its own. A few ms thickens it; more makes an echo. Also lines up a slower link."),
         ]
     }
 }
@@ -115,25 +195,47 @@ public struct VoiceRouter: Sendable {
         return n > hi ? (abs(n - hi) < abs(n - 12 - lo) ? hi : lo) : n
     }
 
-    public func route(_ note: ResolvedNote, params p: ParamStore) -> RoutedNote? {
-        guard let v = voices[note.role] else { return nil }
+    /// The voice's outputs that are switched on: where they go, and their param prefix.
+    private func outputs(_ v: VoiceConfig, _ p: ParamStore) -> [(destination: String, prefix: String, layer: Bool)] {
         let r = "voice.\(v.role)"
-        guard p.bool("\(r).enabled") else { return nil }
-        let pitch = Self.fold(note.note + p.int("\(r).transpose"), low: p.int("\(r).low"), high: p.int("\(r).high"))
-        let velocity = min(max(Int((Double(note.velocity) * p.value("\(r).velocityScale")).rounded()), 1), 127)
-        return RoutedNote(
-            destination: v.destination, channel: p.int("\(r).channel") - 1,
-            note: min(max(pitch, 0), 127), velocity: velocity,
-            start: note.start + p.value("\(r).latencyMs") / 1000, duration: note.duration,
-            role: v.role, maxPolyphony: p.int("\(r).maxPolyphony"), why: note.why
-        )
+        guard p.bool("\(r).enabled") else { return [] }
+        return [(v.destination, r, false)] + v.layers.enumerated().compactMap { i, layer in
+            let lp = VoiceLayer.prefix(role: v.role, number: i + 1)
+            return p.bool("\(lp).enabled") ? (layer.destination, lp, true) : nil
+        }
     }
 
-    public func route(_ control: ControlIntent, params p: ParamStore) -> RoutedControl? {
-        guard let v = voices[control.role], p.bool("voice.\(v.role).enabled") else { return nil }
-        return RoutedControl(destination: v.destination, channel: p.int("voice.\(v.role).channel") - 1,
-                             controller: control.controller, value: min(max(control.value, 0), 127),
-                             time: control.time + p.value("voice.\(v.role).latencyMs") / 1000)
+    /// The note on every output of its voice: the main sound first, then each layer that's on.
+    /// Empty when the voice is off (or there's no voice for the role).
+    public func route(_ note: ResolvedNote, params p: ParamStore) -> [RoutedNote] {
+        guard let v = voices[note.role] else { return [] }
+        let r = "voice.\(v.role)"
+        let pitch = Self.fold(note.note + p.int("\(r).transpose"), low: p.int("\(r).low"), high: p.int("\(r).high"))
+        let baseLatency = p.value("\(r).latencyMs")
+        let poly = p.int("\(r).maxPolyphony")
+        return outputs(v, p).map { out in
+            let shift = out.layer ? p.int("\(out.prefix).transpose") : 0
+            let scale = p.value("\(r).velocityScale") * (out.layer ? p.value("\(out.prefix).velocityScale") : 1)
+            let velocity = min(max(Int((Double(note.velocity) * scale).rounded()), 1), 127)
+            let latency = baseLatency + (out.layer ? p.value("\(out.prefix).latencyMs") : 0)
+            return RoutedNote(
+                destination: out.destination, channel: p.int("\(out.prefix).channel") - 1,
+                note: min(max(pitch + shift, 0), 127), velocity: velocity,
+                start: note.start + latency / 1000, duration: note.duration,
+                role: v.role, maxPolyphony: poly, why: note.why
+            )
+        }
+    }
+
+    /// A controller change on every output of its voice (an LFO wobbles every layer).
+    public func route(_ control: ControlIntent, params p: ParamStore) -> [RoutedControl] {
+        guard let v = voices[control.role] else { return [] }
+        let base = p.value("voice.\(v.role).latencyMs")
+        return outputs(v, p).map { out in
+            RoutedControl(destination: out.destination, channel: p.int("\(out.prefix).channel") - 1,
+                          controller: control.controller, value: min(max(control.value, 0), 127),
+                          time: control.time + (base + (out.layer ? p.value("\(out.prefix).latencyMs") : 0)) / 1000)
+        }
     }
 }
 

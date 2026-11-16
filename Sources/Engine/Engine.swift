@@ -261,9 +261,11 @@ public final class Engine: @unchecked Sendable {
                     }
                     continue
                 }
-                guard let resolved = quantiser.resolve(intent, harmony: harmony, clock: clock, params: params, rng: &rng),
-                      let routed = router.route(resolved, params: params) else { continue }
-                scheduler.schedule(routed)
+                guard let resolved = quantiser.resolve(intent, harmony: harmony, clock: clock, params: params, rng: &rng) else { continue }
+                let outputs = router.route(resolved, params: params)
+                guard let routed = outputs.first else { continue }
+                // Every layer plays; visuals and the log show the voice's note once.
+                for o in outputs { scheduler.schedule(o) }
                 noteCounter += 1
                 var rawPitch: Double?
                 if case .raw(let p) = intent.pitch { rawPitch = p }
@@ -279,7 +281,7 @@ public final class Engine: @unchecked Sendable {
                 }
             }
             for control in out.controls {
-                if let routed = router.route(control, params: params) { scheduler.schedule(routed) }
+                for routed in router.route(control, params: params) { scheduler.schedule(routed) }
             }
         }
 
@@ -336,11 +338,13 @@ extension Engine {
 
     /// Send a voice somewhere else (live). Notes already sounding finish on the old destination.
     /// Call on `queue`, after the sink can reach `destination`.
-    public func setVoiceDestination(_ role: String, _ destination: String) {
-        guard router.voices[role] != nil else { return }
-        router.voices[role]?.destination = destination
-        if let i = scene.voices.firstIndex(where: { $0.role == role }) { scene.voices[i].destination = destination }
-        log("→ \(role) now plays on \(destination)")
+    /// `layer` 0 is the voice's main sound, 1… its layers.
+    public func setVoiceDestination(_ role: String, _ destination: String, layer: Int = 0) {
+        guard var v = router.voices[role] else { return }
+        if layer == 0 { v.destination = destination } else if v.layers.indices.contains(layer - 1) { v.layers[layer - 1].destination = destination } else { return }
+        router.voices[role] = v
+        if let i = scene.voices.firstIndex(where: { $0.role == role }) { scene.voices[i] = v }
+        log("→ \(role)\(layer == 0 ? "" : " layer \(layer)") now plays on \(destination)")
     }
 
     /// Vary the piece at the next chord change. Call on `queue`.
@@ -435,8 +439,8 @@ extension Engine {
     /// Every external MIDI destination an enabled voice plays on (hosted synths, "au:…", get the
     /// tempo through their host musical context instead).
     private var clockDestinations: Set<String> {
-        Set(router.voices.values.filter { !$0.destination.hasPrefix("au:") && params.bool("voice.\($0.role).enabled") }
-            .map(\.destination))
+        Set(router.voices.values.filter { params.bool("voice.\($0.role).enabled") }
+            .flatMap(\.destinations).filter { !$0.hasPrefix("au:") })
     }
 
     private func tickClock(_ beats: Range<Double>) {
