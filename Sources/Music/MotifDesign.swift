@@ -1,4 +1,5 @@
 import Foundation
+import SignalBus
 
 /// A hand-designed motif for apps (or, later, traffic types / devices) whose name matches.
 ///
@@ -39,7 +40,7 @@ public struct MotifDesign: Codable, Sendable, Equatable, Identifiable {
         let m = match.trimmingCharacters(in: .whitespaces)
         if m == "*" { return 1 }
         guard !m.isEmpty else { return 0 }
-        if app.caseInsensitiveCompare(m) == .orderedSame { return 3 }
+        if AppName.same(m, app) { return 3 }
         return app.localizedCaseInsensitiveContains(m) ? 2 : 0
     }
 

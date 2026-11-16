@@ -366,7 +366,7 @@ extension Engine {
         let names = Set(rates.keys).union(appStats.keys)
         return names.map { name in
             EngineStatus.AppInfo(name: name, bytesPerSecond: rates[name] ?? 0, wakes: appStats[name]?.wakes ?? 0,
-                                 lastWake: appStats[name]?.last, ignored: ignore.contains(name))
+                                 lastWake: appStats[name]?.last, ignored: ignore.containsApp(name))
         }
         .sorted { ($0.wakes, $0.bytesPerSecond) > ($1.wakes, $1.bytesPerSecond) }
         .prefix(200).map { $0 }

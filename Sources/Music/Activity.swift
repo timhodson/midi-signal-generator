@@ -1,4 +1,5 @@
 import Foundation
+import SignalBus
 import Params
 
 /// "App X just started talking": the event-timescale signal derived from per-app byte rates.
@@ -36,7 +37,7 @@ public struct ActivityTracker: Sendable {
         let cooldown = p.value("activity.cooldown")
         let skip = p.bool("activity.ignore") ? ignore : []
         var out: [Activation] = []
-        for (key, rate) in rates where !skip.contains(key) {
+        for (key, rate) in rates where !skip.containsApp(key) {
             if rate >= threshold {
                 if !active.contains(key), now - (lastFired[key] ?? -.infinity) >= cooldown {
                     out.append(Activation(key: key, bytesPerSecond: rate, time: now))

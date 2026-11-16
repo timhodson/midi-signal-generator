@@ -8,7 +8,8 @@ import SignalBus
 /// The first block holds cumulative totals since boot and is skipped; every later block holds
 /// per-process byte deltas for the last interval. Rows look like "Brave Browser H.10275,1234,56,".
 /// Names are truncated by nettop (~15 chars) and may contain spaces and dots, so the pid is
-/// split off at the *last* dot. Helper processes with the same name are summed.
+/// split off at the *last* dot. Each process is named after its app (`AppName`), so an app's
+/// helper processes are summed under one name.
 public struct NettopParser: Sendable {
     public struct Snapshot: Sendable, Equatable {
         /// App name -> bytes in + out during the interval.
@@ -18,8 +19,15 @@ public struct NettopParser: Sendable {
 
     private var current: [String: Double]?
     private var blocksSeen = 0
+    private let resolve: @Sendable (String, Int32) -> String
+    /// pid -> app name, for the processes in the last two blocks (pids are reused eventually).
+    private var names: [Int32: String] = [:]
+    private var seen: Set<Int32> = []
 
-    public init() {}
+    /// `resolve` names a process's app from nettop's name and its pid.
+    public init(resolve: @escaping @Sendable (String, Int32) -> String = AppName.resolve(processName:pid:)) {
+        self.resolve = resolve
+    }
 
     /// Feed one line; returns a completed snapshot when a new block header closes the previous one.
     public mutating func feed(line raw: String) -> Snapshot? {
@@ -30,6 +38,8 @@ public struct NettopParser: Sendable {
             defer {
                 blocksSeen += 1
                 current = [:]
+                names = names.filter { seen.contains($0.key) }
+                seen = []
             }
             // Block 1 is totals-since-boot; only emit deltas (block 2 onwards).
             guard blocksSeen >= 2, let finished = current else { return nil }
@@ -43,12 +53,19 @@ public struct NettopParser: Sendable {
               let bytesOut = Double(fields[fields.count - 2])
         else { return nil }
         let nameAndPid = fields[0..<(fields.count - 3)].joined(separator: ",")
-        let name: String
-        if let dot = nameAndPid.lastIndex(of: "."), Int(nameAndPid[nameAndPid.index(after: dot)...]) != nil {
-            name = String(nameAndPid[..<dot]).trimmingCharacters(in: .whitespaces)
-        } else {
-            name = nameAndPid
+        var process = nameAndPid, pid: Int32 = 0
+        if let dot = nameAndPid.lastIndex(of: "."), let n = Int32(nameAndPid[nameAndPid.index(after: dot)...]) {
+            process = String(nameAndPid[..<dot]).trimmingCharacters(in: .whitespaces)
+            pid = n
         }
+        let name: String
+        if let known = names[pid], pid > 0 {
+            name = known
+        } else {
+            name = resolve(process, pid)
+            if pid > 0 { names[pid] = name }
+        }
+        if pid > 0 { seen.insert(pid) }
         let bytes = bytesIn + bytesOut
         if bytes > 0 { current?[name, default: 0] += bytes }
         return nil
