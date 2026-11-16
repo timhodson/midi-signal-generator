@@ -31,6 +31,16 @@ public struct ActivityTracker: Sendable {
 
     public init() {}
 
+    /// Take the first reading as the starting point: apps already busy count as awake, so the
+    /// piece doesn't open with every app "waking up" at once.
+    public mutating func settle(rates: [String: Double], now: Double, params p: ParamStore) {
+        let threshold = p.value("activity.threshold")
+        for (key, rate) in rates where rate >= threshold {
+            active.insert(key)
+            lastFired[key] = now
+        }
+    }
+
     public mutating func update(rates: [String: Double], now: Double, params p: ParamStore,
                                 ignore: Set<String>) -> [Activation] {
         let threshold = p.value("activity.threshold")

@@ -591,6 +591,14 @@ public final class DrumGenerator: Generator {
         return after > 0 && idleBars >= after
     }
 
+    /// A fill at the end of the bar before `bar` and a crash on it: the end of the intro.
+    public func planLanding(on bar: Int, reason: String) {
+        fillBar = bar - 1
+        fillReason = reason
+        crashBar = bar
+        crashReason = reason
+    }
+
     private func startBar(_ bar: Int, _ ctx: GeneratorContext, rng: inout SeededRandom) {
         let p = ctx.params
         currentBar = bar

@@ -80,12 +80,22 @@ private let dDorian = HarmonyContext(root: 2, scale: .dorian)
         try p.set("harmony.hysteresis", 5)
         try p.set("harmony.barsPerChord", 1)
         try p.set("conductor.smoothing", 0)
+        _ = c.observe(total: 0, perApp: [:], activations: [], now: -1, params: p) // a quiet start
         _ = c.observe(total: 100_000, perApp: ["a": 100_000], activations: [], now: 0, params: p)
         _ = c.onBar(1, now: 2, params: p)          // too soon: still quiet, index 1
         #expect(c.mood == .quiet)
         _ = c.onBar(2, now: 6, params: p)          // ready, and quiet's progression wraps here
         #expect(c.mood == .calm)
         #expect(c.chordDegree == 0)
+    }
+
+    @Test func theFirstReadingSetsTheMood() throws {
+        let c = Conductor(progressions: [.quiet: [0, 3], .calm: [0, 5, 3, 4]], gestures: [:])
+        let p = store()
+        try p.set("conductor.smoothing", 0)
+        let notes = c.observe(total: 100_000, perApp: ["a": 50_000, "b": 50_000], activations: [], now: 0, params: p)
+        #expect(c.mood == .calm)                   // no waiting through the hysteresis at the start
+        #expect(notes.contains { $0.contains("calm") })
     }
 
     @Test func flurryInsertsGesture() throws {

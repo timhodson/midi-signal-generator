@@ -50,6 +50,10 @@ public final class Engine: @unchecked Sendable {
     /// Paused: the music holds (no notes, the clock stands still, MIDI clock sends Stop) while
     /// everything stays loaded and settings, signals and the mixer keep working.
     public private(set) var paused = false
+    /// The intro: the bar it started on, and how many bars it lasts (conductor.introBars).
+    private var intro: (start: Int, bars: Int)?
+    private var introPending = true
+    private var activitySettled = false
     private var pauseApplied = false
     private var lastPublish: Double = 0
     private var recentNotes: [EngineStatus.PlayedNote] = []
@@ -192,6 +196,14 @@ public final class Engine: @unchecked Sendable {
         }
         let beats = clock.advance(to: horizon, bpm: params.value("clock.bpm"))
         tickClock(beats)
+        if introPending {
+            introPending = false
+            let bars = params.int("conductor.introBars")
+            let start = Int((beats.lowerBound / Double(clock.beatsPerBar)).rounded(.down))
+            intro = bars > 0 ? (start, bars) : nil
+            if bars > 0 { drums.planLanding(on: start + bars, reason: "the end of the intro") }
+        }
+        if let i = intro, beats.lowerBound >= Double((i.start + i.bars) * clock.beatsPerBar) { intro = nil }
 
         // Fresh per-app data -> activations + mood.
         var activations: [Activation] = []
@@ -199,7 +211,15 @@ public final class Engine: @unchecked Sendable {
         if let v = bus.streamVersion["net.app.bytesPerSec"], v != seenAppVersion {
             seenAppVersion = v
             let rates = bus.streams["net.app.bytesPerSec"] ?? [:]
-            activations = activity.update(rates: rates, now: horizon, params: params, ignore: Set(scene.ignoreApps))
+            if activitySettled {
+                activations = activity.update(rates: rates, now: horizon, params: params, ignore: Set(scene.ignoreApps))
+                // Apps that start talking while the piece is still building count as awake, but
+                // don't play or set off a flurry: motifs begin once the intro is over.
+                if intro != nil { activations = [] }
+            } else {
+                activity.settle(rates: rates, now: horizon, params: params) // apps already talking aren't waking up
+                activitySettled = true
+            }
             for line in conductor.observe(total: total, perApp: rates, activations: activations, now: t, params: params) {
                 log("♪ \(line)")
             }
@@ -269,7 +289,11 @@ public final class Engine: @unchecked Sendable {
                     }
                     continue
                 }
-                guard let resolved = quantiser.resolve(intent, harmony: harmony, clock: clock, params: params, rng: &rng) else { continue }
+                guard var resolved = quantiser.resolve(intent, harmony: harmony, clock: clock, params: params, rng: &rng) else { continue }
+                if intro != nil {
+                    guard let gain = introGain(role: resolved.role, at: resolved.start) else { continue }
+                    resolved.velocity = max(Int((Double(resolved.velocity) * gain).rounded()), 1)
+                }
                 let outputs = router.route(resolved, params: params)
                 guard let routed = outputs.first else { continue }
                 // Every layer plays; visuals and the log show the voice's note once.
@@ -463,6 +487,28 @@ extension Engine {
         for m in messages { sink.sendRaw(destination: m.destination, m.bytes, atUptimeNanos: m.time.map(uptime)) }
     }
 
+    /// When each voice comes in during the intro, as a fraction of it: the pad and sub from the
+    /// start, the bass a quarter in, pulse and drums half way, motifs (the lead) once it's over.
+    static let introEntry: [String: Double] = ["pad": 0, "sub": 0, "bass": 0.25, "pulse": 0.5, "drums": 0.5]
+
+    /// Velocity factor for a note during the intro, or nil if its voice hasn't come in yet. Each
+    /// voice starts softer and grows to full by the end of the intro.
+    private func introGain(role: String, at time: Double) -> Double? {
+        guard let i = intro else { return 1 }
+        let bar = clock.beat(atTime: time) / Double(clock.beatsPerBar)
+        let progress = (bar - Double(i.start)) / Double(i.bars)
+        guard progress < 1 else { return 1 }
+        let entry = Self.introEntry[role] ?? 1
+        guard progress >= entry else { return nil }
+        return 0.55 + 0.45 * min((progress - entry) / max(1 - entry, 0.01), 1)
+    }
+
+    /// The intro bar playing now (1…) and its length, or nil once the piece is going.
+    public var introStatus: (bar: Int, of: Int)? {
+        guard let i = intro else { return nil }
+        return (min(Int((clock.beat / Double(clock.beatsPerBar)).rounded(.down)) - i.start + 1, i.bars), i.bars)
+    }
+
     /// The musical position now, in beats. Call on `queue`.
     public var currentBeat: Double { clock.beat }
 
@@ -473,6 +519,7 @@ extension Engine {
         pauseApplied = false
         if !on {
             firstTick = true // strike the chord again straight away
+            if params.bool("conductor.introAfterPause") { introPending = true }
             log("▶︎ playing")
         } else {
             log("⏸ paused")
@@ -540,6 +587,7 @@ extension Engine {
             style: .init(applied: appliedStyle, pending: styleRequested || params.int("style.name") != appliedStyle)
         )
         status.paused = paused
+        status.intro = introStatus.map { [$0.bar, $0.of] }
         return status
     }
 }

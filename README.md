@@ -118,6 +118,11 @@ The middle of the toolbar has **play/pause** (⌘↩: the music holds, everythin
 **randomise** and **stop** (⌘.: unloads the session, hosted synths too). File → **Open Recent**
 lists recent scenes, and the app starts with the scene you saved last.
 
+**Intro**: the piece builds up over its first bars (`conductor.introBars`, 4 by default, on the
+Harmony page): the pad and sub first, the bass, then pulse and drums, which land with a fill, and
+the apps' motifs once it's going. It starts in the mood the network is already in, and apps that
+were busy before you pressed play don't all "wake up" at once.
+
 ### Sound
 
 **Voices**: each voice's sound in one place. Choose where its notes go (a hosted synth, the

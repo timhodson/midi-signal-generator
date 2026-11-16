@@ -18,6 +18,10 @@ public final class Conductor: @unchecked Sendable {
     }
 
     public static let params: [ParamSpec] = [
+        ParamSpec("conductor.introBars", kind: .integer, range: 0...16, default: 4, unit: "bars", modulatable: false,
+                  help: "How the piece begins: over these bars it builds up (the pad first, then bass, then pulse and drums, which land with a fill), and the apps' motifs come in once it's going. 0 = everything from the first beat."),
+        ParamSpec("conductor.introAfterPause", kind: .toggle, default: 0, modulatable: false,
+                  help: "Build up again with the intro after a pause, instead of carrying straight on."),
         ParamSpec("clock.bpm", kind: .continuous, range: 20...200, default: 66, unit: "bpm",
                   help: "Speed of the musical grid everything snaps to. Lower feels more ambient and spacious; it also slows chord changes, since those are counted in bars."),
         ParamSpec("harmony.root", kind: .choice, default: 2, options: ScaleCatalogue.rootNames,
@@ -108,6 +112,14 @@ public final class Conductor: @unchecked Sendable {
             smoothedApps[key] = old + ((perApp[key] ?? 0) - old) * alpha
         }
         let next = classify(total: smoothedTotal ?? total, perApp: smoothedApps, params: p)
+        if dt == 0, recentActivations.isEmpty, progressionIndex <= 0, next != mood {
+            // The first reading: start in the mood the network is in, rather than in "quiet" and
+            // drifting there a phrase or two later.
+            mood = next
+            candidate = next
+            candidateSince = now
+            notes.append("starting in the \(next.rawValue) mood")
+        }
         if next != candidate {
             candidate = next
             candidateSince = now

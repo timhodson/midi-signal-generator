@@ -58,6 +58,8 @@ public struct EngineStatus: Sendable {
 
     /// The music is paused (the session stays loaded).
     public var paused = false
+    /// [bar, of] while the intro builds up, nil once the piece is going.
+    public var intro: [Int]?
     public var time: Double
     public var beat: Double
     public var bpm: Double

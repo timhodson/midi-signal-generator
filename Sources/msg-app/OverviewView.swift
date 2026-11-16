@@ -351,6 +351,7 @@ struct PlayControls: View {
         guard model.isRunning, let s = model.status else { return "stopped" }
         if model.paused { return "paused · \(s.chordHistory.last?.name ?? "") · \(Int(s.bpm.rounded())) bpm" }
         let bar = Int(s.beat / 4) + 1, beat = Int(s.beat.truncatingRemainder(dividingBy: 4)) + 1
+        if let i = s.intro, i.count == 2 { return "intro \(i[0])/\(i[1]) · \(s.key) · \(Int(s.bpm.rounded())) bpm" }
         return "\(bar).\(beat) · \(s.key) · \(s.chordHistory.last?.name ?? "") · \(Int(s.bpm.rounded())) bpm"
     }
 }

@@ -393,3 +393,31 @@ import Router
         #expect(engine.queue.sync { lines.all.contains { $0.hasPrefix("on ") } }) // the chord again, straight away
     }
 }
+
+@Suite struct IntroTests {
+    @Test func thePieceBuildsUpFromThePad() throws {
+        final class Lines: @unchecked Sendable { var all: [String] = [] }
+        let lines = Lines()
+        let engine = try Engine(scene: .default, sink: PrintSink { lines.all.append($0) })
+        engine.log = { _ in }
+        try engine.start()
+        defer { engine.stop() }
+        Thread.sleep(forTimeInterval: 1.5) // inside the first bar at 66 bpm
+        let first = engine.queue.sync { lines.all.filter { $0.hasPrefix("on ") } }
+        #expect(!first.isEmpty)
+        // Only the pad (ch 1) and sub (ch 5) play in the first bar of the intro.
+        #expect(first.allSatisfy { $0.contains(" ch1 ") || $0.contains(" ch5 ") })
+        #expect(engine.queue.sync { engine.introStatus?.bar } == 1)
+    }
+
+    @Test func noIntroWhenItsOff() throws {
+        var scene = Scene.default
+        scene.params["conductor.introBars"] = 0
+        let engine = try Engine(scene: scene, sink: PrintSink { _ in })
+        engine.log = { _ in }
+        try engine.start()
+        defer { engine.stop() }
+        Thread.sleep(forTimeInterval: 0.3)
+        #expect(engine.queue.sync { engine.introStatus } == nil)
+    }
+}
