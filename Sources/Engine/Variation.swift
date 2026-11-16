@@ -143,12 +143,25 @@ public final class Variation {
         return pendingManual || !p.bool("variation.waitForPhrase") || phraseStarts
     }
 
+    /// A progression picked by hand becomes part of home, so "back home" and variations from
+    /// home keep it.
+    func setHomeProgression(_ mood: Conductor.Mood, _ degrees: [Int]) {
+        home?.progressions[mood] = degrees
+    }
+
+    /// Put back the progressions of pinned moods after something rewrote them.
+    private func keepPinned(_ conductor: Conductor, from saved: [Conductor.Mood: [Int]]) {
+        for m in conductor.pinned { conductor.progressions[m] = saved[m] }
+    }
+
     /// Put home back. Returns what changed.
     func returnHome(_ p: ParamStore, _ conductor: Conductor, now: Double) -> [String] {
         guard let home else { return [] }
         let before = describe(p, conductor)
+        let current = conductor.progressions
         for (id, v) in home.values { try? p.set(id, v) }
         conductor.progressions = home.progressions
+        keepPinned(conductor, from: current)
         let changes = diff(before, describe(p, conductor), p)
         record(.init(time: now, reason: "back home", changes: changes))
         return changes
@@ -166,6 +179,7 @@ public final class Variation {
         let fromHome = p.int("variation.from") == 0
         let enabled = Set(Self.groups.filter { p.bool("variation.\($0)") })
         let before = describe(p, conductor)
+        let current = conductor.progressions
 
         for item in Self.items where enabled.contains(item.group) {
             guard let spec = p.specs[item.id] else { continue }
@@ -204,6 +218,7 @@ public final class Variation {
             conductor.progressions = home.progressions
         }
 
+        keepPinned(conductor, from: current)
         let changes = diff(before, describe(p, conductor), p)
         record(.init(time: now, reason: reason, changes: changes.isEmpty ? ["nothing changed this time"] : changes))
         return changes

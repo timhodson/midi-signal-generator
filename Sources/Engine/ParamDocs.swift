@@ -40,6 +40,8 @@ public struct MoodProgression: Sendable, Hashable {
     public var degrees: [Int]
     public var chords: [String]
     public var numerals: [String]
+    /// Picked by hand, so variations and styles keep it.
+    public var pinned: Bool = false
 }
 
 extension Conductor {
@@ -48,7 +50,8 @@ extension Conductor {
             let degrees = progressions[mood] ?? []
             return MoodProgression(mood: mood.rawValue, degrees: degrees,
                                    chords: degrees.map { harmony.chordName(degree: $0) },
-                                   numerals: degrees.map { harmony.romanNumeral(degree: $0) })
+                                   numerals: degrees.map { harmony.romanNumeral(degree: $0) },
+                                   pinned: pinned.contains(mood))
         }
     }
 

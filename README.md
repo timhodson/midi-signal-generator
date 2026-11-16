@@ -76,7 +76,8 @@ curve, smoothing and depth. Each route shows its input and the target's value mo
 **Harmony**: the mood thresholds (drag the handles), the key and scale on a keyboard, a piano roll of
 every voice against the chords, plus tempo, scale, chord size and a chord progression for each mood.
 **From a song…** borrows a verse or chorus from 734 hand-annotated Billboard hits (search by title, artist, decade
-or genre) or takes typed chords ("Am F C G"). The Clock section sends MIDI clock to external synths.
+or genre) or takes typed chords ("Am F C G"). A progression you pick, type or edit is pinned (📌): variations and styles
+leave its chords alone (they can still move the key and scale), and Reset or the pin releases it. The Clock section sends MIDI clock to external synths.
 
 ![Harmony](docs/screenshots/harmony.jpg)
 

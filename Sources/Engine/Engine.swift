@@ -94,6 +94,7 @@ public final class Engine: @unchecked Sendable {
             progressions[mood] = v
         }
         conductor = Conductor(progressions: progressions, gestures: scene.gestures)
+        conductor.pinned = Set((scene.pinnedProgressions ?? []).compactMap(Conductor.Mood.init(rawValue:)))
         motif.designs = scene.motifs
         drums.custom = scene.grooves
         generators = [DroneGenerator(), motif, PulseGenerator(), BassGenerator(), SubDroneGenerator(), packets, drums] + lfos
@@ -359,6 +360,7 @@ extension Engine {
         for i in s.routes.indices { s.routes[i].amount = params.baseValue("mod.\(i).amount") }
         s.progressions = Dictionary(uniqueKeysWithValues: conductor.progressions.map { ($0.key.rawValue, $0.value) })
         s.gestures = conductor.gestures
+        s.pinnedProgressions = conductor.pinned.isEmpty ? nil : conductor.pinned.map(\.rawValue).sorted()
         s.motifs = motif.designs
         s.grooves = drums.custom
         s.appliedStyle = appliedStyle > 0 ? Style.choices[safe: appliedStyle] : nil
@@ -416,12 +418,27 @@ extension Engine {
 
     /// Replace a mood's chord progression (scale degrees, 0 = tonic). Call on `queue`.
     /// An empty list is ignored: every mood needs at least one chord.
-    public func setProgression(_ mood: String, _ degrees: [Int]) {
+    /// `pin`: true = picked by hand, so variations and styles keep it (and it becomes part of
+    /// home); false = released to them again (Reset); nil = leave the pin as it is.
+    public func setProgression(_ mood: String, _ degrees: [Int], pin: Bool? = nil) {
         guard !degrees.isEmpty else { return }
         if let m = Conductor.Mood(rawValue: mood) {
             conductor.progressions[m] = degrees
+            if let pin { if pin { conductor.pinned.insert(m) } else { conductor.pinned.remove(m) } }
+            variation.setHomeProgression(m, degrees)
         } else {
             conductor.gestures[mood] = degrees
+        }
+    }
+
+    /// Keep (or release) a mood's progression from variations and styles. Call on `queue`.
+    public func setProgressionPinned(_ mood: String, _ pinned: Bool) {
+        guard let m = Conductor.Mood(rawValue: mood) else { return }
+        if pinned {
+            conductor.pinned.insert(m)
+            if let d = conductor.progressions[m] { variation.setHomeProgression(m, d) }
+        } else {
+            conductor.pinned.remove(m)
         }
     }
 
@@ -446,7 +463,8 @@ extension Engine {
                 for (id, v) in saved.values where id != "style.name" && params.specs[id]?.id.hasPrefix("mod.") == false {
                     try? params.set(id, v)
                 }
-                conductor.progressions = saved.progressions
+                let kept = conductor.progressions.filter { conductor.pinned.contains($0.key) }
+                conductor.progressions = saved.progressions.merging(kept) { _, k in k }
                 beforeStyle = nil
                 variation.note("style off: back to the scene", changes: ["settings and progressions as they were before the style"], now: t)
                 log("♪ style off: back to the scene")

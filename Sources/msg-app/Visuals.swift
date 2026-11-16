@@ -476,8 +476,17 @@ struct ProgressionEditor: View {
                             .controlSize(.small)
                             .help("Use the chords of a verse, chorus or bridge from a real song (or type some)")
                     }
+                    if SongPicker.moods.contains(p.mood) {
+                        Button { model.setProgressionPinned(p.mood, !p.pinned) } label: {
+                            Image(systemName: p.pinned ? "pin.fill" : "pin").foregroundStyle(p.pinned ? Color.accentColor : .secondary)
+                        }
+                        .buttonStyle(.borderless)
+                        .help(p.pinned
+                              ? "Kept: variations and styles leave these chords alone (they can still change the key and scale). Click to let them vary it again."
+                              : "Click to keep these chords through variations and styles. Picking a song, typing chords or editing a chip keeps them too.")
+                    }
                     if let defaults = Self.defaults[p.mood], defaults != p.degrees {
-                        Button("Reset") { model.setProgression(p.mood, defaults) }.controlSize(.small)
+                        Button("Reset") { model.setProgression(p.mood, defaults, pin: false) }.controlSize(.small)
                     }
                 }
             }

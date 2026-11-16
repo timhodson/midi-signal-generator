@@ -261,8 +261,13 @@ public final class Session: @unchecked Sendable {
     }
 
     /// Replace a mood's (or gesture's) chord progression, from any thread.
-    public func setProgression(_ mood: String, _ degrees: [Int]) {
-        engine.queue.async { [engine] in engine.setProgression(mood, degrees) }
+    public func setProgression(_ mood: String, _ degrees: [Int], pin: Bool? = nil) {
+        engine.queue.async { [engine] in engine.setProgression(mood, degrees, pin: pin) }
+    }
+
+    /// Keep (or release) a mood's progression from variations and styles, from any thread.
+    public func setProgressionPinned(_ mood: String, _ pinned: Bool) {
+        engine.queue.async { [engine] in engine.setProgressionPinned(mood, pinned) }
     }
 
     /// Set a param from any thread.

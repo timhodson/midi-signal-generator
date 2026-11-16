@@ -415,7 +415,8 @@ extension Style {
         let candidates = songSections(scale: scale)
         var out: [String] = []
         var used: Set<[Int]> = []
-        for mood in Conductor.Mood.allCases {
+        // Progressions picked by hand stay.
+        for mood in Conductor.Mood.allCases where !conductor.pinned.contains(mood) {
             var pick: [Int]?
             var from = ""
             if !candidates.isEmpty, rng.chance(0.5) {

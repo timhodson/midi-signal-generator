@@ -215,6 +215,6 @@ struct SongPicker: View {
         if scale != Int(model.base("harmony.scale")) { model.set("harmony.scale", Double(scale)) }
         if root != Int(model.base("harmony.root")) { model.set("harmony.root", Double(root)) }
         model.setProgression(mood, fit.degrees)
-        applied = "\(mood.capitalized) now plays \(label)"
+        applied = "\(mood.capitalized) now plays \(label), kept through variations (pinned)"
     }
 }

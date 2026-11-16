@@ -127,6 +127,44 @@ import Router
         _ = back
     }
 
+    @Test func pinnedProgressionsSurviveVariationsStylesAndGoingHome() throws {
+        let (v, p, c) = try rig(["variation.amount": 1, "variation.from": 1])
+        let song = [0, 4, 5, 3]
+        c.progressions[.calm] = song
+        c.pinned = [.calm]
+        v.setHomeProgression(.calm, song)
+        var rng = SeededRandom(seed: 9)
+        var quietChanged = false
+        for _ in 0..<20 {
+            _ = v.apply(p, c, rng: &rng, now: 0) // key and scale may move; the degrees stay
+            #expect(c.progressions[.calm] == song)
+            if c.progressions[.quiet] != Conductor.defaultProgressions[.quiet] { quietChanged = true }
+        }
+        #expect(quietChanged) // unpinned moods still vary
+        _ = Style.all[0].apply(p, c, rng: &rng)
+        #expect(c.progressions[.calm] == song)
+        _ = v.returnHome(p, c, now: 1)
+        #expect(c.progressions[.calm] == song)
+    }
+
+    @Test func pickingASongPinsItIntoHomeAndTheScene() throws {
+        let engine = try Engine(scene: .default, sink: PrintSink { _ in })
+        engine.log = { _ in }
+        engine.makeHome()
+        engine.setProgression("busy", [0, 3, 4], pin: true)
+        var saved = engine.currentScene()
+        #expect(saved.pinnedProgressions == ["busy"])
+        // Reloading keeps the pin; Reset releases it.
+        saved = try JSONDecoder().decode(Scene.self, from: saved.encoded())
+        let again = try Engine(scene: saved, sink: PrintSink { _ in })
+        #expect(again.currentScene().pinnedProgressions == ["busy"])
+        again.setProgression("busy", Conductor.defaultProgressions[.busy]!, pin: false)
+        #expect(again.currentScene().pinnedProgressions == nil)
+        // A scene with no pins doesn't write the key.
+        let json = String(decoding: try Scene.default.encoded(), as: UTF8.self)
+        #expect(!json.contains("pinnedProgressions"))
+    }
+
     @Test func switchedOffGroupsDontMove() throws {
         let (v, p, c) = try rig(["variation.amount": 1, "variation.harmony": 0, "variation.motifs": 0, "variation.generators": 0])
         var rng = SeededRandom(seed: 5)

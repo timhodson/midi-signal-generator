@@ -53,6 +53,9 @@ public final class Conductor: @unchecked Sendable {
     ]
 
     public var progressions: [Mood: [Int]]
+    /// Moods whose progression was picked by hand (a song, typed chords, edited chips): variations
+    /// and styles leave these chords alone.
+    public var pinned: Set<Mood> = []
     /// Degree sequences inserted ahead of the progression when a gesture fires.
     public var gestures: [String: [Int]]
 

@@ -21,6 +21,9 @@ public struct Scene: Codable, Sendable {
     public var grooves: [DrumGroove] = []
     public var progressions: [String: [Int]]
     public var gestures: [String: [Int]]
+    /// Moods whose progression was picked by hand (a song, typed chords): variations and styles
+    /// keep them. Written only when there are some.
+    public var pinnedProgressions: [String]?
     /// Apps that never trigger motifs (always-on daemons) while `activity.ignore` is on.
     public var ignoreApps: [String]
     /// The style whose settings are already in `params` (saved with the scene), so loading it
@@ -67,7 +70,7 @@ public struct Scene: Codable, Sendable {
     )
 
     private enum CodingKeys: String, CodingKey {
-        case name, seed, params, routes, macros, voices, instruments, motifs, grooves, progressions, gestures, ignoreApps, appliedStyle
+        case name, seed, params, routes, macros, voices, instruments, motifs, grooves, progressions, gestures, pinnedProgressions, ignoreApps, appliedStyle
     }
 
     public init(name: String, seed: UInt64, params: [String: Double], routes: [ModRoute], macros: [Macro],
@@ -98,6 +101,7 @@ public struct Scene: Codable, Sendable {
         grooves = try c.decodeIfPresent([DrumGroove].self, forKey: .grooves) ?? []
         progressions = try c.decode([String: [Int]].self, forKey: .progressions)
         gestures = try c.decode([String: [Int]].self, forKey: .gestures)
+        pinnedProgressions = try c.decodeIfPresent([String].self, forKey: .pinnedProgressions)
         ignoreApps = try c.decode([String].self, forKey: .ignoreApps)
         appliedStyle = try c.decodeIfPresent(String.self, forKey: .appliedStyle)
         addDrumsIfMissing()

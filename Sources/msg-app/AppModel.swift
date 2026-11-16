@@ -396,10 +396,13 @@ final class AppModel {
         return HarmonyContext(root: s.root, scaleSteps: s.scaleSteps, chordDegree: s.chordDegree, chordSize: s.chordSize)
     }
 
-    func setProgression(_ mood: String, _ degrees: [Int]) {
+    /// Hand edits pin the progression (variations and styles keep it); Reset passes `pin: false`.
+    func setProgression(_ mood: String, _ degrees: [Int], pin: Bool? = true) {
         guard !degrees.isEmpty else { return }
-        session?.setProgression(mood, degrees)
+        session?.setProgression(mood, degrees, pin: pin)
     }
+
+    func setProgressionPinned(_ mood: String, _ pinned: Bool) { session?.setProgressionPinned(mood, pinned) }
 
     // MARK: - Params
 
