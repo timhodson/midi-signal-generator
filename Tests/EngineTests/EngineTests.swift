@@ -69,6 +69,18 @@ import Router
     }
 }
 
+@Suite struct PresetNameTests {
+    @Test func savedScenesNameThePresetThatsPlaying() throws {
+        var scene = Scene.default
+        scene.instruments = [InstrumentConfig(id: "j6", component: "Synth One J6", preset: "Intersteller Pad")]
+        let engine = try Engine(scene: scene, sink: PrintSink { _ in })
+        // As the AU host registers it: the factory presets as a choice.
+        engine.params.register(ParamSpec("au.j6.preset", kind: .choice, default: 0, options: ["Intersteller Pad", "COSMIC AMBIENT PAD  "]))
+        try engine.params.set("au.j6.preset", 1)
+        #expect(engine.currentScene().instruments.first?.preset == "COSMIC AMBIENT PAD")
+    }
+}
+
 @Suite struct VariationTests {
     /// The engine's params and conductor, as the engine sets them up.
     func rig(_ sets: [String: Double] = [:]) throws -> (Variation, ParamStore, Conductor) {

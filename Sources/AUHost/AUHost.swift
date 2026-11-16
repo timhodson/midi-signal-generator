@@ -86,6 +86,11 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
 
     private init() {}
 
+    /// A plugin's factory preset name by index ("j6", 12 → "COSMIC AMBIENT PAD"), trimmed.
+    public func presetName(_ id: String, index: Int) -> String? {
+        plugins[id]?.presetNames[safe: index]?.trimmingCharacters(in: .whitespaces)
+    }
+
     public func transport(_ state: TransportState) { hostTransport.update(state) }
 
     /// Highest absolute sample on the output mix since the last call (0...1+). Lets a headless

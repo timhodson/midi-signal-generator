@@ -101,7 +101,11 @@ public final class Session: @unchecked Sendable {
         var auHost: AUHostSink?
         if !scene.instruments.isEmpty, options.output != .silent {
             let host = try await AUHostSink.load(scene.instruments)
-            for i in scene.instruments { notes.append("→ AU: \(i.id) = \(i.component)\(i.preset.map { " (\($0))" } ?? "")") }
+            for i in scene.instruments {
+                // The saved preset choice (au.<id>.preset) is what plays; the config's name is only the starting sound.
+                let saved = scene.params["au.\(i.id).preset"].flatMap { host.presetName(i.id, index: Int($0)) }
+                notes.append("→ AU: \(i.id) = \(i.component)\((saved ?? i.preset).map { " (\($0))" } ?? "")")
+            }
             auHost = host
         }
 

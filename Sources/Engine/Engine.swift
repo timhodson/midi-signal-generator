@@ -350,6 +350,12 @@ extension Engine {
     public var paramSpecs: [ParamSpec] { params.order.compactMap { params.specs[$0] } }
 
     /// The scene as it stands now, including every tweak, ready to save. Call on `queue`.
+    /// The option name a preset choice param is set to, if it's registered (instruments loaded).
+    private func presetChoice(_ id: String) -> String? {
+        guard let spec = params.specs[id] else { return nil }
+        return spec.options[safe: params.int(id)]?.trimmingCharacters(in: .whitespaces)
+    }
+
     public func currentScene() -> Scene {
         var s = scene
         // Macros are left out (their effect is already in the target values) so the scene
@@ -360,6 +366,15 @@ extension Engine {
         for i in s.routes.indices { s.routes[i].amount = params.baseValue("mod.\(i).amount") }
         s.progressions = Dictionary(uniqueKeysWithValues: conductor.progressions.map { ($0.key.rawValue, $0.value) })
         s.gestures = conductor.gestures
+        // Hosted synths and effects: the preset name follows the preset that's playing, so the
+        // scene reads true (its au.*.preset value already restores it).
+        for i in s.instruments.indices {
+            let id = s.instruments[i].id
+            if let name = presetChoice("au.\(id).preset") { s.instruments[i].preset = name }
+            for n in s.instruments[i].effects.indices {
+                if let name = presetChoice("au.\(s.instruments[i].effectID(n + 1)).preset") { s.instruments[i].effects[n].preset = name }
+            }
+        }
         s.pinnedProgressions = conductor.pinned.isEmpty ? nil : conductor.pinned.map(\.rawValue).sorted()
         s.motifs = motif.designs
         s.grooves = drums.custom

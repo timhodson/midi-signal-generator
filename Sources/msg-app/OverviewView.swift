@@ -13,7 +13,13 @@ struct OverviewView: View {
                     Label(error, systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.red).textSelection(.enabled)
                 }
-                ForEach(model.messages, id: \.self) { m in
+                // Hosted synths live (their preset changes while playing); other setup notes as they were.
+                ForEach(model.hostedInstruments.map(\.id), id: \.self) { id in
+                    let users = model.users(ofInstrument: id)
+                    Text("→ AU: \(id) = \(model.instrumentLabel(id))\(users.isEmpty ? "" : "  ·  plays " + users.joined(separator: ", "))")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
+                ForEach(model.messages.filter { !$0.hasPrefix("→ AU: ") }, id: \.self) { m in
                     Text(m).font(.callout).foregroundStyle(m.hasPrefix("⚠︎") ? .orange : .secondary)
                 }
                 if model.isRunning {
