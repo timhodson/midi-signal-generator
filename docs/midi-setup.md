@@ -1,7 +1,7 @@
 # MIDI setup
 
-Run `msg-spike --list-destinations` to see what this Mac can send to, and
-`msg-spike --list-instruments` for Audio Unit synths it can host itself.
+Run `msg-cli --list-destinations` to see what this Mac can send to, and
+`msg-cli --list-instruments` for Audio Unit synths it can host itself.
 
 ## In the app
 
@@ -21,14 +21,14 @@ which tells several Bluetooth devices apart (their endpoints are all called "Blu
 
 ## Hosted Audio Unit synths on the Mac (Synth One J6, King of FM 2…)
 
-No other app is needed: the synths run inside `msg-spike` and play through the Mac's audio output.
+No other app is needed: the synths run inside `msg-cli` and play through the Mac's audio output.
 
 ```sh
-msg-spike --scene scenes/audiokit-hosted.json --verbose
+msg-cli --scene scenes/audiokit-hosted.json --verbose
 # or pick per role on the command line (role=synth[@preset]):
-msg-spike --au pad="Synth One J6@Intersteller Pad" --au lead="King of FM 2@DX Tub Bells"
-msg-spike --au pad="Synth One J6" --list-options au.pad.preset   # browse presets
-msg-spike --au pad="Synth One J6" --list-params | grep '^au\.pad'  # all synth controls
+msg-cli --au pad="Synth One J6@Intersteller Pad" --au lead="King of FM 2@DX Tub Bells"
+msg-cli --au pad="Synth One J6" --list-options au.pad.preset   # browse presets
+msg-cli --au pad="Synth One J6" --list-params | grep '^au\.pad'  # all synth controls
 ```
 
 Every synth control is a param, so it can be a mod-matrix target. The hosted scene routes
@@ -46,9 +46,9 @@ See [ADR 0010](decisions/0010-hosted-audio-unit-instruments.md).
 4. Run:
 
    ```sh
-   msg-spike --scene scenes/ipad-network.json
+   msg-cli --scene scenes/ipad-network.json
    # or, with any scene:
-   msg-spike --dest network
+   msg-cli --dest network
    ```
 
    `network` always means the Mac's network session, whatever it is called.
@@ -56,7 +56,7 @@ See [ADR 0010](decisions/0010-hosted-audio-unit-instruments.md).
    `pad` = ch 1, `lead` = ch 2, `pulse` = ch 3 (change with `--set voice.lead.channel=5`).
 
 If the destination warning says the session is disabled, step 2 hasn't taken effect yet.
-Restart `msg-spike` after enabling it.
+Restart `msg-cli` after enabling it.
 
 ## Syncing arps, LFOs and delays (MIDI clock)
 

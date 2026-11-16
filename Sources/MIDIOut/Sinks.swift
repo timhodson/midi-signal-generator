@@ -46,7 +46,7 @@ public final class CoreMIDISink: MIDISink, @unchecked Sendable {
     private var destinations: Set<String> = []
 
     public init(clientName: String = "MIDISignalGenerator", virtualName: String = "MIDI Signal Generator") {
-        manager = MIDIManager(clientName: clientName, model: "msg-spike", manufacturer: "midi-signal-generator")
+        manager = MIDIManager(clientName: clientName, model: "msg-cli", manufacturer: "midi-signal-generator")
         self.virtualName = virtualName
     }
 

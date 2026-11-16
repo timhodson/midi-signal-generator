@@ -9,7 +9,7 @@ let package = Package(
     name: "MIDISignalGenerator",
     platforms: [.macOS(.v15)],
     products: [
-        .executable(name: "msg-spike", targets: ["msg-spike"]),
+        .executable(name: "msg-cli", targets: ["msg-cli"]),
         .executable(name: "msg-app", targets: ["msg-app"]),
         .executable(name: "msg-pcap", targets: ["msg-pcap"]),
         .library(name: "MSGEngine", targets: ["Engine"]),
@@ -52,7 +52,7 @@ let package = Package(
         .target(name: "Engine", dependencies: ["Params", "SignalBus", "Music", "Router", "MIDIOut", "Sources"]),
         // Builds a session (hosted synths + MIDI + engine + source); shared by CLI and app.
         .target(name: "Runtime", dependencies: ["Engine", "AUHost", "MIDIOut", "Music", "Router", "SignalBus", "Sources"]),
-        .executableTarget(name: "msg-spike", dependencies: ["Runtime", "Engine", "AUHost"]),
+        .executableTarget(name: "msg-cli", dependencies: ["Runtime", "Engine", "AUHost"]),
         // The Mac app: SwiftUI panels generated from ParamSpecs, scopes, synth editors.
         .executableTarget(name: "msg-app", dependencies: [
             "Runtime", "Engine", "AUHost", "MIDIOut", "Music", "Params", "Router", "Sources",

@@ -10,9 +10,9 @@ import Runtime
 import Sources
 
 let usage = """
-msg-spike — turn this Mac's network traffic into MIDI.
+msg-cli — turn this Mac's network traffic into MIDI.
 
-USAGE: msg-spike [options]
+USAGE: msg-cli [options]
 
   --source nettop|synthetic|replay:<file>
                               Data source (default: nettop = real per-app traffic).

@@ -64,7 +64,7 @@ something pleasant: only interpretation changes.
 | `msg-pcap` | CPcap (system libpcap), PacketFeatures, OSC | the capture helper (ADR 0015) |
 | `Engine` | Params, SignalBus, Music, Router, MIDIOut, Sources | `Engine` (tick loop, `onStatus`), `Scene` (JSON), `EngineStatus` |
 | `Runtime` | Engine, AUHost, MIDIOut, Sources | `Session`: builds synths + sinks + engine + source + recorder |
-| `msg-spike` | Runtime | CLI |
+| `msg-cli` | Runtime | CLI |
 | `msg-app` | Runtime | SwiftUI app (ADR 0012) |
 
 `Params`, `SignalBus`, `Music` and `Router` contain no I/O, so the future SwiftUI app and the tests use the same code.

@@ -38,7 +38,7 @@ jobs:
           BIN="$(swift build -c release --arch arm64 --show-bin-path)"
           mkdir -p "dist/$NAME"
           # The executables, and the resource bundles they load from beside themselves.
-          cp "$BIN/msg-app" "$BIN/msg-spike" "$BIN/msg-pcap" "dist/$NAME/"
+          cp "$BIN/msg-app" "$BIN/msg-cli" "$BIN/msg-pcap" "dist/$NAME/"
           cp -R "$BIN"/*.bundle "dist/$NAME/"
           cp -R scenes "dist/$NAME/scenes"
           cp README.md "dist/$NAME/"
@@ -50,7 +50,7 @@ jobs:
 
           Then, from this folder:
               ./msg-app --scene scenes/default.json        the Mac app
-              ./msg-spike --source synthetic --dry-run     command line, no MIDI out
+              ./msg-cli --source synthetic --dry-run       command line (optional), prints notes, no MIDI out
               sudo ./msg-pcap --print                      packet capture helper (optional)
 
           Keep the .bundle folders next to the executables: the app loads its skin from them.

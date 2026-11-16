@@ -19,22 +19,26 @@ unzipping, run `xattr -dr com.apple.quarantine midi-signal-generator-*`, then `.
 (INSTALL.txt in the zip has the details). To cut a release, push a version tag: `git tag v0.1.0 && git push
 origin v0.1.0`. The Release workflow tests, builds and publishes it.
 
+`msg-app` is all you need. `msg-cli` is the same engine without a window: run it headless, print
+the notes it would play (`--dry-run --verbose`), list MIDI ports, synths, effects and presets, and
+record or replay traffic. `msg-pcap` is the optional packet-capture helper.
+
 ## Quick start
 
 ```sh
 swift run -c release msg-app --scene scenes/audiokit-hosted.json   # the Mac app (release: much lighter)
 swift build
-.build/debug/msg-spike --source synthetic --dry-run   # hear nothing, see the notes
-.build/debug/msg-spike --verbose                      # real traffic → virtual MIDI port "MIDI Signal Generator"
-.build/debug/msg-spike --scene scenes/audiokit-hosted.json   # Synth One J6 + King of FM, hosted in-app
-.build/debug/msg-spike --au pad="Synth One J6@Intersteller Pad"  # any AU synth per role
-.build/debug/msg-spike --dest network                 # → iPad via network MIDI (docs/midi-setup.md)
-.build/debug/msg-spike --list-params                  # all ~80 parameters (hundreds more with hosted synths)
-.build/debug/msg-spike --set macro.faithfulness=0.9   # closer to raw data
-.build/debug/msg-spike --packets                      # + DNS lookups, handshakes, LAN chatter (msg-pcap, ADR 0015)
+.build/debug/msg-cli --source synthetic --dry-run   # hear nothing, see the notes
+.build/debug/msg-cli --verbose                      # real traffic → virtual MIDI port "MIDI Signal Generator"
+.build/debug/msg-cli --scene scenes/audiokit-hosted.json   # Synth One J6 + King of FM, hosted in-app
+.build/debug/msg-cli --au pad="Synth One J6@Intersteller Pad"  # any AU synth per role
+.build/debug/msg-cli --dest network                 # → iPad via network MIDI (docs/midi-setup.md)
+.build/debug/msg-cli --list-params                  # all ~80 parameters (hundreds more with hosted synths)
+.build/debug/msg-cli --set macro.faithfulness=0.9   # closer to raw data
+.build/debug/msg-cli --packets                      # + DNS lookups, handshakes, LAN chatter (msg-pcap, ADR 0015)
 .build/debug/msg-pcap --print                         # see packet features (needs sudo or ChmodBPF)
-.build/debug/msg-spike --record recordings/evening.jsonl          # capture the traffic…
-.build/debug/msg-spike --source replay:recordings/evening.jsonl  # …and replay it while tuning
+.build/debug/msg-cli --record recordings/evening.jsonl          # capture the traffic…
+.build/debug/msg-cli --source replay:recordings/evening.jsonl  # …and replay it while tuning
 ```
 
 Voices: `pad` = ch 1, `lead` = ch 2, `pulse` = ch 3, `bass` = ch 4, `sub` = ch 5, `drums` = ch 10 (all tunable).
