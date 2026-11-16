@@ -114,12 +114,20 @@ where the piece is now, and read what changed on the LCD.
 
 ![Variation](docs/screenshots/variation.jpg)
 
+The middle of the toolbar has **play/pause** (⌘↩: the music holds, everything stays loaded),
+**randomise** and **stop** (⌘.: unloads the session, hosted synths too). File → **Open Recent**
+lists recent scenes, and the app starts with the scene you saved last.
+
 ### Sound
 
-**Voices**: where each voice's notes go: a hosted synth, the virtual MIDI port, network MIDI to an
-iPad, or Bluetooth MIDI. Each voice also has its channel, transpose, range and polyphony.
-
-**Instruments**: the AUv3 synths hosted inside the app, with their presets and parameters.
+**Voices**: each voice's sound in one place. Choose where its notes go (a hosted synth, the
+virtual MIDI port, network MIDI to an iPad, or Bluetooth MIDI) and, for a hosted synth, its
+preset, volume, pan, editor window and every synth parameter. **Layers** play the same notes on
+more sounds at once (the pad on Synth One *and* the iPad, an octave up, a little later), each with
+its own channel, transpose, level and delay. **Effects**: put Audio Unit effects (delay, chorus,
+distortion…) after a hosted synth, with bypass, presets and their own editors. "New hosted synth"
+in the destination menu loads another one. Each voice also has its channel, transpose, range and
+polyphony.
 
 **Mixer**: for hosted synths: 3-band EQ, reverb and tempo-synced delay sends, pan, mute and solo, faders
 and meters, and a master. External MIDI voices get a velocity trim.

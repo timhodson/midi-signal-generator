@@ -82,8 +82,9 @@
      - panel textures must tile: generate, then make seamless (offset and blend), and check at 1× and 2×
      - keep source prompts and settings in the repo (e.g. `art/`) so the look can be regenerated
    - no reuse of AudioKit's artwork
-4. **App, next round:** adding
-   and removing hosted instruments, scene A/B comparison, MIDI-learn for params, an app bundle.
+4. **App, next round:** scene A/B comparison, MIDI-learn for params, an app bundle. Done: one
+   Sound panel per voice with layers, adding/removing hosted synths, AU effects on hosted synths,
+   pause, Open Recent (ADR 0021). Later: patch the audio graph live instead of reloading.
 5. **MIDI clock**: out done (ADR 0018). Still to come: clock **in**, to follow a DAW; timestamped notes.
 6. More generators: arpeggiator over the chord, flow-voice (one voice per live connection with voice stealing).
 7. Drums, next: more grooves and odd meters, per-lane timing feel (laid-back snare), groove morphing between moods.
