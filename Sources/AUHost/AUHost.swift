@@ -43,15 +43,19 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
         /// Param id -> what to do when it changes (see applyParams).
         var targets: [String: Target] = [:]
 
+        /// An effect in a synth's chain (`au.<synth>.fx<N>`), not a synth.
+        public let isEffect: Bool
+
         enum Target {
-            case preset, volume, pan
+            case preset, volume, pan, bypass
             case parameter(AUParameter)
             case eqGain(Int), eqFrequency(Int), send(Int), mute, solo
         }
 
-        init(config: InstrumentConfig, unit: AVAudioUnit) {
+        init(config: InstrumentConfig, unit: AVAudioUnit, isEffect: Bool = false) {
             self.config = config
             self.unit = unit
+            self.isEffect = isEffect
             volume = config.volume
             presetNames = unit.auAudioUnit.factoryPresets?.map(\.name) ?? []
         }
@@ -64,6 +68,10 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
     private var instrumentByParam: [String: String] = [:]
     private var changeCursor = 0
     public private(set) var instruments: [String: Instrument] = [:]
+    /// Each synth's effects, in chain order.
+    public private(set) var effects: [String: [Instrument]] = [:]
+    /// Synths and effects by id ("j6", "j6.fx1"): everything with parameters and an editor.
+    public private(set) var plugins: [String: Instrument] = [:]
     public var log: (String) -> Void = { print($0) }
     let meterLock = NSLock()
     private var peak: Float = 0
@@ -113,10 +121,25 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
 
     /// Matches "Synth One J6" or "AudioKit Pro: Synth One J6", ignoring case.
     public static func component(named query: String) -> AVAudioUnitComponent? {
-        let q = query.lowercased()
-        return availableInstruments().first {
-            $0.name.lowercased() == q || "\($0.manufacturerName): \($0.name)".lowercased() == q
+        find(query, in: availableInstruments())
+    }
+
+    /// Every Audio Unit effect (types `aufx` and `aumf`) installed on this Mac.
+    public static func availableEffects() -> [AVAudioUnitComponent] {
+        [kAudioUnitType_Effect, kAudioUnitType_MusicEffect].flatMap { type in
+            AVAudioUnitComponentManager.shared().components(matching: AudioComponentDescription(
+                componentType: type, componentSubType: 0, componentManufacturer: 0, componentFlags: 0, componentFlagsMask: 0))
         }
+        .sorted { ($0.manufacturerName, $0.name) < ($1.manufacturerName, $1.name) }
+    }
+
+    public static func effectComponent(named query: String) -> AVAudioUnitComponent? {
+        find(query, in: availableEffects())
+    }
+
+    private static func find(_ query: String, in list: [AVAudioUnitComponent]) -> AVAudioUnitComponent? {
+        let q = query.lowercased()
+        return list.first { $0.name.lowercased() == q || "\($0.manufacturerName): \($0.name)".lowercased() == q }
     }
 
     // MARK: - Loading
@@ -145,6 +168,24 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
             }
             host.engine.attach(unit)
             host.instruments[config.id] = inst
+            host.plugins[config.id] = inst
+            for (n, fx) in config.effects.enumerated() {
+                guard let component = effectComponent(named: fx.component) else { throw AUHostError.effectNotFound(fx.component) }
+                let unit = try await AVAudioUnit.instantiate(with: component.audioComponentDescription,
+                                                             options: fx.outOfProcess ? .loadOutOfProcess : [])
+                unit.auAudioUnit.musicalContextBlock = host.hostTransport.musicalContextBlock
+                unit.auAudioUnit.transportStateBlock = host.hostTransport.transportStateBlock
+                let effect = Instrument(config: InstrumentConfig(id: config.effectID(n + 1), component: fx.component, preset: fx.preset,
+                                                                 outOfProcess: fx.outOfProcess),
+                                        unit: unit, isEffect: true)
+                if let name = fx.preset {
+                    guard let i = Self.presetIndex(of: name, in: effect.presetNames) else { throw AUHostError.presetNotFound(name, fx.component) }
+                    effect.presetIndex = i
+                }
+                host.engine.attach(unit)
+                host.effects[config.id, default: []].append(effect)
+                host.plugins[effect.config.id] = effect
+            }
         }
         if !configs.isEmpty {
             host.buildMixer()
@@ -158,7 +199,7 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
             // before the engine starts and reports it as current, but keeps its default sound.
             // Its parameter values also update asynchronously, so wait for them to settle
             // before they become our parameters' defaults.
-            for inst in host.instruments.values.sorted(by: { $0.config.id < $1.config.id }) {
+            for inst in host.plugins.values.sorted(by: { $0.config.id < $1.config.id }) {
                 guard let index = inst.presetIndex else { continue }
                 let before = snapshot(inst)
                 host.select(preset: index, on: inst)
@@ -263,10 +304,32 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
                                      help: "Where \(inst.config.component) sits left (−1) to right (+1). Spreading layers apart makes the mix clearer and wider."))
             inst.pushed["\(p).volume"] = inst.config.volume
             inst.pushed["\(p).pan"] = inst.config.pan
+            inst.targets["\(p).volume"] = .volume
+            inst.targets["\(p).pan"] = .pan
+            registerPluginParams(inst, in: store)
+            for fx in effects[inst.config.id] ?? [] {
+                store.register(ParamSpec("\(fx.prefix).bypass", kind: .toggle, default: 0,
+                                         help: "Take \(fx.config.component) out of \(inst.config.component)'s chain (the sound passes through untouched). Compare with and without."))
+                fx.pushed["\(fx.prefix).bypass"] = 0
+                fx.targets["\(fx.prefix).bypass"] = .bypass
+                registerPluginParams(fx, in: store)
+            }
+        }
+        registerMixerParams(in: store)
+        for inst in plugins.values { for id in inst.targets.keys { instrumentByParam[id] = inst.config.id } }
+        changeCursor = store.changeCursor
+    }
+
+    /// A plugin's preset and every one of its parameters, synced both ways with its own window.
+    private func registerPluginParams(_ inst: Instrument, in store: ParamStore) {
+        do {
+            let p = inst.prefix
             if !inst.presetNames.isEmpty {
                 store.register(ParamSpec("\(p).preset", kind: .choice, default: Double(inst.presetIndex ?? 0),
                                          options: inst.presetNames,
-                                         help: "The factory sound of \(inst.config.component). Changing it reloads all of the synth's settings. Picking a preset in the synth's own window updates this too."))
+                                         help: inst.isEffect
+                                             ? "A factory setting of \(inst.config.component). Changing it reloads all of the effect's settings. Picking one in its own window updates this too."
+                                             : "The factory sound of \(inst.config.component). Changing it reloads all of the synth's settings. Picking a preset in the synth's own window updates this too."))
                 inst.pushed["\(p).preset"] = Double(inst.presetIndex ?? 0)
             }
             let params = inst.unit.auAudioUnit.parameterTree?.allParameters ?? []
@@ -284,15 +347,9 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
                 inst.idByAddress[param.address] = id
             }
             observeExternalChanges(inst)
-            inst.targets["\(p).preset"] = .preset
-            inst.targets["\(p).volume"] = .volume
-            inst.targets["\(p).pan"] = .pan
+            if !inst.presetNames.isEmpty { inst.targets["\(p).preset"] = .preset }
             for (id, param) in inst.parameters { inst.targets[id] = .parameter(param) }
-            for id in inst.targets.keys { instrumentByParam[id] = inst.config.id }
         }
-        registerMixerParams(in: store)
-        for inst in instruments.values { for id in inst.targets.keys { instrumentByParam[id] = inst.config.id } }
-        changeCursor = store.changeCursor
     }
 
     /// Two-way sync: when the user turns a knob or picks a preset in the plugin's own window,
@@ -355,7 +412,7 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
     /// Called every engine tick. Only params whose value changed since the last call are
     /// looked at (via the store's change log), not all of them.
     public func applyParams(_ store: ParamStore) {
-        for inst in instruments.values {
+        for inst in plugins.values {
             drainExternalChanges(inst, store)
             if let due = inst.resyncAt, Date() >= due {
                 inst.resyncAt = nil
@@ -369,7 +426,7 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
             applyGlobalMix(store)
         }
         for id in Set(ids) {
-            guard let owner = instrumentByParam[id], let inst = instruments[owner],
+            guard let owner = instrumentByParam[id], let inst = plugins[owner],
                   let target = inst.targets[id], let v = changed(id, inst, store) else { continue }
             switch target {
             case .preset:
@@ -378,6 +435,7 @@ public final class AUHostSink: ParameterisedSink, @unchecked Sendable {
                 inst.resyncAt = Date().addingTimeInterval(0.6)
                 log("♪ \(inst.config.id) preset → \(inst.presetNames[safe: Int(v)] ?? "?")")
             case .pan: inst.mixer.pan = Float(v)
+            case .bypass: inst.unit.auAudioUnit.shouldBypassEffect = v >= 0.5
             case .parameter(let param): param.setValue(AUValue(v), originator: inst.observerToken)
             default: _ = applyMixer(target, v, inst)
             }
@@ -422,12 +480,14 @@ public enum AUHostError: Error, CustomStringConvertible {
     case notFound(String)
     case presetNotFound(String, String)
     case duplicateID(String)
+    case effectNotFound(String)
 
     public var description: String {
         switch self {
         case .notFound(let c): "No Audio Unit instrument named \"\(c)\". Run --list-instruments."
         case .presetNotFound(let p, let c): "\(c) has no factory preset \"\(p)\"."
         case .duplicateID(let id): "Two instruments use the id \"\(id)\"."
+        case .effectNotFound(let c): "No Audio Unit effect named \"\(c)\"."
         }
     }
 }

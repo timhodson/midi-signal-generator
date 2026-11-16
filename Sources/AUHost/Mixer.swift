@@ -4,7 +4,7 @@ import Params
 
 /// The hosted mix, laid out like a desk:
 ///
-///   synth → EQ (low shelf, mid bell, high shelf) → channel (fader, pan, mute/solo) ─┬→ master
+///   synth → effects → EQ (low shelf, mid bell, high shelf) → channel (fader, pan, mute/solo) ─┬→ master
 ///                                                                                  ├→ send → reverb bus → return ─→ master
 ///                                                                                  └→ send → delay bus  → return ─→ master
 ///
@@ -62,7 +62,13 @@ extension AUHostSink {
             for b in eq.bands { b.gain = 0; b.bypass = false }
             engine.attach(eq)
             engine.attach(inst.mixer)
-            engine.connect(inst.unit, to: eq, format: nil)
+            // synth → effects in order → EQ
+            var last: AVAudioNode = inst.unit
+            for fx in effects[inst.config.id] ?? [] {
+                engine.connect(last, to: fx.unit, format: nil)
+                last = fx.unit
+            }
+            engine.connect(last, to: eq, format: nil)
             engine.connect(eq, to: inst.mixer, format: nil)
             inst.sends = buses.map { _ in AVAudioMixerNode() }
             var points = [AVAudioConnectionPoint(node: main, bus: main.nextAvailableInputBus)]

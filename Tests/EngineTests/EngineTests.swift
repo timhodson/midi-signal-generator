@@ -4,6 +4,7 @@ import Testing
 import MIDIOut
 import Music
 import Params
+import Router
 
 @Suite struct EngineTests {
     @Test func editedProgressionsPlayAndAreSaved() throws {
@@ -329,5 +330,34 @@ import Params
         let dubstep = Style.all.first { $0.name == "Dubstep" }!
         #expect(dubstep.suggestedPresets(role: "bass", presets: presets).first?.name == "Wobble Monster")
         #expect(synthwave.suggestedPresets(role: "pulse", presets: ["Init"]).isEmpty)
+    }
+}
+
+@Suite struct StructureEditTests {
+    @Test func removingANumberedItemMovesLaterOnesUp() throws {
+        var s = Scene.default
+        s.params = ["voice.pad.layer1.transpose": 12, "voice.pad.layer2.transpose": 7, "voice.pad.layer3.transpose": -12, "voice.pad.channel": 2]
+        s.routes = [ModRoute(source: "lfo.1", target: "voice.pad.layer1.velocityScale", amount: 1),
+                    ModRoute(source: "lfo.1", target: "voice.pad.layer3.velocityScale", amount: 1)]
+        s.renumber(prefix: { "voice.pad.layer\($0)" }, removed: 1, count: 3)
+        #expect(s.params == ["voice.pad.layer1.transpose": 7, "voice.pad.layer2.transpose": -12, "voice.pad.channel": 2])
+        #expect(s.routes.map(\.target) == ["voice.pad.layer2.velocityScale"])
+    }
+
+    @Test func swappingExchangesSettingsAndRoutes() {
+        var s = Scene.default
+        s.params = ["au.j6.fx1.mix": 0.2, "au.j6.fx2.mix": 0.9, "au.j6.fx10.mix": 0.5]
+        s.routes = [ModRoute(source: "lfo.1", target: "au.j6.fx2.mix", amount: 1)]
+        s.swapPrefixes("au.j6.fx1.", "au.j6.fx2.")
+        #expect(s.params == ["au.j6.fx1.mix": 0.9, "au.j6.fx2.mix": 0.2, "au.j6.fx10.mix": 0.5])
+        #expect(s.routes[0].target == "au.j6.fx1.mix")
+    }
+
+    @Test func effectsAreSavedOnlyWhenThere() throws {
+        let plain = InstrumentConfig(id: "j6", component: "Synth One J6")
+        #expect(!String(decoding: try JSONEncoder().encode(plain), as: UTF8.self).contains("effects"))
+        let withFX = InstrumentConfig(id: "j6", component: "Synth One J6", effects: [EffectConfig(component: "AUDelay", preset: "Slapback")])
+        #expect(try JSONDecoder().decode(InstrumentConfig.self, from: JSONEncoder().encode(withFX)) == withFX)
+        #expect(withFX.effectID(1) == "j6.fx1")
     }
 }

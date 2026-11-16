@@ -134,3 +134,35 @@ public struct Scene: Codable, Sendable {
         return try e.encode(self)
     }
 }
+
+// Structural edits: numbered items (a voice's layers, a synth's effects) whose settings are
+// params named by their number.
+extension Scene {
+    /// After removing item `removed` of `count` numbered ones, move later items' params and
+    /// modulation routes down by one, and drop the removed one's.
+    public mutating func renumber(prefix: (Int) -> String, removed: Int, count: Int) {
+        let original = params
+        var params = original.filter { key, _ in !(removed...count).contains { key.hasPrefix(prefix($0) + ".") } }
+        for n in (removed + 1)...max(count, removed + 1) where n <= count {
+            let from = prefix(n) + ".", to = prefix(n - 1) + "."
+            for (key, value) in original where key.hasPrefix(from) { params[to + key.dropFirst(from.count)] = value }
+        }
+        self.params = params
+        routes.removeAll { $0.target.hasPrefix(prefix(removed) + ".") }
+        for r in routes.indices {
+            for n in (removed + 1)...max(count, removed + 1) where n <= count {
+                let from = prefix(n) + "."
+                if routes[r].target.hasPrefix(from) { routes[r].target = prefix(n - 1) + "." + routes[r].target.dropFirst(from.count) }
+            }
+        }
+    }
+
+    /// Exchange two prefixes' params and routes.
+    public mutating func swapPrefixes(_ a: String, _ b: String) {
+        func flip(_ key: String) -> String {
+            key.hasPrefix(a) ? b + key.dropFirst(a.count) : key.hasPrefix(b) ? a + key.dropFirst(b.count) : key
+        }
+        params = Dictionary(uniqueKeysWithValues: params.map { (flip($0.key), $0.value) })
+        for r in routes.indices { routes[r].target = flip(routes[r].target) }
+    }
+}

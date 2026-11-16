@@ -254,21 +254,25 @@ public struct InstrumentConfig: Codable, Sendable, Equatable {
     /// Run the plugin in a separate process (the default). A crashing plugin can't take the
     /// app down, and some plugins (King of FM 2) only load this way from a command-line host.
     public var outOfProcess: Bool
+    /// Audio Unit effects after the synth, in order, before its mixer channel. Params
+    /// `au.<id>.fx<N>.*`, N from 1.
+    public var effects: [EffectConfig] = []
 
     public init(id: String, component: String, preset: String? = nil, volume: Double = 0.8,
-                pan: Double = 0, outOfProcess: Bool = true) {
+                pan: Double = 0, outOfProcess: Bool = true, effects: [EffectConfig] = []) {
         self.id = id
         self.component = component
         self.preset = preset
         self.volume = volume
         self.pan = pan
         self.outOfProcess = outOfProcess
+        self.effects = effects
     }
 
     public static let destinationPrefix = "au:"
     public var destination: String { Self.destinationPrefix + id }
 
-    private enum CodingKeys: String, CodingKey { case id, component, preset, volume, pan, outOfProcess }
+    private enum CodingKeys: String, CodingKey { case id, component, preset, volume, pan, outOfProcess, effects }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -277,6 +281,45 @@ public struct InstrumentConfig: Codable, Sendable, Equatable {
         preset = try c.decodeIfPresent(String.self, forKey: .preset)
         volume = try c.decodeIfPresent(Double.self, forKey: .volume) ?? 0.8
         pan = try c.decodeIfPresent(Double.self, forKey: .pan) ?? 0
+        outOfProcess = try c.decodeIfPresent(Bool.self, forKey: .outOfProcess) ?? true
+        effects = try c.decodeIfPresent([EffectConfig].self, forKey: .effects) ?? []
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(component, forKey: .component)
+        try c.encodeIfPresent(preset, forKey: .preset)
+        try c.encode(volume, forKey: .volume)
+        try c.encode(pan, forKey: .pan)
+        try c.encode(outOfProcess, forKey: .outOfProcess)
+        if !effects.isEmpty { try c.encode(effects, forKey: .effects) }
+    }
+
+    /// The id an effect of this synth is known by: "j6.fx1" (params "au.j6.fx1.*").
+    public func effectID(_ number: Int) -> String { "\(id).fx\(number)" }
+}
+
+/// An Audio Unit effect on a hosted synth: a delay, a chorus, a filter…
+public struct EffectConfig: Codable, Sendable, Equatable {
+    /// Component name as listed by `--list-effects`, e.g. "AUDelay" or "Apple: AUDelay".
+    public var component: String
+    /// Factory preset to load (nil = the plugin's default).
+    public var preset: String?
+    public var outOfProcess: Bool
+
+    public init(component: String, preset: String? = nil, outOfProcess: Bool = true) {
+        self.component = component
+        self.preset = preset
+        self.outOfProcess = outOfProcess
+    }
+
+    private enum CodingKeys: String, CodingKey { case component, preset, outOfProcess }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        component = try c.decode(String.self, forKey: .component)
+        preset = try c.decodeIfPresent(String.self, forKey: .preset)
         outOfProcess = try c.decodeIfPresent(Bool.self, forKey: .outOfProcess) ?? true
     }
 }

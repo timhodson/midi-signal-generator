@@ -64,23 +64,7 @@ extension AppModel {
             guard let i = scene.voices.firstIndex(where: { $0.role == role }), scene.voices[i].layers.indices.contains(layer - 1) else { return }
             let count = scene.voices[i].layers.count
             scene.voices[i].layers.remove(at: layer - 1)
-            var params = scene.params
-            for n in layer...count {
-                let from = VoiceLayer.prefix(role: role, number: n + 1) + ".", to = VoiceLayer.prefix(role: role, number: n) + "."
-                for key in params.keys where key.hasPrefix(to) { params[key] = nil }
-                for (key, value) in scene.params where key.hasPrefix(from) { params[to + key.dropFirst(from.count)] = value }
-            }
-            scene.params = params
-            // Modulation of the removed layer goes; later layers' routes follow them up.
-            scene.routes.removeAll { $0.target.hasPrefix(VoiceLayer.prefix(role: role, number: layer) + ".") }
-            for r in scene.routes.indices {
-                for n in (layer + 1)...max(count, layer + 1) {
-                    let from = VoiceLayer.prefix(role: role, number: n) + "."
-                    if scene.routes[r].target.hasPrefix(from) {
-                        scene.routes[r].target = VoiceLayer.prefix(role: role, number: n - 1) + "." + scene.routes[r].target.dropFirst(from.count)
-                    }
-                }
-            }
+            scene.renumber(prefix: { VoiceLayer.prefix(role: role, number: $0) }, removed: layer, count: count)
         }
     }
 
@@ -118,6 +102,44 @@ extension AppModel {
         if !taken.contains(base) { return base }
         for c in "bcdefghijklmnopqrstuvwxyz" where !taken.contains(base + String(c)) { return base + String(c) }
         return base + String(taken.count)
+    }
+}
+
+extension AppModel {
+    // MARK: Effects on a hosted synth
+
+    /// Every Audio Unit effect on this Mac, for "Add effect".
+    var installedEffects: [(name: String, maker: String)] {
+        AUHostSink.availableEffects().map { ($0.name, $0.manufacturerName) }
+    }
+
+    func addEffect(_ component: String, to instrument: String) async {
+        await restructure { scene in
+            guard let i = scene.instruments.firstIndex(where: { $0.id == instrument }) else { return }
+            scene.instruments[i].effects.append(EffectConfig(component: component))
+        }
+    }
+
+    /// Remove effect `number` (1…) from a synth's chain; later effects move up with their settings.
+    func removeEffect(_ number: Int, from instrument: String) async {
+        await restructure { scene in
+            guard let i = scene.instruments.firstIndex(where: { $0.id == instrument }),
+                  scene.instruments[i].effects.indices.contains(number - 1) else { return }
+            let count = scene.instruments[i].effects.count
+            scene.instruments[i].effects.remove(at: number - 1)
+            scene.renumber(prefix: { "au.\(instrument).fx\($0)" }, removed: number, count: count)
+        }
+    }
+
+    /// Move effect `number` one place earlier (-1) or later (+1) in the chain.
+    func moveEffect(_ number: Int, by offset: Int, in instrument: String) async {
+        await restructure { scene in
+            guard let i = scene.instruments.firstIndex(where: { $0.id == instrument }) else { return }
+            let a = number - 1, b = a + offset
+            guard scene.instruments[i].effects.indices.contains(a), scene.instruments[i].effects.indices.contains(b) else { return }
+            scene.instruments[i].effects.swapAt(a, b)
+            scene.swapPrefixes("au.\(instrument).fx\(a + 1).", "au.\(instrument).fx\(b + 1).")
+        }
     }
 }
 

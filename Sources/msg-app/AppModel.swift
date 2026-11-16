@@ -517,7 +517,7 @@ final class AppModel {
             w.makeKeyAndOrderFront(nil)
             return
         }
-        guard let inst = session?.auHost?.instruments[instrumentID], !openingEditors.contains(instrumentID) else { return }
+        guard let inst = session?.auHost?.plugins[instrumentID], !openingEditors.contains(instrumentID) else { return }
         let title = "\(inst.config.component) — \(instrumentID)"
         openingEditors.insert(instrumentID)
         inst.unit.auAudioUnit.requestViewController { [weak self] vc in

@@ -112,33 +112,126 @@ struct HostedSynthControls: View {
                     .font(.caption).foregroundStyle(.orange)
             }
             HStack(alignment: .center, spacing: 18) {
-                if let preset = model.specsByID[prefix + "preset"] { ParamRow(spec: preset).frame(maxWidth: 460) }
+                if let preset = model.specsByID[prefix + "preset"] { PresetMenu(spec: preset).frame(maxWidth: 360) }
                 if let v = model.specsByID[prefix + "volume"] { ParamKnob(spec: v, label: "Volume", size: 52) }
                 if let p = model.specsByID[prefix + "pan"] { ParamKnob(spec: p, label: "Pan", size: 52) }
                 Spacer()
             }
             let synthParams = model.specs(withPrefix: [prefix]).filter { HostedSynthControls.isSynthParam($0.id, prefix: prefix) }
-            DisclosureGroup("Synth parameters (\(synthParams.count)): every one is a mod-matrix target", isExpanded: $showParams) {
-                TextField("Filter", text: $filter).skinField().padding(.vertical, 4)
-                let matching = synthParams.filter {
-                    filter.isEmpty || $0.id.localizedCaseInsensitiveContains(filter) || $0.label.localizedCaseInsensitiveContains(filter)
-                }
-                if model.useKnobs {
-                    KnobGrid(specs: matching)
-                } else {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(matching, id: \.id) { ParamRow(spec: $0) }
-                    }
+            PluginParams(title: "Synth parameters", specs: synthParams, expanded: $showParams)
+            EffectsChain(config: config)
+        }
+    }
+
+    /// The plugin's own parameters, not the app's preset/level/mixer controls for it or its effects'.
+    static func isSynthParam(_ id: String, prefix: String) -> Bool {
+        let rest = id.dropFirst(prefix.count)
+        return !["preset", "volume", "pan", "eqLow", "eqMid", "eqMidFreq", "eqHigh", "sendReverb", "sendDelay", "mute", "solo", "bypass"].contains(rest)
+            && !isEffectParam(rest)
+    }
+
+    /// "fx2.mix": a param of the synth's second effect.
+    static func isEffectParam(_ rest: Substring) -> Bool {
+        guard rest.hasPrefix("fx"), let dot = rest.firstIndex(of: ".") else { return false }
+        let digits = rest[rest.index(rest.startIndex, offsetBy: 2)..<dot]
+        return !digits.isEmpty && digits.allSatisfy(\.isNumber)
+    }
+}
+
+/// A plugin's own parameters behind a disclosure, with a filter.
+struct PluginParams: View {
+    @Environment(AppModel.self) private var model
+    let title: String
+    let specs: [ParamSpec]
+    @Binding var expanded: Bool
+    @State private var filter = ""
+
+    var body: some View {
+        DisclosureGroup("\(title) (\(specs.count)): every one is a mod-matrix target", isExpanded: $expanded) {
+            TextField("Filter", text: $filter).skinField().padding(.vertical, 4)
+            let matching = specs.filter {
+                filter.isEmpty || $0.id.localizedCaseInsensitiveContains(filter) || $0.label.localizedCaseInsensitiveContains(filter)
+            }
+            if model.useKnobs {
+                KnobGrid(specs: matching)
+            } else {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(matching, id: \.id) { ParamRow(spec: $0) }
                 }
             }
         }
     }
+}
 
-    /// The plugin's own parameters, not the app's preset/level/mixer controls for it.
-    static func isSynthParam(_ id: String, prefix: String) -> Bool {
-        let rest = id.dropFirst(prefix.count)
-        return !["preset", "volume", "pan", "eqLow", "eqMid", "eqMidFreq", "eqHigh", "sendReverb", "sendDelay", "mute", "solo"].contains(rest)
-            && !rest.hasPrefix("fx")
+/// Audio Unit effects after a hosted synth, in order: each with bypass, preset, editor and its
+/// parameters; add, remove and reorder them (the sound reloads for a moment).
+struct EffectsChain: View {
+    @Environment(AppModel.self) private var model
+    let config: InstrumentConfig
+
+    var body: some View {
+        let chain = model.hostedInstruments.first { $0.id == config.id }?.effects ?? config.effects
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(chain.isEmpty ? "No effects" : "Effects, in order").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                Spacer()
+                Menu {
+                    ForEach(model.installedEffects, id: \.name) { e in
+                        Button("\(e.name) (\(e.maker))") { Task { await model.addEffect(e.name, to: config.id) } }
+                    }
+                } label: { Label("Add effect", systemImage: "plus") }
+                .fixedSize()
+                .help("Put an Audio Unit effect after this synth: delay, chorus, distortion, a filter… The sound reloads for a moment.")
+            }
+            .controlSize(.small)
+            ForEach(Array(chain.enumerated()), id: \.offset) { i, fx in
+                EffectRow(config: config, number: i + 1, effect: fx, last: i == chain.count - 1)
+            }
+        }
+        .padding(.top, 4)
+    }
+}
+
+struct EffectRow: View {
+    @Environment(AppModel.self) private var model
+    let config: InstrumentConfig
+    let number: Int
+    let effect: EffectConfig
+    let last: Bool
+    @State private var showParams = false
+
+    var body: some View {
+        let id = config.effectID(number), prefix = "au.\(id)."
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                if let bypass = model.specsByID[prefix + "bypass"] {
+                    // Lit = in use (the param is "bypass", so the light shows its opposite).
+                    let on = model.base(bypass.id) < 0.5
+                    Button { model.set(bypass.id, on ? 1 : 0) } label: {
+                        Circle().fill(on ? Color.green : Color.secondary.opacity(0.35)).frame(width: 10, height: 10)
+                            .shadow(color: on ? .green : .clear, radius: 3)
+                    }
+                    .buttonStyle(.plain).help(on ? "Bypass this effect" : "Use this effect")
+                }
+                Text("\(number). \(effect.component)").fontWeight(.medium)
+                if let preset = model.specsByID[prefix + "preset"] { PresetMenu(spec: preset).frame(maxWidth: 300) }
+                Spacer()
+                Button { Task { await model.moveEffect(number, by: -1, in: config.id) } } label: { Image(systemName: "arrow.up") }
+                    .disabled(number == 1).help("Earlier in the chain")
+                Button { Task { await model.moveEffect(number, by: 1, in: config.id) } } label: { Image(systemName: "arrow.down") }
+                    .disabled(last).help("Later in the chain")
+                if model.openingEditors.contains(id) { ProgressView().controlSize(.small) }
+                Button { model.openEditor(id) } label: { Label("Editor", systemImage: "macwindow") }
+                    .disabled(model.openingEditors.contains(id))
+                Button(role: .destructive) { Task { await model.removeEffect(number, from: config.id) } } label: { Image(systemName: "trash") }
+                    .help("Remove this effect")
+            }
+            .controlSize(.small)
+            let params = model.specs(withPrefix: [prefix]).filter { !["bypass", "preset"].contains($0.id.dropFirst(prefix.count)) }
+            if !params.isEmpty { PluginParams(title: "\(effect.component) parameters", specs: params, expanded: $showParams) }
+        }
+        .padding(8)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.05)))
     }
 }
 
@@ -203,5 +296,20 @@ struct DestinationMenu: View {
         destination == CoreMIDISink.virtualDestination || destination == CoreMIDISink.networkDestination
             || model.hostedInstruments.contains { $0.destination == destination }
             || model.midiDestinations.contains { $0.address == destination }
+    }
+}
+
+/// A plugin's factory presets as one compact menu.
+struct PresetMenu: View {
+    @Environment(AppModel.self) private var model
+    let spec: ParamSpec
+
+    var body: some View {
+        let options = spec.options.enumerated().map { (Double($0.offset), $0.element.trimmingCharacters(in: .whitespaces)) }
+        HStack(spacing: 6) {
+            Text("Preset").font(.caption).foregroundStyle(.secondary)
+            SkinPicker(selection: Binding(get: { model.base(spec.id) }, set: { model.set(spec.id, $0) }), options: options)
+        }
+        .help(spec.help)
     }
 }

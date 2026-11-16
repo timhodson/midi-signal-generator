@@ -42,6 +42,7 @@ USAGE: msg-spike [options]
   --list-params               Print every tunable parameter and exit.
   --list-destinations         Print MIDI destinations on this Mac and exit.
   --list-instruments          Print Audio Unit instruments on this Mac and exit.
+  --list-effects              Print Audio Unit effects on this Mac (for an instrument's "effects") and exit.
   --list-options <param>      Print every option of a choice param (e.g. au.pad.preset).
   --dump-scene                Print the effective scene as JSON and exit.
   -h, --help                  Show this help.
@@ -57,6 +58,7 @@ struct Options {
     var dest: String?
     var au: [(role: String, component: String, preset: String?)] = []
     var listInstruments = false
+    var listEffects = false
     var listOptions: String?
     var networkSession = false
     var dryRun = false
@@ -108,6 +110,7 @@ func parse(_ args: [String]) -> Options {
             let parts = kv[1].split(separator: "@", maxSplits: 1).map(String.init)
             o.au.append((kv[0], parts[0], parts.count > 1 ? parts[1] : nil))
         case "--list-instruments": o.listInstruments = true
+        case "--list-effects": o.listEffects = true
         case "--list-options": o.listOptions = value(a)
         case "--network-session": o.networkSession = true
         case "--dry-run": o.dryRun = true
@@ -147,6 +150,12 @@ for (id, value) in options.sets { scene.params[id] = value }
 if options.listInstruments {
     print("Audio Unit instruments on this Mac (use with --au or a scene's \"instruments\"):")
     for c in AUHostSink.availableInstruments() { print("  \(c.manufacturerName): \(c.name)") }
+    exit(0)
+}
+
+if options.listEffects {
+    print("Audio Unit effects on this Mac (use in an instrument's \"effects\": [{\"component\": …}]):")
+    for c in AUHostSink.availableEffects() { print("  \(c.manufacturerName): \(c.name)") }
     exit(0)
 }
 
