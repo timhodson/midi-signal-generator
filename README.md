@@ -11,6 +11,14 @@ and pad brightness. The network's "mood" (quiet / calm / busy / focused) picks t
 progression, and a flurry of apps waking at once triggers a cadence. **Every musical decision
 is a tunable parameter**, from raw sonification to tidy ambient music.
 
+## Demo
+
+A two-minute tour of the app (with sound): the Overview, signal flow, harmony and chords from
+songs, styles and variations, motifs, quantise, voices and the mixer. It plays the synthetic
+source, so no real traffic is shown.
+
+https://github.com/user-attachments/assets/8874b810-d624-404b-842b-c3bc740cb017
+
 ## Download
 
 Builds for Apple silicon Macs (macOS 15 or later) are on the
