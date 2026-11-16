@@ -227,6 +227,9 @@ public final class Session: @unchecked Sendable {
         engine.queue.sync { coreMIDI?.connectedDestinations() ?? [:] }
     }
 
+    /// Pause or resume the music, from any thread. Everything stays loaded.
+    public func setPaused(_ on: Bool) { engine.queue.async { [engine] in engine.setPaused(on) } }
+
     /// Vary the piece at the next chord change, from any thread.
     public func randomise() { engine.queue.async { [engine] in engine.randomiseNow() } }
 

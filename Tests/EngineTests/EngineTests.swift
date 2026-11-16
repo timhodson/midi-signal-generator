@@ -361,3 +361,35 @@ import Router
         #expect(withFX.effectID(1) == "j6.fx1")
     }
 }
+
+@Suite struct PauseTests {
+    @Test func pauseHoldsTheMusicAndPlayCarriesOn() throws {
+        final class Lines: @unchecked Sendable { var all: [String] = [] }
+        let lines = Lines()
+        let engine = try Engine(scene: .default, sink: PrintSink { lines.all.append($0) }) // sink runs on the engine queue
+        engine.log = { _ in }
+        try engine.start()
+        defer { engine.stop() }
+        Thread.sleep(forTimeInterval: 1)
+        #expect(engine.queue.sync { lines.all.contains { $0.hasPrefix("on ") } })   // the first chord sounded
+
+        engine.queue.sync { engine.setPaused(true) }
+        Thread.sleep(forTimeInterval: 0.3)
+        let (beat, offs) = engine.queue.sync { () -> (Double, Bool) in
+            let b = engine.currentBeat
+            let released = lines.all.contains { $0.hasPrefix("off ") }
+            lines.all = []
+            return (b, released)
+        }
+        #expect(offs)                                                     // pausing released what was sounding
+        Thread.sleep(forTimeInterval: 1.2)
+        engine.queue.sync {
+            #expect(!lines.all.contains { $0.hasPrefix("on ") })          // nothing new while paused
+            #expect(abs(engine.currentBeat - beat) < 0.01)               // and the beat stood still
+        }
+
+        engine.queue.sync { engine.setPaused(false) }
+        Thread.sleep(forTimeInterval: 0.6)
+        #expect(engine.queue.sync { lines.all.contains { $0.hasPrefix("on ") } }) // the chord again, straight away
+    }
+}

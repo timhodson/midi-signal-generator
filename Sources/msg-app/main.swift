@@ -158,6 +158,12 @@ enum Snapshot {
                          to: directory.appendingPathComponent("song-picker.png"), size: NSSize(width: 1040, height: 700))
             await render(DrumsCard().environment(model).frame(width: 1100).padding(20),
                          to: directory.appendingPathComponent("drums.png"), size: NSSize(width: 1140, height: 900))
+            await render(PlayControls().environment(model).padding(12).skinnedPage(model.skin),
+                         to: directory.appendingPathComponent("play-controls.png"), size: NSSize(width: 560, height: 60))
+            await model.playPause()
+            try? await Task.sleep(for: .milliseconds(400))
+            await render(PlayControls().environment(model).padding(12).skinnedPage(model.skin),
+                         to: directory.appendingPathComponent("play-controls-paused.png"), size: NSSize(width: 560, height: 60))
             model.stop()
             exit(0)
         }

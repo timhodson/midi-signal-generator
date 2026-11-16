@@ -51,10 +51,9 @@ struct TransportBar: View {
         HStack(spacing: 12) {
             if model.isRunning {
                 Button { model.stop() } label: { Label("Stop", systemImage: "stop.fill") }
-                    .keyboardShortcut(".", modifiers: .command)
+                    .help("Stop and unload everything (hosted synths too). Every setting is kept for the next Start. To hold the music without unloading, use Pause at the top of the window.")
             } else {
                 Button { Task { await model.start() } } label: { Label("Start", systemImage: "play.fill") }
-                    .keyboardShortcut(.return, modifiers: .command)
                     .disabled(model.isStarting)
                     .skinProminent(.green)
             }
@@ -314,5 +313,44 @@ struct RecentNotes: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// The middle of the toolbar: play/pause, randomise, and what's playing. Pause holds the music
+/// with everything still loaded; Stop (on the Overview) unloads the session.
+struct PlayControls: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.skin) private var skin
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button { Task { await model.playPause() } } label: {
+                Image(systemName: !model.isRunning || model.paused ? "play.fill" : "pause.fill").frame(width: 22)
+            }
+            .keyboardShortcut(.return, modifiers: .command)
+            .disabled(model.isStarting)
+            .help(!model.isRunning ? "Start (⌘↩)" : model.paused ? "Play (⌘↩)" : "Pause (⌘↩): the music holds, everything stays loaded")
+            Button { model.randomise() } label: { Image(systemName: "dice").frame(width: 22) }
+                .disabled(!model.isRunning)
+                .help("Randomise: vary the piece at the next chord (key, scale, progressions, motifs…) by the deviation set on the Variation page")
+            Button { model.stop() } label: { Image(systemName: "stop.fill").frame(width: 22) }
+                .keyboardShortcut(".", modifiers: .command)
+                .disabled(!model.isRunning)
+                .help("Stop (⌘.): unload everything, hosted synths too. Settings are kept for the next start.")
+            Text(readout).font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundStyle(model.paused ? .orange : .secondary)
+                .lineLimit(1).frame(minWidth: 180, alignment: .leading)
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(RoundedRectangle(cornerRadius: 4).fill(Color.black.opacity(skin == .studio ? 0.45 : 0.08)))
+        }
+        .controlSize(.regular)
+    }
+
+    private var readout: String {
+        if model.isStarting { return "starting…" }
+        guard model.isRunning, let s = model.status else { return "stopped" }
+        if model.paused { return "paused · \(s.chordHistory.last?.name ?? "") · \(Int(s.bpm.rounded())) bpm" }
+        let bar = Int(s.beat / 4) + 1, beat = Int(s.beat.truncatingRemainder(dividingBy: 4)) + 1
+        return "\(bar).\(beat) · \(s.key) · \(s.chordHistory.last?.name ?? "") · \(Int(s.bpm.rounded())) bpm"
     }
 }

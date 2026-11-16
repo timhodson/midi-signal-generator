@@ -145,6 +145,7 @@ final class AppModel {
             }
             try s.start()
             session = s
+            paused = false
             if !visualsActive { s.setStatusInterval(1.0) }
         } catch {
             self.error = "\(error)"
@@ -261,6 +262,16 @@ final class AppModel {
     }
 
     func randomise() { session?.randomise() }
+
+    /// Paused: the music holds, but the session (hosted synths, settings, signals) stays loaded.
+    private(set) var paused = false
+
+    /// Play / pause; starts the session first if it isn't running.
+    func playPause() async {
+        guard isRunning else { await start(); return }
+        paused.toggle()
+        session?.setPaused(paused)
+    }
     func returnHome() { session?.returnHome() }
     func makeHome() { session?.makeHome() }
     func restartClock() { session?.restartClock() }

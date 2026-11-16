@@ -47,6 +47,10 @@ public final class Engine: @unchecked Sendable {
     private var seenAppVersion = 0
     private var lastStatus: Double = 0
     private var firstTick = true
+    /// Paused: the music holds (no notes, the clock stands still, MIDI clock sends Stop) while
+    /// everything stays loaded and settings, signals and the mixer keep working.
+    public private(set) var paused = false
+    private var pauseApplied = false
     private var lastPublish: Double = 0
     private var recentNotes: [EngineStatus.PlayedNote] = []
     private var noteCounter = 0
@@ -182,6 +186,10 @@ public final class Engine: @unchecked Sendable {
         // Look ahead: generators work on the musical time slightly in the future so the
         // scheduler holds notes before they're due.
         let horizon = t + Self.lookahead
+        if paused {
+            holdWhilePaused(t: t, horizon: horizon)
+            return
+        }
         let beats = clock.advance(to: horizon, bpm: params.value("clock.bpm"))
         tickClock(beats)
 
@@ -455,6 +463,40 @@ extension Engine {
         for m in messages { sink.sendRaw(destination: m.destination, m.bytes, atUptimeNanos: m.time.map(uptime)) }
     }
 
+    /// The musical position now, in beats. Call on `queue`.
+    public var currentBeat: Double { clock.beat }
+
+    /// Pause or resume the music. Call on `queue`.
+    public func setPaused(_ on: Bool) {
+        guard on != paused else { return }
+        paused = on
+        pauseApplied = false
+        if !on {
+            firstTick = true // strike the chord again straight away
+            log("▶︎ playing")
+        } else {
+            log("⏸ paused")
+        }
+    }
+
+    /// One tick while paused: release everything once, keep signals and the status flowing.
+    private func holdWhilePaused(t: Double, horizon: Double) {
+        if !pauseApplied {
+            pauseApplied = true
+            scheduler.panic()
+            send(clockOut.stopAll())
+            sink.transport(TransportState(bpm: clock.bpm, beat: clock.beat, uptimeNanos: uptime(now),
+                                          beatsPerBar: clock.beatsPerBar, playing: false))
+        }
+        clock.hold(at: horizon)
+        _ = bus.drainEvents()
+        let total = bus.value("net.total.bytesPerSec") ?? 0
+        if let onStatus, t - lastPublish >= statusInterval {
+            lastPublish = t
+            onStatus(status(at: t, harmony: conductor.harmony(params), total: total))
+        }
+    }
+
     /// Send Stop, then Start again on the next bar line, to every clocked destination. Call on `queue`.
     public func restartClock() { send(clockOut.restart()) }
 
@@ -467,7 +509,7 @@ extension Engine {
             .map { EngineStatus.AppRate(app: $0.key, bytesPerSecond: $0.value) }
         var values: [String: Double] = [:]
         for id in params.order { values[id] = params.value(id) }
-        return EngineStatus(
+        var status = EngineStatus(
             time: t, beat: clock.beat, bpm: clock.bpm, mood: conductor.mood.rawValue,
             chordDegree: harmony.chordDegree,
             chord: harmony.chordDegrees.map { harmony.pitchName(harmony.note(degree: $0)) },
@@ -497,6 +539,8 @@ extension Engine {
             clock: .init(destinations: clockOut.targets.sorted(), started: clockOut.started.sorted()),
             style: .init(applied: appliedStyle, pending: styleRequested || params.int("style.name") != appliedStyle)
         )
+        status.paused = paused
+        return status
     }
 }
 

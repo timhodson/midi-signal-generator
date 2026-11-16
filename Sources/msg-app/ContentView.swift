@@ -64,11 +64,9 @@ struct ContentView: View {
             detail(selection).skinnedPage(model.skin)
         }
         .toolbar {
+            ToolbarItem(placement: .principal) { PlayControls() }
             ToolbarItemGroup {
                 @Bindable var model = model
-                Button { model.randomise() } label: { Label("Randomise", systemImage: "dice") }
-                    .help("Vary the piece now (key, scale, progressions, motifs…) by the deviation set on the Variation page")
-                    .disabled(!model.isRunning)
                 Picker("Skin", selection: $model.skin) {
                     ForEach(SkinStyle.allCases) { Text($0.rawValue).tag($0) }
                 }

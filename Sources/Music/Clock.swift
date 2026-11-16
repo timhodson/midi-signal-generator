@@ -21,6 +21,12 @@ public struct MusicalClock: Sendable {
         return from..<beat
     }
 
+    /// Stand still at `now`: time moves on, the beat doesn't (while paused). The next `advance`
+    /// carries on from the same beat.
+    public mutating func hold(at now: Double) {
+        if time != 0 { time = now }
+    }
+
     /// Engine time at which a (future or recent) beat position occurs, assuming current tempo.
     public func time(ofBeat b: Double) -> Double {
         time + (b - beat) * secondsPerBeat

@@ -56,6 +56,8 @@ public struct EngineStatus: Sendable {
         public var pitchClasses: [Int]
     }
 
+    /// The music is paused (the session stays loaded).
+    public var paused = false
     public var time: Double
     public var beat: Double
     public var bpm: Double
