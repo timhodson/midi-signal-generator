@@ -40,6 +40,12 @@ MainActor.assumeIsolated {
         Snapshot.run(model: model, directory: URL(fileURLWithPath: dir), seconds: Double(arg("--seconds") ?? "") ?? 8,
                      height: Double(arg("--height") ?? "") ?? 860)
     } else {
+        // No scene asked for: carry on with the one saved last.
+        if arg("--scene") == nil, let last = AppModel.lastSavedScene, let loaded = try? Scene.load(last) {
+            model.scene = loaded
+            model.sceneURL = last
+        }
+        if let url = model.sceneURL { model.noteRecent(url) }
         MSGApp.initialModel = model
         MSGApp.main()
     }
@@ -62,6 +68,16 @@ struct MSGApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("Open Scene…") { Task { await model.openScene() } }.keyboardShortcut("o")
+                Menu("Open Recent") {
+                    ForEach(model.recentScenes, id: \.self) { url in
+                        Button(url.deletingPathExtension().lastPathComponent) { Task { await model.openScene(url) } }
+                    }
+                    if !model.recentScenes.isEmpty {
+                        Divider()
+                        Button("Clear Menu") { model.clearRecent() }
+                    }
+                }
+                .disabled(model.recentScenes.isEmpty)
                 Button("Save Scene") { model.saveSceneAsking() }.keyboardShortcut("s")
                 Button("Save Scene As…") { model.saveScene() }.keyboardShortcut("s", modifiers: [.command, .shift])
             }

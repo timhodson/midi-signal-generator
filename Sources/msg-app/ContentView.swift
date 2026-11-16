@@ -80,8 +80,12 @@ struct ContentView: View {
                 .help("Show continuous settings as knobs or as sliders with inline explanations")
                 Toggle(isOn: $model.showExplanations) { Label("Explanations", systemImage: "text.bubble") }
                     .help("Show what each setting does under its control")
-                Button { Task { await model.openScene() } } label: { Label("Open Scene", systemImage: "folder") }
-                    .help("Open a scene (JSON)")
+                Menu {
+                    ForEach(model.recentScenes, id: \.self) { url in
+                        Button(url.deletingPathExtension().lastPathComponent) { Task { await model.openScene(url) } }
+                    }
+                } label: { Label("Open Scene", systemImage: "folder") } primaryAction: { Task { await model.openScene() } }
+                    .help("Open a scene (JSON); the arrow lists recent scenes")
                 Button { model.saveSceneAsking() } label: { Label("Save Scene", systemImage: "square.and.arrow.down") }
                     .help("Save the current scene, including every tweak")
             }

@@ -443,16 +443,57 @@ final class AppModel {
     func openScene() async {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.json]
-        panel.directoryURL = Self.scenesDirectory
+        panel.directoryURL = Self.lastSavedScene?.deletingLastPathComponent() ?? Self.scenesDirectory
         guard panel.runModal() == .OK, let url = panel.url else { return }
+        await openScene(url)
+    }
+
+    func openScene(_ url: URL) async {
         do {
             let loaded = try Scene.load(url)
             let wasRunning = isRunning
             stop()
             scene = loaded
             sceneURL = url
+            noteRecent(url)
             if wasRunning { await start() }
-        } catch { self.error = "Could not open \(url.lastPathComponent): \(error)" }
+        } catch {
+            self.error = "Could not open \(url.lastPathComponent): \(error)"
+            if !FileManager.default.fileExists(atPath: url.path) { forgetRecent(url) }
+        }
+    }
+
+    // MARK: Recent scenes
+
+    /// Scenes opened or saved, newest first (kept on this Mac only).
+    private(set) var recentScenes: [URL] = AppModel.loadRecent()
+    private static let recentKey = "scenes.recent"
+    private static let lastSavedKey = "scenes.lastSaved"
+
+    /// The scene saved most recently, if it's still there: the app opens it at launch.
+    static var lastSavedScene: URL? {
+        guard let path = UserDefaults.standard.string(forKey: lastSavedKey), FileManager.default.fileExists(atPath: path) else { return nil }
+        return URL(fileURLWithPath: path)
+    }
+
+    func noteRecent(_ url: URL) {
+        recentScenes = [url] + recentScenes.filter { $0.standardizedFileURL != url.standardizedFileURL }
+        recentScenes = Array(recentScenes.prefix(10))
+        UserDefaults.standard.set(recentScenes.map(\.path), forKey: Self.recentKey)
+    }
+
+    func forgetRecent(_ url: URL) {
+        recentScenes.removeAll { $0.standardizedFileURL == url.standardizedFileURL }
+        UserDefaults.standard.set(recentScenes.map(\.path), forKey: Self.recentKey)
+    }
+
+    func clearRecent() {
+        recentScenes = []
+        UserDefaults.standard.removeObject(forKey: Self.recentKey)
+    }
+
+    private static func loadRecent() -> [URL] {
+        (UserDefaults.standard.stringArray(forKey: recentKey) ?? []).map { URL(fileURLWithPath: $0) }
     }
 
     func saveScene(askForLocation: Bool = true) {
@@ -461,7 +502,7 @@ final class AppModel {
         if askForLocation || url == nil {
             let panel = NSSavePanel()
             panel.allowedContentTypes = [.json]
-            panel.directoryURL = Self.scenesDirectory
+            panel.directoryURL = sceneURL?.deletingLastPathComponent() ?? Self.lastSavedScene?.deletingLastPathComponent() ?? Self.scenesDirectory
             panel.nameFieldStringValue = Self.suggestedName(for: sceneURL)
             guard panel.runModal() == .OK, let chosen = panel.url else { return }
             url = chosen
@@ -471,6 +512,8 @@ final class AppModel {
             try current.encoded().write(to: url)
             sceneURL = url
             scene = current
+            noteRecent(url)
+            UserDefaults.standard.set(url.path, forKey: Self.lastSavedKey)
         } catch { self.error = "Could not save: \(error)" }
     }
 
