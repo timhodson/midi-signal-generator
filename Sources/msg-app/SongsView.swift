@@ -61,8 +61,6 @@ struct SongPicker: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Text("Use for").foregroundStyle(.secondary)
-            SkinPicker(selection: $mood, options: Self.moods.map { ($0, $0.capitalized) }).frame(width: 130)
         }
         .padding(14)
     }
@@ -147,10 +145,7 @@ struct SongPicker: View {
                 Text(summary(fit, in: "\(ScaleCatalogue.rootNames[t.root]) \(ScaleCatalogue.names[t.scale])"))
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
-                Button { apply(fit, scale: t.scale, root: t.root, label: "\(song.title) (\(section.name))") } label: {
-                    Label("Use for \(mood.capitalized)", systemImage: "arrow.down.to.line")
-                }
-                .controlSize(.small)
+                useButton { apply(fit, scale: t.scale, root: t.root, label: "\(song.title) (\(section.name))") }
             }
         }
     }
@@ -200,15 +195,23 @@ struct SongPicker: View {
                 HStack {
                     Text(summary(fit, in: "\(ScaleCatalogue.rootNames[root]) \(ScaleCatalogue.names[scale])")).font(.caption).foregroundStyle(.secondary)
                     Spacer()
-                    Button { apply(fit, scale: scale, root: root, label: typed) } label: {
-                        Label("Use for \(mood.capitalized)", systemImage: "arrow.down.to.line")
-                    }
-                    .controlSize(.small)
+                    useButton { apply(fit, scale: scale, root: root, label: typed) }
                 }
             } else if !typed.trimmingCharacters(in: .whitespaces).isEmpty {
                 Text("Couldn't read that: use chord names like C, Am, F♯m, B♭7, Ddim.").font(.caption).foregroundStyle(.orange)
             }
         }
+    }
+
+    /// "Use for [Calm ▾]": the mood (threshold) to apply to, right by the button. One choice
+    /// shared by every section, so picking a mood once carries on to the next song.
+    private func useButton(_ action: @escaping () -> Void) -> some View {
+        HStack(spacing: 6) {
+            Button(action: action) { Label("Use for", systemImage: "arrow.down.to.line") }
+            SkinPicker(selection: $mood, options: Self.moods.map { ($0, $0.capitalized) }).frame(width: 110)
+        }
+        .controlSize(.small)
+        .help("Replace this mood's chord progression with these chords. Quiet, Calm, Busy and Focused are the traffic thresholds on the Mood bar.")
     }
 
     private func apply(_ fit: FittedProgression, scale: Int, root: Int, label: String) {
