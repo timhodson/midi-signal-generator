@@ -22,7 +22,7 @@ enum SidebarItem: String, CaseIterable, Identifiable, Hashable {
         ("At a glance", [.overview, .flow, .tabletop]),
         ("Signals", [.modulation, .harmony]),
         ("Music", [.style, .generators, .motifs, .quantise, .variation]),
-        ("Sound", [.voices, .instruments, .mixer]),
+        ("Sound", [.voices, .mixer]),
     ]
 
     var icon: String {

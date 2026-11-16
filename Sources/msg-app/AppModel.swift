@@ -328,10 +328,13 @@ final class AppModel {
     }
 
     /// Send a voice somewhere else: live if running, and into the scene either way.
-    func setDestination(_ role: String, _ destination: String) {
-        guard let i = scene.voices.firstIndex(where: { $0.role == role }), scene.voices[i].destination != destination else { return }
-        scene.voices[i].destination = destination
-        session?.setDestination(role, destination)
+    /// `layer` 0 is the voice's main sound, 1… its layers.
+    func setDestination(_ role: String, _ destination: String, layer: Int = 0) {
+        guard let i = scene.voices.firstIndex(where: { $0.role == role }), self.destination(of: role, layer: layer) != destination else { return }
+        if layer == 0 { scene.voices[i].destination = destination }
+        else if scene.voices[i].layers.indices.contains(layer - 1) { scene.voices[i].layers[layer - 1].destination = destination }
+        else { return }
+        session?.setDestination(role, destination, layer: layer)
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(300))
             self.refreshDestinations()

@@ -20,7 +20,7 @@ struct DestinationPicker: View {
                     Label(Self.label(current, model: model), systemImage: Self.icon(current, model: model))
                 }
                 .frame(maxWidth: 360, alignment: .leading)
-                StatusText(destination: current)
+                DestinationStatus(destination: current)
                 Spacer()
                 Button("Bluetooth MIDI…") { model.showBluetoothMIDI() }
                     .help("Opens macOS's Bluetooth MIDI panel to find, pair and connect devices (an iPad running a synth, a BLE MIDI controller). Once connected they appear in the menu.")
@@ -84,7 +84,7 @@ struct DestinationPicker: View {
         case CoreMIDISink.networkDestination: return "Network session"
         default:
             if let inst = model.hostedInstruments.first(where: { $0.destination == destination }) {
-                return "\(inst.component) (hosted)"
+                return model.instrumentLabel(inst.id)
             }
             return destination
         }
@@ -105,7 +105,7 @@ struct DestinationPicker: View {
 }
 
 /// Connected, waiting for the device, or what to do.
-private struct StatusText: View {
+struct DestinationStatus: View {
     @Environment(AppModel.self) private var model
     let destination: String
 

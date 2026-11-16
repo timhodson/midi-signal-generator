@@ -111,9 +111,9 @@ struct ChannelStrip: View {
 
     var body: some View {
         let p = "au.\(instrument.id)"
-        let roles = model.scene.voices.filter { $0.destination == instrument.destination }.map(\.role)
+        let roles = model.users(ofInstrument: instrument.id)
         let color = roles.first.map { RoleStyle.color($0) } ?? .accentColor
-        StripFrame(title: instrument.id, subtitle: "\(instrument.component)\(roles.isEmpty ? "" : " · " + roles.joined(separator: ", "))", color: color) {
+        StripFrame(title: roles.first ?? instrument.id, subtitle: model.instrumentLabel(instrument.id), color: color) {
             SectionLegend(text: "EQ")
             Knob(id: "\(p).eqHigh", label: "High", color: color)
             HStack(spacing: 2) {

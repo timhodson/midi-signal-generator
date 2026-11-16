@@ -59,6 +59,8 @@ enum Panels {
 
     static func specs(_ panel: PanelID, model: AppModel) -> [ParamSpec] {
         model.specs(withPrefix: panel.page.prefixes).filter { groupKey($0.id, component: panel.page.groupComponent) == panel.group }
+            // A voice's layers have their own cards (VoiceSounds).
+            .filter { panel.page != .voices || !$0.id.contains(".layer") }
     }
 
     static func title(_ panel: PanelID) -> String {
@@ -66,6 +68,14 @@ enum Panels {
         case .voices: "\(panel.group.capitalized) voice"
         case .instruments: panel.group
         case .generators: ParamSection.title(panel.group)
+        }
+    }
+
+    /// Like `title`, but a hosted synth is named by what it is now: "King of FM 2 · Rock Organ".
+    static func title(_ panel: PanelID, model: AppModel) -> String {
+        switch panel.page {
+        case .instruments: model.instrumentLabel(panel.group)
+        default: title(panel)
         }
     }
 
@@ -124,8 +134,9 @@ enum Panels {
             let roles = model.scene.voices.filter { $0.destination == InstrumentConfig.destinationPrefix + id }.map(\.role)
             let peak = Double(model.mixLevels()[id] ?? 0)
             let level = peak > 0.001 ? String(format: " · %.0f dB", 20 * log10(peak)) : ""
-            return ["\(inst?.component ?? id)\(preset.map { " · \($0)" } ?? "")",
-                    (roles.isEmpty ? "plays no voices" : "plays " + roles.joined(separator: ", ")) + level]
+            _ = (inst, preset, roles)
+            let users = model.users(ofInstrument: id)
+            return [model.instrumentLabel(id), (users.isEmpty ? "plays no voices" : "plays " + users.joined(separator: ", ")) + level]
         case (.generators, "activity"):
             let recent = s.apps.filter { ($0.lastWake ?? -.infinity) > now - 60 }.count
             return ["Wakes above \(Format.rate(model.effective("activity.threshold")))", "\(recent) app\(recent == 1 ? "" : "s") woke in the last minute"]
@@ -139,7 +150,8 @@ enum Panels {
             return [live ? "Capturing · \(Int(s.capture?.packetsPerSecond ?? 0)) packets/s" : model.packetCapture ? "Not capturing" : "Off for this session",
                     last.map { "\(EventFeed.kindLabel($0)) \($0.name)" + ($0.played ? "" : " (skipped)") } ?? "No events yet"]
         case (.voices, let role):
-            let dest = DestinationPicker.label(model.destination(of: role), model: model)
+            let layers = model.voice(role)?.layers.count ?? 0
+            let dest = DestinationPicker.label(model.destination(of: role), model: model) + (layers == 0 ? "" : " + \(layers) layer\(layers == 1 ? "" : "s")")
             let sounding = s.recentNotes.filter { $0.role == role && $0.time <= now && now < $0.time + $0.duration }.count
             return [dest, "ch \(Int(model.base("voice.\(role).channel"))) · \(Format.note(Int(model.base("voice.\(role).low"))))–\(Format.note(Int(model.base("voice.\(role).high")))) · \(sounding) sounding"]
         default:
@@ -213,9 +225,9 @@ struct PanelHeader: View {
         HStack(spacing: 10) {
             RoundedRectangle(cornerRadius: 2).fill(Panels.color(panel, model: model)).frame(width: 12, height: 12)
             if skin == .studio {
-                Text(Panels.title(panel).uppercased()).font(Studio.legend(15, weight: .bold)).tracking(1.5)
+                Text(Panels.title(panel, model: model).uppercased()).font(Studio.legend(15, weight: .bold)).tracking(1.5)
             } else {
-                Text(Panels.title(panel)).font(.title3.weight(.semibold))
+                Text(Panels.title(panel, model: model)).font(.title3.weight(.semibold))
             }
             Spacer()
             PinButton(panel: panel)
@@ -271,7 +283,7 @@ struct TilePage: View {
                 let matching = filter.isEmpty ? groups : groups.filter { g in
                     !Panels.specs(PanelID(page: page, group: g), model: model).filter {
                         $0.id.localizedCaseInsensitiveContains(filter) || $0.help.localizedCaseInsensitiveContains(filter)
-                    }.isEmpty || Panels.title(PanelID(page: page, group: g)).localizedCaseInsensitiveContains(filter)
+                    }.isEmpty || Panels.title(PanelID(page: page, group: g), model: model).localizedCaseInsensitiveContains(filter)
                 }
                 let open = groups.contains(expanded) ? expanded : nil
                 VStack(spacing: 0) {
@@ -341,9 +353,9 @@ struct PanelTile: View {
                 .buttonStyle(.plain).disabled(state == nil)
                 .help(state == nil ? "" : panel.page == .instruments ? (on ? "Mute in the mixer" : "Unmute") : on ? "Switch off" : "Switch on")
                 if skin == .studio {
-                    Text(Panels.title(panel).uppercased()).font(Studio.legend(compact ? 11 : 12, weight: .bold)).tracking(1).lineLimit(1)
+                    Text(Panels.title(panel, model: model).uppercased()).font(Studio.legend(compact ? 11 : 12, weight: .bold)).tracking(1).lineLimit(1)
                 } else {
-                    Text(Panels.title(panel)).font(compact ? .subheadline.weight(.semibold) : .headline).lineLimit(1)
+                    Text(Panels.title(panel, model: model)).font(compact ? .subheadline.weight(.semibold) : .headline).lineLimit(1)
                 }
                 Spacer(minLength: 4)
                 PinButton(panel: panel)
@@ -433,7 +445,7 @@ struct PanelWindow: View {
         }
         .frame(minWidth: 520, minHeight: 360)
         .skinnedPage(model.skin, shade: 0.35)
-        .navigationTitle(Panels.title(panel))
+        .navigationTitle(Panels.title(panel, model: model))
     }
 }
 
@@ -524,9 +536,9 @@ struct AddToTabletopMenu: View {
                             let panel = PanelID(page: page, group: g)
                             Button { model.togglePin(panel) } label: {
                                 if model.pinned.contains(panel) {
-                                    Label(Panels.title(panel), systemImage: "checkmark")
+                                    Label(Panels.title(panel, model: model), systemImage: "checkmark")
                                 } else {
-                                    Text(Panels.title(panel))
+                                    Text(Panels.title(panel, model: model))
                                 }
                             }
                         }
