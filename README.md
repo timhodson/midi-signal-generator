@@ -17,7 +17,7 @@ A two-minute tour of the app (with sound): the Overview, signal flow, harmony an
 songs, styles and variations, motifs, quantise, voices and the mixer. It plays the synthetic
 source, so no real traffic is shown.
 
-https://github.com/user-attachments/assets/c61a0bed-9eb0-4b85-97c6-81427663d08a
+https://github.com/user-attachments/assets/fccfa971-47e4-448b-a41b-853d7b650748
 
 ## Download
 
